@@ -5,18 +5,18 @@ from pathlib import Path
 
 import cv2
 import numpy
-from PyQt5.QtGui import QImage, QPixmap
 
-from split_image import SplitImage
 from utils import (FRAME_HEIGHT, FRAME_WIDTH, LAST_IMAGE_DIR,
                    OPEN_SCREENSHOT_ON_CAPTURE)
 
 
 class Capture:
     cap: cv2.VideoCapture
+    most_recent_frame: numpy.ndarray
 
     def __init__(self) -> None:
         self.__set_capture()
+        self.most_recent_frame = None
 
     def __set_capture(self) -> bool:
         self.cap = cv2.VideoCapture(0)
@@ -39,24 +39,11 @@ class Capture:
             else:
                 subprocess.call(["xdg-open", screenshot_path])
 
-    def __get_raw_frame(self) -> numpy.ndarray:
+    def get_raw_frame(self) -> numpy.ndarray:
         frame = self.cap.read()[1]
+        if (frame == self.most_recent_frame).all():
+            return None
+        
+        self.most_recent_frame = frame
         frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_AREA)
         return frame
-
-    def get_frame_for_comparison(self, split_image: SplitImage) -> numpy.ndarray:
-        frame = self.__get_raw_frame()
-        processed_frame = cv2.matchTemplate(
-            frame,
-            split_image.ndarray[:,:,0:3],
-            cv2.TM_CCORR_NORMED,
-            mask=split_image.alpha
-        )
-        return processed_frame
-
-    def get_frame_for_video_feed(self):
-        frame = self.__get_raw_frame()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
-        frame_pixmap = QPixmap.fromImage(frame_img)
-        return frame_pixmap
