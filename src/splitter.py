@@ -1,47 +1,41 @@
 import glob
 import pathlib
-import time
 
 import cv2
 import numpy
-
-from PyQt5.QtCore import QObject, pyqtSignal, QRunnable, pyqtSlot
+import pyautogui
+from PyQt5.QtCore import QObject, QRunnable, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QPixmap
 
-from capture import Capture
 from split_image import SplitImage
-from utils import DEFAULT_FPS
+from utils import PAUSE_KEY, SPLIT_KEY
 
 
 class Splitter(QObject):
-    video_feed_frame_signal = pyqtSignal(QPixmap)
-    match_percent_signal = pyqtSignal(str)
+    match_percent_signal = pyqtSignal(float)
+    blank_match_percent_signal = pyqtSignal()
+    send_to_splitter_signal = pyqtSignal(bool)
+    pause_after_split_signal = pyqtSignal(float)
     update_split_image_signal = pyqtSignal(QPixmap)
 
-    video_source: cv2.VideoCapture
     split_image: SplitImage
     image_dir: str
     image_list: list
     image_list_index: int
     current_loop_count: float
-    fps: int
     
     def __init__(self, image_dir: str):
         super().__init__()
-        self.video_source = Capture()
         self.split_image = None
         self.image_dir = image_dir
-
+        self.current_loop_count = 0
         self.image_list = []
-        self.splits_active = False
+        self.below_flag = False
+        self.dummy_flag = False
+        self.pause_flag = False
+        self.went_below_threshold_flag = False
         for image in self.get_split_image_paths():
             self.image_list += [SplitImage(image)]
-        if self.image_list:
-            self.splits_active = True
-
-        self.image_list_index = 0
-        self.current_loop_count = 0
-        self.fps = DEFAULT_FPS
 
     def get_split_image_paths(self):
         if not pathlib.Path(self.image_dir).is_dir():
@@ -53,119 +47,71 @@ class Splitter(QObject):
         )
         
     def set_splits_to_initial_state(self):
-        self.image_list_index = 0
-        self.go_to_next_split()
+        self.image_list_index = -1
+        if self.image_list:
+            self.go_to_next_split()
+        else:
+            self.blank_match_percent_signal.emit()
+            self.send_to_splitter_signal.emit(False)
 
     def go_to_next_split(self):
-        self.split_image = self.image_list[self.image_list_index]
-        self.current_loop_count = self.split_image.loop_count
-        self.update_split_image_signal.emit(self.split_image.image_for_gui)
-    
-    def get_comparison_frame(self, split_image: SplitImage, frame: numpy.ndarray) -> numpy.ndarray:
+        self.went_below_threshold_flag = False
+
+        if self.current_loop_count == 0:
+            self.image_list_index += 1
+            if self.image_list_index == len(self.image_list):
+                self.image_list_index = 0
+            self.split_image = self.image_list[self.image_list_index]
+            self.current_loop_count = self.split_image.loop_count
+            self.update_split_image_signal.emit(self.split_image.pixmap)
+
+            if "b" in self.split_image.flags:
+                self.below_flag = True
+            else:
+                self.below_flag = False
+
+            if "d" in self.split_image.flags:
+                self.dummy_flag = True
+            else:
+                self.dummy_flag = False
+
+            if "p" in self.split_image.flags:
+                self.pause_flag = True
+            else:
+                self.pause_flag = False
+
+        else:
+            self.current_loop_count -= 1
+            self.update_split_image_signal.emit(self.split_image.pixmap)  # In case first image has multiple loops
+
+
+    def compare_frame_with_split_image(self, raw_frame: numpy.ndarray):
         comparison_frame = cv2.matchTemplate(
-            frame,
-            split_image.raw_image[:,:,0:3],
+            raw_frame,
+            self.split_image.ndarray[:,:,0:3],
             cv2.TM_CCORR_NORMED,
-            mask=split_image.alpha
+            mask=self.split_image.alpha
         )
-        return comparison_frame
 
-    def read_loop(self):
-        prev_time = 0
+        match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+        self.match_percent_signal.emit(match_percent)
 
-        while True:
-            time_elapsed = time.time() - prev_time
-            if time_elapsed > 1. / self.fps:
-                prev_time = time.time()
+        if match_percent > self.split_image.threshold:
+            if self.below_flag:
+                self.went_above_threshold_flag = True
+            else:
+                self.split_action()
 
-                raw_frame = self.video_source.get_raw_frame()
-                if not self.is_valid_image(raw_frame):
-                    continue
+        elif self.went_above_threshold_flag and match_percent < self.split_image.threshold:
+            self.split_action()
 
-                video_feed_frame = SplitImage.get_pixmap_from_frame(raw_frame)
-                self.video_feed_frame_signal.emit(video_feed_frame)
-
-
-    # def read_loop(self):
-    #     while True:
-    #         if not self.watch_for_match():
-    #             self.set_splits_to_initial_state()
-    #             self.read_loop()
-            
-    #         # send match_percent of 0 to gui
-    #         time.sleep(self.split_image.delay)
-
-    #         if "p" in self.split_image.flags:
-    #             # key in the pause key
-    #             pass
-    #         elif not "d" in self.split_image.flags:
-    #             # key in the split key
-    #             pass
-
-    #         time.sleep(self.split_image.pause)
-
-    #         if self.current_loop_count > 0:
-    #             self.current_loop_count -= 1
-    #         else:
-    #             self.image_list_index += 1
-    #             if self.image_list_index == len(self.image_list):
-    #                 self.set_splits_to_initial_state()
-    #                 self.read_loop()
-
-    #             self.go_to_next_split()
-
-    # def watch_for_match(self):
-    #     prev_time = 0
-    #     went_above_threshold = False
-    #     below_flag_set = False
-    #     if "b" in self.split_image.flags:
-    #         below_flag_set = True
-
-    #     while True:
-    #         time_elapsed = time.time() - prev_time
-    #         if time_elapsed > 1. / self.fps:
-    #             prev_time = time.time()
-
-    #             comparison_frame, video_feed_frame = self.video_source.get_processed_frames(self.split_image)
-    #             if not self.is_valid_image(comparison_frame):
-    #                 continue
-
-    #             match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
-    #             self.video_feed_frame_signal.emit(video_feed_frame)
-    #             self.match_percent_signal.emit("{:.1f}".format(match_percent * 100))
-
-    #             if match_percent > self.split_image.threshold:
-    #                 if below_flag_set:
-    #                     went_above_threshold = True
-    #                 else:
-    #                     return True
-
-    #             elif went_above_threshold and match_percent < self.split_image.threshold:
-    #                 return True                
-
-    def is_valid_image(self, image: numpy.ndarray):
-        return image is not None
-    
-    def update_default_fps(self, fps):
-        self.fps = fps
-
-class SplitterThread(QRunnable):
-    def __init__(self, splitter: Splitter):
-        super(SplitterThread, self).__init__()
-        self.splitter = splitter
-
-    @pyqtSlot()
-    def run(self):
-        self.splitter.set_splits_to_initial_state()
-        self.splitter.read_loop()
-
-
-
-
-def main():
-    print("Hello")
-
-
-if __name__ == "__main__":
-    main()
-
+    def split_action(self):
+        if self.dummy_flag:
+            self.go_to_next_split()
+        else:
+            self.delay_before_split_signal.emit(self.split_image.delay_duration)
+            if self.pause_flag:
+                pyautogui.press(PAUSE_KEY)
+            else:
+                pyautogui.press(SPLIT_KEY)
+            self.pause_after_split_signal.emit(self.split_image.pause_duration)
