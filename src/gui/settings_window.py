@@ -1,9 +1,9 @@
-from PyQt5.QtCore import QRect
+from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (QCheckBox, QDialog, QDoubleSpinBox, QFrame,
                              QKeySequenceEdit, QLabel, QPushButton, QSpinBox)
 
 from utils import (DEFAULT_DELAY, DEFAULT_FPS, DEFAULT_PAUSE,
-                      DEFAULT_THRESHOLD, convert_css_to_string)
+                      DEFAULT_THRESHOLD, OPEN_SCREENSHOT_ON_CAPTURE, convert_css_to_string)
 
 
 class GUISettingsWindow(QDialog):
@@ -106,6 +106,10 @@ class GUISettingsWindow(QDialog):
 
         self.open_screenshots_checkbox = QCheckBox(self)
         self.open_screenshots_checkbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 41 + self.TOP_EDGE_CORRECTION, 61, 31))
+        if OPEN_SCREENSHOT_ON_CAPTURE:
+            self.open_screenshots_checkbox.setCheckState(Qt.Checked)
+        else:
+            self.open_screenshots_checkbox.setCheckState(Qt.Unchecked)
 
         self.default_threshold_double_spinbox = QDoubleSpinBox(self)
         self.default_threshold_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 70 + self.TOP_EDGE_CORRECTION, 68, 31))
@@ -119,16 +123,16 @@ class GUISettingsWindow(QDialog):
         self.default_delay_double_spinbox = QDoubleSpinBox(self)
         self.default_delay_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 100 + self.TOP_EDGE_CORRECTION, 68, 31))
         self.default_delay_double_spinbox.setDecimals(3)
-        self.default_delay_double_spinbox.setMinimum(0.0)
-        self.default_delay_double_spinbox.setMaximum(10000000.0)
+        self.default_delay_double_spinbox.setMinimum(0)
+        self.default_delay_double_spinbox.setMaximum(10000000)
         self.default_delay_double_spinbox.setSingleStep(0.1)
         self.default_delay_double_spinbox.setProperty("value", DEFAULT_DELAY)
 
         self.default_pause_double_spinbox = QDoubleSpinBox(self)
         self.default_pause_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 130 + self.TOP_EDGE_CORRECTION, 68, 31))
         self.default_pause_double_spinbox.setDecimals(0)
-        self.default_pause_double_spinbox.setMinimum(0.0)
-        self.default_pause_double_spinbox.setMaximum(10000000.0)
+        self.default_pause_double_spinbox.setMinimum(0)
+        self.default_pause_double_spinbox.setMaximum(10000000)
         self.default_pause_double_spinbox.setSingleStep(1.0)
         self.default_pause_double_spinbox.setProperty("value", DEFAULT_PAUSE)
 
@@ -150,6 +154,7 @@ class GUISettingsWindow(QDialog):
         self.border_helper_frame.setFrameShape(QFrame.StyledPanel)
         self.border_helper_frame.setFrameShadow(QFrame.Raised)
         self.border_helper_frame.setStyleSheet(self.helper_frame_style)
+        self.border_helper_frame.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         self.cancel_button = QPushButton(self)
         self.cancel_button.setGeometry(QRect(30 + self.LEFT_EDGE_CORRECTION, 315 + self.TOP_EDGE_CORRECTION, 111, 31))

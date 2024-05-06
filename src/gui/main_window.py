@@ -1,17 +1,18 @@
-import time
-from PyQt5.QtCore import QRect, Qt, QThreadPool, QRunnable, pyqtSlot
-from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QPushButton, QWidget)
+
+from PyQt5.QtCore import QRect, Qt, pyqtSignal
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
+                             QPushButton, QWidget, QMessageBox)
 
 from utils import VERSION_NUMBER, convert_css_to_string
-
+from utils import PercentType, MATCH_PERCENT_DECIMALS
 
 class GUIMainWindow(QMainWindow):
+    pause_comparison_signal = pyqtSignal()
+    unpause_comparison_signal = pyqtSignal()
+    
     def __init__(self):
         super().__init__()
-        # Threads
-        self.threadpool = QThreadPool()
 
         # Constants (to facilitate moving things around)
         self.LEFT_EDGE_CORRECTION = -35
@@ -21,6 +22,7 @@ class GUIMainWindow(QMainWindow):
         self.main_window_style = convert_css_to_string("res/css/main_window.css")
         self.line_edit_style = convert_css_to_string("res/css/line_edit.css")
         self.image_style = convert_css_to_string("res/css/image.css")
+        self.loaded_split_image_style = convert_css_to_string("res/css/loaded_split_image.css")
         self.button_style = convert_css_to_string("res/css/button.css")
 
         # Main window
@@ -147,9 +149,12 @@ class GUIMainWindow(QMainWindow):
 
         self.pause_comparison_button = QPushButton(self.main_window)
         self.pause_comparison_button.setGeometry(QRect(580 + self.LEFT_EDGE_CORRECTION, 680 + self.TOP_EDGE_CORRECTION, 191, 41))
-        self.pause_comparison_button.setText("Pause comparison")
+        self.pause_comparison_button_pause_text = "Pause comparison"
+        self.pause_comparison_button_unpause_text = "Resume comparison"
+        self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
         self.pause_comparison_button.setEnabled(False)
         self.pause_comparison_button.setStyleSheet(self.button_style)
+        self.pause_comparison_button.clicked.connect(self.toggle_pause_comparison)
 
         self.skip_split_button = QPushButton(self.main_window)
         self.skip_split_button.setGeometry(QRect(580 + self.LEFT_EDGE_CORRECTION, 730 + self.TOP_EDGE_CORRECTION, 91, 41))
@@ -188,25 +193,67 @@ class GUIMainWindow(QMainWindow):
         self.video_feed.setPixmap(frame)
 
     def set_split_image(self, frame: QPixmap):
-        print("sup")
         self.split_image.setPixmap(frame)
 
-    def set_match_percent(self, match_percent: float):
-        self.current_match_percent.setText("{:.1f}".format(match_percent * 100))
+    def set_match_percent(self, match_percent: str, percent_type: PercentType):
+        if percent_type == PercentType.CURRENT:
+            label = self.current_match_percent
+        elif percent_type == PercentType.HIGHEST:
+            label = self.highest_match_percent
+        else:
+            label = self.threshold_match_percent
 
-    def block_object_signal(self, object, seconds):
-        blocker = BlockingThread(object, seconds)
-        self.threadpool.start(blocker)
+        if match_percent == "--.-":
+            label.setText("--.-")
+        else:
+            match_percent_string = f"{{:.{MATCH_PERCENT_DECIMALS}f}}"
+            label.setText(match_percent_string.format(float(match_percent) * 100))
 
+    def toggle_pause_comparison(self):
+        if self.pause_comparison_button.text() == self.pause_comparison_button_pause_text:
+            self.pause_comparison_button.setText(self.pause_comparison_button_unpause_text)
+            self.pause_comparison_signal.emit()
+        else:
+            self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
+            self.unpause_comparison_signal.emit()
 
-class BlockingThread(QRunnable):
-    def __init__(self, object, seconds) -> None:
-        super(BlockingThread, self).__init__()
-        self.object = object
-        self.seconds = seconds
+    def set_screenshot_button_status(self, status):
+        self.screenshot_button.setEnabled(status)
 
-    @pyqtSlot()
-    def run(self):
-        self.object.blockSignals(True)
-        time.sleep(self.seconds)
-        self.object.blockSignals(False)
+    def set_previous_split_button_status(self, status):
+        self.previous_split_button.setEnabled(status)
+
+    def set_next_split_button_status(self, status):
+        self.next_split_button.setEnabled(status)
+
+    def set_pause_comparison_button_status(self, status):
+        self.pause_comparison_button.setEnabled(status)
+
+    def set_skip_split_button_status(self, status):
+        self.skip_split_button.setEnabled(status)
+
+    def set_undo_split_button_status(self, status):
+        self.undo_split_button.setEnabled(status)
+
+    def set_reset_splits_button_status(self, status):
+        self.reset_splits_button.setEnabled(status)
+
+    def set_split_image_css_status(self, splits_are_loaded: bool):
+        if splits_are_loaded:
+            self.split_image.setStyleSheet(self.loaded_split_image_style)
+        else:
+            self.split_image.setStyleSheet(self.image_style)
+
+    def screenshot_success_message(self, screenshot_path):
+        message = QMessageBox()
+        message.setText("Screenshot taken")
+        message.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
+        message.setIcon(QMessageBox.Information)
+        message.exec()
+
+    def screenshot_error_message(self):
+        message = QMessageBox()
+        message.setText("Something went wrong")
+        message.setInformativeText("Screenshot could not be taken. Please ensure video feed is active and try again.")
+        message.setIcon(QMessageBox.Warning)
+        message.exec()
