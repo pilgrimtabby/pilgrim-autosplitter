@@ -4,12 +4,12 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
                              QPushButton, QWidget, QMessageBox)
 
-from utils import VERSION_NUMBER, convert_css_to_string
-from utils import PercentType, MATCH_PERCENT_DECIMALS
+from utils import convert_css_to_string, PercentType, settings
+
 
 class GUIMainWindow(QMainWindow):
-    pause_comparison_signal = pyqtSignal()
-    unpause_comparison_signal = pyqtSignal()
+    pause_comparison_button_clicked_signal = pyqtSignal()
+    unpause_comparison_button_clicked_signal = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -26,7 +26,7 @@ class GUIMainWindow(QMainWindow):
         self.button_style = convert_css_to_string("res/css/button.css")
 
         # Main window
-        self.setWindowTitle(f"Pilgrim Universal Autosplitter v{VERSION_NUMBER}")
+        self.setWindowTitle(f"Pilgrim Universal Autosplitter v{settings.value('VERSION_NUMBER')}")
         self.setFixedSize(1020, 570)
         self.main_window = QWidget(self)
         self.main_window.setStyleSheet(self.main_window_style)
@@ -154,7 +154,7 @@ class GUIMainWindow(QMainWindow):
         self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
         self.pause_comparison_button.setEnabled(False)
         self.pause_comparison_button.setStyleSheet(self.button_style)
-        self.pause_comparison_button.clicked.connect(self.toggle_pause_comparison)
+        self.pause_comparison_button.clicked.connect(self.toggle_pause_comparison_button)
 
         self.skip_split_button = QPushButton(self.main_window)
         self.skip_split_button.setGeometry(QRect(580 + self.LEFT_EDGE_CORRECTION, 730 + self.TOP_EDGE_CORRECTION, 91, 41))
@@ -190,10 +190,32 @@ class GUIMainWindow(QMainWindow):
         self.setMenuBar(self.menu_bar)
 
     def set_video_frame(self, frame: QPixmap):
-        self.video_feed.setPixmap(frame)
+        if frame.isNull():
+            self.video_feed.setText("No video feed detected")
+        else:
+            self.video_feed.setPixmap(frame)
 
     def set_split_image(self, frame: QPixmap):
-        self.split_image.setPixmap(frame)
+        if frame.isNull():
+            self.split_image.setStyleSheet(self.image_style)
+            self.split_image.setText("No split images loaded")
+        else:
+            self.split_image.setStyleSheet(self.loaded_split_image_style)
+            self.split_image.setPixmap(frame)
+
+    def set_split_name(self, name: str | None):
+        if name is None:
+            self.split_name_label.setText("")
+        else:
+            self.split_name_label.setText(f"Current split: {name}")
+
+    def set_loop_text(self, current_loop: int | None, total_loops: int):
+        if current_loop is None:
+            self.current_loop_label.setText("")
+        elif current_loop == 0:
+            self.current_loop_label.setText("Split does not loop")
+        else:
+            self.current_loop_label.setText(f"Loop {current_loop} of {total_loops}")
 
     def set_match_percent(self, match_percent: str, percent_type: PercentType):
         if percent_type == PercentType.CURRENT:
@@ -206,16 +228,19 @@ class GUIMainWindow(QMainWindow):
         if match_percent == "--.-":
             label.setText("--.-")
         else:
-            match_percent_string = f"{{:.{MATCH_PERCENT_DECIMALS}f}}"
+            match_percent_string = f"{{:.{settings.value('MATCH_PERCENT_DECIMALS')}f}}"
             label.setText(match_percent_string.format(float(match_percent) * 100))
 
-    def toggle_pause_comparison(self):
+    def toggle_pause_comparison_button(self):
         if self.pause_comparison_button.text() == self.pause_comparison_button_pause_text:
             self.pause_comparison_button.setText(self.pause_comparison_button_unpause_text)
-            self.pause_comparison_signal.emit()
+            self.pause_comparison_button_clicked_signal.emit()
         else:
             self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
-            self.unpause_comparison_signal.emit()
+            self.unpause_comparison_button_clicked_signal.emit()
+
+    def reset_pause_comparison_button_text(self):
+        self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
 
     def set_screenshot_button_status(self, status):
         self.screenshot_button.setEnabled(status)
@@ -238,12 +263,6 @@ class GUIMainWindow(QMainWindow):
     def set_reset_splits_button_status(self, status):
         self.reset_splits_button.setEnabled(status)
 
-    def set_split_image_css_status(self, splits_are_loaded: bool):
-        if splits_are_loaded:
-            self.split_image.setStyleSheet(self.loaded_split_image_style)
-        else:
-            self.split_image.setStyleSheet(self.image_style)
-
     def screenshot_success_message(self, screenshot_path):
         message = QMessageBox()
         message.setText("Screenshot taken")
@@ -251,9 +270,9 @@ class GUIMainWindow(QMainWindow):
         message.setIcon(QMessageBox.Information)
         message.exec()
 
-    def screenshot_error_message(self):
+    def screenshot_error_message(self, message):
         message = QMessageBox()
-        message.setText("Something went wrong")
-        message.setInformativeText("Screenshot could not be taken. Please ensure video feed is active and try again.")
+        message.setText("Could not take screenshot")
+        message.setInformativeText(message)
         message.setIcon(QMessageBox.Warning)
         message.exec()
