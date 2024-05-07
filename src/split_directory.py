@@ -8,15 +8,17 @@ from split_image import SplitImage
 
 
 class SplitDirectory(QObject):
-    current_or_empty_split_image_to_gui_signal = pyqtSignal(object)
-    current_or_empty_split_image_to_splitter_signal = pyqtSignal(object)
+    split_image_to_gui_signal = pyqtSignal(object)
+    split_image_to_splitter_signal = pyqtSignal(object)
+    loop_information_signal = pyqtSignal(int, int)
+    image_amount_signal = pyqtSignal(int)
 
     split_image: SplitImage
     image_dir: str
     image_list: list
     image_list_index: int
     remaining_loops: int
-    
+
     def __init__(self, dir_path):
         super().__init__()
         self.path = dir_path
@@ -27,29 +29,32 @@ class SplitDirectory(QObject):
             for image in self.get_image_paths():
                 self.images += [SplitImage(image)]
         if self.images:
+            self.image_amount_signal.emit(len(self.images))
             self.load_next_split_image(first_image=True)
         else:
-            self.current_or_empty_split_image_to_gui_signal.emit(QPixmap())
-            self.current_or_empty_split_image_to_splitter_signal.emit(None)
+            self.split_image_to_gui_signal.emit(QPixmap())
+            self.split_image_to_splitter_signal.emit(None)
             
     def load_next_split_image(self, first_image=False):
         if first_image:
             current_image = self.images[0]
             self.current_index = 0
-            self.remaining_loops = current_image.loop_count
+            self.current_loop = 0
+            self.split_image_to_gui_signal.emit(current_image.pixmap)
+            self.split_image_to_splitter_signal.emit(current_image)
+
         else:
-            if self.remaining_loops > 0:
-                self.remaining_loops -= 1
-                return
-
-            self.current_index += 1
-            if self.current_index >= len(self.images):
-                self.current_index = 0
             current_image = self.images[self.current_index]
-            self.remaining_loops = current_image.loop_count
-
-        self.current_or_empty_split_image_to_gui_signal.emit(current_image.pixmap)
-        self.current_or_empty_split_image_to_splitter_signal.emit(current_image)
+            if self.current_loop == current_image.loop_count:
+                self.current_index += 1
+                if self.current_index >= len(self.images):
+                    self.current_index = 0
+                self.current_loop = 0
+                self.split_image_to_gui_signal.emit(current_image.pixmap)
+                self.split_image_to_splitter_signal.emit(current_image)
+            else:
+                self.current_loop += 1
+        self.loop_information_signal.emit(self.current_loop, current_image.loop_count)
 
     def get_image_paths(self):
         if not pathlib.Path(self.path).is_dir():

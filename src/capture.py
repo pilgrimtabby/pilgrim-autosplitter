@@ -11,11 +11,10 @@ from PyQt5.QtGui import QImage, QPixmap
 from utils import settings
 
 class Capture(QObject):
-    frame_to_gui_signal = pyqtSignal(QPixmap)
-    frame_to_splitter_signal = pyqtSignal(numpy.ndarray)
+    send_to_gui_signal = pyqtSignal(QPixmap)
+    send_to_splitter_signal = pyqtSignal(numpy.ndarray)
     cap_open_signal = pyqtSignal(bool)
-    screenshot_success_signal = pyqtSignal(str)
-    screenshot_error_signal = pyqtSignal()
+    screenshot_result_signal = pyqtSignal(object)
     video_is_active_signal = pyqtSignal(bool)
 
     cap: cv2.VideoCapture
@@ -33,7 +32,7 @@ class Capture(QObject):
         if self.cap:
             self.cap.release()
 
-        self.cap = cv2.VideoCapture(settings.value("TEST_VID_PATH"))
+        self.cap = cv2.VideoCapture("res/test-vid.mp4")
         # self.cap = cv2.VideoCapture(0)
         if self.cap.isOpened():
             self.video_is_active = True
@@ -47,21 +46,21 @@ class Capture(QObject):
         if frame is None:
             return
 
-        self.frame_to_gui_signal.emit(self.convert_frame_to_video_frame(frame))
-        self.frame_to_splitter_signal.emit(frame)
+        self.send_to_gui_signal.emit(self.frame_to_pixmap(frame))
+        self.send_to_splitter_signal.emit(frame)
     
-    def convert_frame_to_video_frame(self, frame: numpy.ndarray):
+    def frame_to_pixmap(self, frame: numpy.ndarray):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
         frame_pixmap = QPixmap.fromImage(frame_img)
         return frame_pixmap
     
-    def get_and_resize_frame(self, is_screenshot: bool) -> numpy.ndarray | None:
+    def get_and_resize_frame(self, is_screenshot=False) -> numpy.ndarray | None:
         frame = self.cap.read()[1]
         if frame is None:
             self.video_is_active = False
             self.video_is_active_signal.emit(False)
-            self.frame_to_gui_signal.emit(QPixmap())
+            self.send_to_gui_signal.emit(QPixmap())
             return None
         
         if not is_screenshot and (frame == self.most_recent_frame).all():
@@ -71,13 +70,30 @@ class Capture(QObject):
         frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
         return frame
 
+    # def get_and_resize_frame(self, is_screenshot=False) -> numpy.ndarray | None:
+    #     frame = self.cap.read()[1]
+    #     if frame is None:
+    #         self.connect_to_video_feed()  # Try to reconnect
+    #         if self.video_is_active:
+    #             self.send_to_gui_signal.emit(QPixmap())
+    #             return None
+    #         else:
+    #             return self.get_and_resize_frame()
+        
+    #     if not is_screenshot and (frame == self.most_recent_frame).all():
+    #         return None
+
+    #     self.most_recent_frame = frame
+    #     frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+    #     return frame
+
     def take_screenshot(self) -> bool:
         frame = self.get_and_resize_frame(is_screenshot=True)
         if frame is None:
-            self.screenshot_error_signal.emit("No video feed detected. Please ensure video feed is active and try again.")
+            self.screenshot_result_signal.emit(None)
             return
 
-        screenshot_path = f"{settings.value('LAST_IMAGE_DIR')}/test100000.png"    #TODO: filename auto-generation
+        screenshot_path = f"{settings.value('LAST_IMAGE_DIR')}/test100000.png"
         cv2.imwrite(screenshot_path, frame)
         if Path(screenshot_path).is_file():
             if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
@@ -88,4 +104,4 @@ class Capture(QObject):
                 else:
                     subprocess.call(["xdg-open", screenshot_path])
             else:
-                self.screenshot_success_signal.emit(screenshot_path)
+                self.screenshot_result_signal.emit(screenshot_path)

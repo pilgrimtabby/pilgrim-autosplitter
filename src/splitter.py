@@ -7,47 +7,34 @@ from utils import PercentType
 
 
 class Splitter(QObject):
-    allow_external_pausing_signal = pyqtSignal(bool)
-    execute_split_signal = pyqtSignal()
-    split_name_signal = pyqtSignal(str)
+    suspended_status_signal = pyqtSignal(bool)
+    delaying_status_signal = pyqtSignal(bool)
+    request_next_split_image_signal = pyqtSignal()
     match_percent_signal = pyqtSignal(object, PercentType)
-    split_loop_signal = pyqtSignal(object, object)
-    unpause_splitter_button_text_correction = pyqtSignal()
     split_action_pause_signal = pyqtSignal()
     split_action_split_signal = pyqtSignal()
-
-    image_dir: str
-    image_list: list
-    image_list_index: int
-    current_loop_count: float
     
     def __init__(self):
         super().__init__()
         self.split_image = None
-        self.paused = False
+        self.video_feed_active = False
+        self.splits_active = False
+        self.suspended = False
+        self.delaying = False
         self.keyboard = keyboard.Controller()
 
     def set_split_image(self, image):
         self.split_image = image
         if self.split_image:
+            self.splits_active = True
             self.highest_match_percent = 0
             self.went_above_threshold_flag = False
             self.match_percent_signal.emit(self.split_image.threshold, PercentType.THRESHOLD)
-            self.split_name_signal.emit(self.split_image.name)
-            if self.split_image.loop_count == 0:
-                self.current_loop_count = 0
-                self.split_loop_signal.emit(0, 0)
-            else:
-                self.current_loop_count = 1
-                self.split_loop_signal.emit(1, 1)
         else:
-            self.match_percent_signal.emit("--.-", PercentType.THRESHOLD)
-            self.split_name_signal.emit(None)
-            self.split_loop_signal.emit(None)
+            self.splits_active = False
 
-
-    def compare_frame_to_split_image(self, frame: numpy.ndarray):
-        if not self.split_image or self.paused:
+    def compare_frame(self, frame: numpy.ndarray):
+        if not self.splits_active or not self.video_feed_active or self.suspended:
             return
 
         comparison_frame = cv2.matchTemplate(
@@ -56,42 +43,31 @@ class Splitter(QObject):
             cv2.TM_CCORR_NORMED,
             mask=self.split_image.alpha
         )
-
         match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
         self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT)
         if match_percent > self.highest_match_percent:
             self.highest_match_percent = match_percent
             self.match_percent_signal.emit(str(self.highest_match_percent), PercentType.HIGHEST)
 
-        if match_percent > self.split_image.threshold:
+        if match_percent >= self.split_image.threshold:
             if self.split_image.below_flag:
                 self.went_above_threshold_flag = True
             else:
-                self.highest_match_percent = 0
                 self.split()
 
-        elif self.went_above_threshold_flag and match_percent < self.split_image.threshold:
-            self.went_above_threshold_flag = False
-            self.highest_match_percent = 0
+        elif self.went_above_threshold_flag:
             self.split()
 
     def split(self):
-        # Delay, then split
-        if self.split_image.delay_duration > 0:
-            self.set_match_percent_null()
+        total_down_time = self.split_image.delay_duration + self.split_image.pause_duration
+        if total_down_time > 0:
+            self.set_suspended_status(True)
+            if self.split_image.delay_duration > 0:
+                self.set_delay_status(True)
             QTimer.singleShot(int(self.split_image.delay_duration * 1000), self.split_action)
+            QTimer.singleShot(int(total_down_time * 1000), lambda: self.set_suspended_status(False))
         else:
             self.split_action()
-
-        self.execute_split_signal.emit()  # Request next split image
-        self.iterate_split_image_loop()  # Update loop info in GUI
-
-        # Pause comparisons
-        if self.split_image.pause_duration > 0:
-            self.pause_splitter()
-            self.allow_external_pausing_signal.emit(False)
-            QTimer.singleShot(int(self.split_image.pause_duration * 1000), self.unpause_splitter)
-            QTimer.singleShot(int(self.split_image.pause_duration * 1000), self.unpause_splitter_button_text_correction.emit)
 
     def split_action(self):
         if self.split_image.pause_flag:
@@ -100,22 +76,18 @@ class Splitter(QObject):
             self.split_action_split_signal.emit()
             self.keyboard.press(keyboard.Key.space)
 
-    def pause_splitter(self):
-        self.paused = True
-        self.set_match_percent_null()
+        self.set_delay_status(False)
+        self.request_next_split_image_signal.emit()
 
-    def unpause_splitter(self):
-        self.paused = False
-        self.allow_external_pausing_signal.emit(True)
-        self.match_percent_signal.emit(str(self.highest_match_percent), PercentType.HIGHEST)
-        self.match_percent_signal.emit(self.split_image.threshold, PercentType.THRESHOLD)
+    def set_video_feed_active_status(self, is_active):
+        self.video_feed_active = is_active
 
-    def iterate_split_image_loop(self):
-        if self.current_loop_count > 0:
-            self.current_loop_count += 1
-            self.split_loop_signal.emit(self.current_loop_count, self.split_image.loop_count)
+    def set_suspended_status(self, status: bool):
+        if self.suspended != status:
+            self.suspended = status
+            self.suspended_status_signal.emit(self.suspended)
 
-    def set_match_percent_null(self):
-        self.match_percent_signal.emit("--.-", PercentType.CURRENT)
-        self.match_percent_signal.emit("--.-", PercentType.HIGHEST)
-        self.match_percent_signal.emit("--.-", PercentType.THRESHOLD)
+    def set_delay_status(self, status: bool):
+        if self.delaying != status:
+            self.delaying = status
+            self.delaying_status_signal.emit(self.delaying)
