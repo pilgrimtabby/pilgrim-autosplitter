@@ -1,23 +1,25 @@
+from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtGui import QPixmap
+
 from gui.main_window import GUIMainWindow
 from gui.settings_window import GUISettingsWindow
-from utils import PercentType
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import pyqtSignal
+from utils import PercentType, settings
 
 
-class GUIController:
+class GUIController(QObject):
     image_directory_button_signal = pyqtSignal()
     screenshot_button_signal = pyqtSignal()
     reload_video_button_signal = pyqtSignal()
     previous_split_button_signal = pyqtSignal()
     next_split_button_signal = pyqtSignal()
-    pause_comparison_button_signal = pyqtSignal()
-    unpause_comparison_button_signal = pyqtSignal()
+    pause_request_signal = pyqtSignal(bool)
     skip_split_button_signal = pyqtSignal()
     undo_split_button_signal = pyqtSignal()
     reset_splits_button_signal = pyqtSignal()
 
     def __init__(self) -> None:
+        super().__init__()
+
         self.main_window = GUIMainWindow()
         self.settings_window = GUISettingsWindow()
 
@@ -25,10 +27,8 @@ class GUIController:
         self.splits_active = False
         self.splitter_suspended = False
         self.splitter_delaying = False
-        
-        self.split_image = QPixmap()
-        self.image_amount = 0
-
+        self.is_first_split = False
+        self.is_last_split = False
         self.show_comparison_match = False
         self.show_threshold = False
         self.image_directory_button_enabled = False
@@ -41,109 +41,252 @@ class GUIController:
         self.undo_split_button_enabled = False
         self.reset_splits_button_enabled = False
 
-        self.main_window.settings_action.triggered.connect(self.settings_window.exec)
+        # Handle signals from main_window
+        self.main_window.settings_window_action.triggered.connect(self.settings_window.exec)
+        self.main_window.about_window_action.triggered.connect(lambda: None)
 
         self.main_window.image_directory_button.clicked.connect(self.image_directory_button_signal.emit)
         self.main_window.screenshot_button.clicked.connect(self.screenshot_button_signal.emit)
         self.main_window.reload_video_button.clicked.connect(self.reload_video_button_signal.emit)
         self.main_window.previous_split_button.clicked.connect(self.previous_split_button_signal.emit)
         self.main_window.next_split_button.clicked.connect(self.next_split_button_signal.emit)
-        self.main_window.pause_comparison_button_clicked_signal.connect(self.pause_comparison_button_signal.emit)
-        self.main_window.unpause_comparison_button_clicked_signal.connect(self.unpause_comparison_button_signal.emit)
+        self.main_window.pause_comparison_button.clicked.connect(self.process_pause_request)
         self.main_window.skip_split_button.clicked.connect(self.skip_split_button_signal.emit)
-        self.main_window.undo_split_button_signal.clicked.connect(self.undo_split_button_signal.emit)
+        self.main_window.undo_split_button.clicked.connect(self.undo_split_button_signal.emit)
         self.main_window.reset_splits_button.clicked.connect(self.reset_splits_button_signal.emit)
+
+    def update_enabled_comparison_data(self):
+        if self.splits_active:
+            self.set_show_threshold_status(True)
+            if self.video_feed_active and not self.splitter_suspended:
+                self.set_show_comparison_match_status(True)
+            else:
+                self.set_show_comparison_match_status(False)
+        else:
+            self.set_show_threshold_status(False)
+            self.set_show_comparison_match_status(False)
+
+    def update_enabled_buttons(self):
+        self.set_image_directory_button_enabled_status(True)
+        self.set_reload_video_button_enabled_status(True)
+
+        if self.splits_active:
+            self.set_reset_splits_button_enabled_status(True)
+
+            if self.is_first_split:
+                self.set_undo_split_button_enabled_status(False)
+                self.set_previous_split_button_enabled_status(False)
+            else:
+                self.set_undo_split_button_enabled_status(True)
+                self.set_previous_split_button_enabled_status(True)
+
+            if self.is_last_split:
+                self.set_skip_split_button_enabled_status(False)
+                self.set_next_split_button_enabled_status(False)
+            else:
+                self.set_skip_split_button_enabled_status(True)
+                self.set_next_split_button_enabled_status(True)
+
+            if self.video_feed_active:
+                self.set_screenshot_button_enabled_status(True)
+
+                if self.splitter_delaying:
+                    self.set_pause_comparison_button_enabled_status(False)
+                else:
+                    self.set_pause_comparison_button_enabled_status(True)
+
+            else:
+                self.set_screenshot_button_enabled_status(False)
+                self.set_pause_comparison_button_enabled_status(False)
+
+        else:
+            self.set_skip_split_button_enabled_status(False)
+            self.set_undo_split_button_enabled_status(False)
+            self.set_reset_splits_button_enabled_status(False)
+            self.set_previous_split_button_enabled_status(False)
+            self.set_next_split_button_enabled_status(False)
+            self.set_pause_comparison_button_enabled_status(False)
+            if self.video_feed_active:
+                self.set_screenshot_button_enabled_status(True)
+            else:
+                self.set_screenshot_button_enabled_status(False)
+
+    def update_labels(self):
+        if not self.splits_active:
+            self.set_split_name(None)
+
+    def update_all_elements(self):
+        self.update_enabled_comparison_data()
+        self.update_enabled_buttons()
+        self.update_labels()
 
     def set_video_feed_active_status(self, status: bool):
         if self.video_feed_active != status:
             self.video_feed_active = status
-            self.update_enabled_elements()
+            self.update_enabled_comparison_data()
+            self.update_enabled_buttons()
 
-    def set_split_image(self, image: object):
-        self.split_image = image
-        if self.split_image.isNull() and self.splits_active:
-            self.splits_active = False
-            self.update_enabled_elements()
-        elif not self.split_image.isNull() and not self.splits_active:
-            self.splits_active = True
-            self.update_enabled_elements()
+    def set_split_image_and_splits_active_status(self, frame: QPixmap):
+        if frame.isNull():
+            self.main_window.set_blank_split_image()
+            if self.splits_active:
+                self.splits_active = False
+                self.update_all_elements()
+        else:
+            self.main_window.set_live_split_image(frame)
+            if not self.splits_active:
+                self.splits_active = True
+                self.update_enabled_comparison_data()
+                self.update_enabled_buttons()
 
     def set_splitter_suspended_status(self, status: bool):
         if self.splitter_suspended != status:
             self.splitter_suspended = status
-            self.update_enabled_elements()
+            self.update_enabled_comparison_data()
+            self.update_enabled_buttons()
+            self.set_pause_comparison_button_text()
 
     def set_splitter_delaying_status(self, status: bool):
         if self.splitter_delaying != status:
             self.splitter_delaying = status
-            self.update_enabled_elements()
+            self.update_enabled_buttons()
 
-    def update_enabled_elements(self):
-        self.update_enabled_comparison_data()
-        self.update_enabled_buttons()
+    def set_first_split_status(self, status):
+        if self.is_first_split != status:
+            self.is_first_split = status
+            self.update_enabled_buttons()
 
-    def update_enabled_comparison_data(self):
-        if self.splits_active:
-            self.show_threshold = True
-            if self.video_feed_active and not self.splitter_suspended:
-                self.show_comparison_match = True
-        else:
-            self.show_threshold = False
-            self.show_comparison_match = False
+    def set_last_split_status(self, status):
+        if self.is_last_split != status:
+            self.is_last_split = status
+            self.update_enabled_buttons()
 
-    def update_enabled_buttons(self):
-        self.image_directory_button_enabled = True
-        if self.splits_active: # Qualify this
-            self.skip_split_button_enabled = True # not if last split
-            self.undo_split_button_enabled = True # not if first split
-            self.reset_splits_button_enabled = True
-            self.previous_split_button_enabled = True # not if first split
-            self.next_split_button_enabled = True # not if last split
-            if self.video_feed_active:
-                self.screenshot_button_enabled = True
-                if self.splitter_delaying:
-                    self.set_pause_comparison_button_status(False)
-                else:
-                    self.set_pause_comparison_button_status(True)
-            else:
-                self.screenshot_button_enabled = False
-                self.set_pause_comparison_button_status(False)
+    def set_show_comparison_match_status(self, status):
+        if self.show_comparison_match != status:
+            self.show_comparison_match = status
+            if not self.show_comparison_match:
+                self.set_match_percent(self.get_match_percent_null_value(), PercentType.CURRENT)
+                self.set_match_percent(self.get_match_percent_null_value(), PercentType.HIGHEST)
 
-        else:
-            self.skip_split_button_enabled = False
-            self.undo_split_button_enabled = False
-            self.reset_splits_button_enabled = False
-            self.previous_split_button_enabled = False
-            self.next_split_button_enabled = False
-            self.set_pause_comparison_button_status(False)
-            if self.video_feed_active:
-                self.screenshot_button_enabled = True
-            else:
-                self.screenshot_button_enabled = False
+    def set_show_threshold_status(self, status):
+        if self.show_threshold != status:
+            self.show_threshold = status
+            if not self.show_threshold:
+                self.set_match_percent(self.get_match_percent_null_value(), PercentType.THRESHOLD)
 
-    def set_comparison_match_percents_null(self):
-        self.match_percent_signal.emit("--.-", PercentType.CURRENT)
-        self.match_percent_signal.emit("--.-", PercentType.HIGHEST)
+    def set_image_directory_button_enabled_status(self, status):
+        if self.image_directory_button_enabled != status:
+            self.image_directory_button_enabled = status
+            self.main_window.set_image_directory_button_status(status)
 
-    def set_threshold_match_percent_null(self):
-        self.match_percent_signal.emit("--.-", PercentType.THRESHOLD)
+    def set_screenshot_button_enabled_status(self, status):
+        if self.screenshot_button_enabled != status:
+            self.screenshot_button_enabled = status
+            self.main_window.set_screenshot_button_status(status)
 
-    def show_screenshot_result(self, message):
-        # None
-        # "No video feed detected. Please make sure video feed is active and try again."
-        pass
+    def set_reload_video_button_enabled_status(self, status):
+        if self.reload_video_button_enabled != status:
+            self.reload_video_button_enabled = status
+            self.main_window.set_reload_video_button_status(status)
 
-    def set_video_frame(self):
-        pass
+    def set_previous_split_button_enabled_status(self, status):
+        if self.previous_split_button_enabled != status:
+            self.previous_split_button_enabled = status
+            self.main_window.set_previous_split_button_status(status)
 
-    def set_match_percent(self):
-        pass
+    def set_next_split_button_enabled_status(self, status):
+        if self.next_split_button_enabled != status:
+            self.next_split_button_enabled = status
+            self.main_window.set_next_split_button_status(status)
 
-    def set_image_amount(self, amount):
-        self.image_amount = amount
-
-    def set_pause_comparison_button_status(self, status: bool):
+    def set_pause_comparison_button_enabled_status(self, status):
+        print(status)
         if self.pause_comparison_button_enabled != status:
             self.pause_comparison_button_enabled = status
-        # set text (dependent on self.splitter_suspended -- if is suspended, should say "unpause" or whatever)
-        # should this be inside or outside the `if` statement?
+            self.main_window.set_pause_comparison_button_status(status)
+
+    def process_pause_request(self):
+        if self.splitter_suspended:
+            self.pause_request_signal.emit(False)
+        else:
+            self.pause_request_signal.emit(True)
+        self.set_pause_comparison_button_text()
+
+    def set_pause_comparison_button_text(self):
+        if self.splitter_suspended:
+            self.main_window.set_pause_comparison_button_text_to_unpause()
+        else:
+            self.main_window.set_pause_comparison_button_text_to_pause()
+
+    def set_skip_split_button_enabled_status(self, status):
+        if self.skip_split_button_enabled != status:
+            self.skip_split_button_enabled = status
+            self.main_window.set_skip_split_button_status(status)
+
+    def set_undo_split_button_enabled_status(self, status):
+        if self.undo_split_button_enabled != status:
+            self.undo_split_button_enabled = status
+            self.main_window.set_undo_split_button_status(status)
+
+    def set_reset_splits_button_enabled_status(self, status):
+        if self.reset_splits_button_enabled != status:
+            self.reset_splits_button_enabled = status
+            self.main_window.set_reset_splits_button_status(status)
+
+    def set_match_percent(self, match_percent: str, percent_type: PercentType):
+        if percent_type == PercentType.CURRENT:
+            if self.show_comparison_match:
+                self.main_window.set_current_match_percent(self.format_match_percent(match_percent))
+            else:
+                self.main_window.set_current_match_percent(self.get_match_percent_null_value())
+
+        elif percent_type == PercentType.HIGHEST:
+            if self.show_comparison_match:
+                self.main_window.set_highest_match_percent(self.format_match_percent(match_percent))
+            else:
+                self.main_window.set_highest_match_percent(self.get_match_percent_null_value())
+        
+        else:  # PercentType.THRESHOLD
+            if self.show_threshold:
+                self.main_window.set_threshold_match_percent(self.format_match_percent(match_percent))
+            else:
+                self.main_window.set_threshold_match_percent(self.get_match_percent_null_value())
+
+    def get_match_percent_null_value(self):
+        null_value = "--"
+        decimals = settings.value("MATCH_PERCENT_DECIMALS")
+        if decimals > 0:
+            null_value += "."
+            while decimals > 0:
+                null_value += "-"
+        return null_value
+
+    def format_match_percent(self, match_percent: str) -> str:
+        format_string = f"{{:.{settings.value('MATCH_PERCENT_DECIMALS')}f}}"
+        return format_string.format(float(match_percent) * 100)
+            
+    def show_screenshot_result(self, path: str):
+        if path is None:
+            self.main_window.screenshot_error_message()
+        else:
+            self.main_window.screenshot_success_message(path)
+
+    def set_video_frame(self, frame: QPixmap):
+        if frame.isNull():
+            self.main_window.set_blank_video_frame()
+        else:
+            self.main_window.set_live_video_frame(frame)
+
+    def set_split_name(self, name: str | None):
+        if name is None:
+            self.main_window.set_blank_split_name_label()
+        else:
+            self.main_window.set_live_split_name_label(name)
+
+    def set_loop_text(self, current_loop: int | None, total_loops: int):
+        if current_loop is None:
+            self.main_window.set_blank_loop_label()
+        elif current_loop == 0:
+            self.main_window.set_no_loop_loop_label()
+        else:
+            self.main_window.set_live_loop_label_text(current_loop, total_loops)

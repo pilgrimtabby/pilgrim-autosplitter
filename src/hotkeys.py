@@ -10,7 +10,7 @@ class Hotkeys:
     def press_split_hotkey(self):
         pass
 
-    def press_reset_listener(self):
+    def press_reset_hotkey(self):
         pass
 
     def press_pause_hotkey(self):

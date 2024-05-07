@@ -10,7 +10,7 @@ class Splitter(QObject):
     suspended_status_signal = pyqtSignal(bool)
     delaying_status_signal = pyqtSignal(bool)
     request_next_split_image_signal = pyqtSignal()
-    match_percent_signal = pyqtSignal(object, PercentType)
+    match_percent_signal = pyqtSignal(str, PercentType)
     split_action_pause_signal = pyqtSignal()
     split_action_split_signal = pyqtSignal()
     
@@ -29,7 +29,7 @@ class Splitter(QObject):
             self.splits_active = True
             self.highest_match_percent = 0
             self.went_above_threshold_flag = False
-            self.match_percent_signal.emit(self.split_image.threshold, PercentType.THRESHOLD)
+            self.match_percent_signal.emit(str(self.split_image.threshold), PercentType.THRESHOLD)
         else:
             self.splits_active = False
 
@@ -79,11 +79,14 @@ class Splitter(QObject):
         self.set_delay_status(False)
         self.request_next_split_image_signal.emit()
 
-    def set_video_feed_active_status(self, is_active):
-        self.video_feed_active = is_active
+    def set_video_feed_active_status(self, status: bool):
+        if self.video_feed_active != status:
+            self.highest_match_percent = 0
+            self.video_feed_active = status
 
     def set_suspended_status(self, status: bool):
         if self.suspended != status:
+            self.highest_match_percent = 0
             self.suspended = status
             self.suspended_status_signal.emit(self.suspended)
 

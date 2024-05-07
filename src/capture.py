@@ -10,6 +10,7 @@ from PyQt5.QtGui import QImage, QPixmap
 
 from utils import settings
 
+
 class Capture(QObject):
     send_to_gui_signal = pyqtSignal(QPixmap)
     send_to_splitter_signal = pyqtSignal(numpy.ndarray)
@@ -32,7 +33,7 @@ class Capture(QObject):
         if self.cap:
             self.cap.release()
 
-        self.cap = cv2.VideoCapture("res/test-vid.mp4")
+        self.cap = cv2.VideoCapture("res/test-vid2.mp4")
         # self.cap = cv2.VideoCapture(0)
         if self.cap.isOpened():
             self.video_is_active = True
@@ -58,10 +59,12 @@ class Capture(QObject):
     def get_and_resize_frame(self, is_screenshot=False) -> numpy.ndarray | None:
         frame = self.cap.read()[1]
         if frame is None:
-            self.video_is_active = False
-            self.video_is_active_signal.emit(False)
-            self.send_to_gui_signal.emit(QPixmap())
-            return None
+            self.connect_to_video_feed()  # Try to reconnect
+            if self.video_is_active:
+                self.send_to_gui_signal.emit(QPixmap())
+                return None
+            else:
+                return self.get_and_resize_frame()
         
         if not is_screenshot and (frame == self.most_recent_frame).all():
             return None
@@ -69,23 +72,6 @@ class Capture(QObject):
         self.most_recent_frame = frame
         frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
         return frame
-
-    # def get_and_resize_frame(self, is_screenshot=False) -> numpy.ndarray | None:
-    #     frame = self.cap.read()[1]
-    #     if frame is None:
-    #         self.connect_to_video_feed()  # Try to reconnect
-    #         if self.video_is_active:
-    #             self.send_to_gui_signal.emit(QPixmap())
-    #             return None
-    #         else:
-    #             return self.get_and_resize_frame()
-        
-    #     if not is_screenshot and (frame == self.most_recent_frame).all():
-    #         return None
-
-    #     self.most_recent_frame = frame
-    #     frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-    #     return frame
 
     def take_screenshot(self) -> bool:
         frame = self.get_and_resize_frame(is_screenshot=True)

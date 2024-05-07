@@ -1,10 +1,9 @@
-
 from PyQt5.QtCore import QRect, Qt, pyqtSignal
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QPushButton, QWidget, QMessageBox)
+                             QMessageBox, QPushButton, QWidget)
 
-from utils import convert_css_to_string, PercentType, settings
+from utils import convert_css_to_string, settings
 
 
 class GUIMainWindow(QMainWindow):
@@ -21,8 +20,8 @@ class GUIMainWindow(QMainWindow):
         # Import style sheets
         self.main_window_style = convert_css_to_string("res/css/main_window.css")
         self.line_edit_style = convert_css_to_string("res/css/line_edit.css")
-        self.image_style = convert_css_to_string("res/css/image.css")
-        self.loaded_split_image_style = convert_css_to_string("res/css/loaded_split_image.css")
+        self.blank_image_style = convert_css_to_string("res/css/image.css")
+        self.live_image_style = convert_css_to_string("res/css/loaded_split_image.css")
         self.button_style = convert_css_to_string("res/css/button.css")
 
         # Main window
@@ -32,7 +31,7 @@ class GUIMainWindow(QMainWindow):
         self.main_window.setStyleSheet(self.main_window_style)
         self.setCentralWidget(self.main_window)
 
-        # Split image directory box  # self.file_dialog = QFileDialog.getExistingDirectory(self, "Select Directory")
+        # Split image directory box
         self.image_directory_line_edit = QLineEdit(self.main_window)
         self.image_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 785, self.image_directory_line_edit.height()))
         self.image_directory_line_edit.setText(" Nothing selected yet")
@@ -42,14 +41,16 @@ class GUIMainWindow(QMainWindow):
         # Video feed and split image
         self.video_feed = QLabel(self.main_window)
         self.video_feed.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 480, 360))
-        self.video_feed.setText("No video feed detected")
-        self.video_feed.setStyleSheet(self.image_style)
+        self.video_feed_blank_text = "No video feed detected"
+        self.video_feed.setText(self.video_feed_blank_text)
+        self.video_feed.setStyleSheet(self.blank_image_style)
         self.video_feed.setAlignment(Qt.AlignCenter)
 
         self.split_image = QLabel(self.main_window)
         self.split_image.setGeometry(QRect(550 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 480, 360))
-        self.split_image.setText("No split images loaded")
-        self.split_image.setStyleSheet(self.image_style)
+        self.split_image_blank_text = "No split images loaded"
+        self.split_image.setText(self.split_image_blank_text)
+        self.split_image.setStyleSheet(self.blank_image_style)
         self.split_image.setAlignment(Qt.AlignCenter)
 
         # Text labels
@@ -154,7 +155,6 @@ class GUIMainWindow(QMainWindow):
         self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
         self.pause_comparison_button.setEnabled(False)
         self.pause_comparison_button.setStyleSheet(self.button_style)
-        self.pause_comparison_button.clicked.connect(self.toggle_pause_comparison_button)
 
         self.skip_split_button = QPushButton(self.main_window)
         self.skip_split_button.setGeometry(QRect(580 + self.LEFT_EDGE_CORRECTION, 730 + self.TOP_EDGE_CORRECTION, 91, 41))
@@ -177,73 +177,27 @@ class GUIMainWindow(QMainWindow):
         # Menu bar
         self.menu_bar = QMenuBar(self.main_window)
 
-        self.settings_action = QAction("&Open Settings Menu", self)
-        self.settings_action.setShortcut("Ctrl+.")
+        self.settings_window_action = QAction("&Open Settings Menu", self)
+        self.settings_window_action.setShortcut("Ctrl+.")
 
-        self.about_action = QAction("&Help", self)
-        self.about_action.setShortcut("Ctrl+shift+H")
+        self.about_window_action = QAction("&Help", self)
+        self.about_window_action.setShortcut("Ctrl+shift+H")
 
         self.file_menu = self.menu_bar.addMenu("&Pilgrim UA")
-        self.file_menu.addAction(self.settings_action)
-        self.file_menu.addAction(self.about_action)
+        self.file_menu.addAction(self.settings_window_action)
+        self.file_menu.addAction(self.settings_window_action)
 
         self.setMenuBar(self.menu_bar)
 
-    def set_video_frame(self, frame: QPixmap):
-        if frame.isNull():
-            self.video_feed.setText("No video feed detected")
-        else:
-            self.video_feed.setPixmap(frame)
-
-    def set_split_image(self, frame: QPixmap):
-        if frame.isNull():
-            self.split_image.setStyleSheet(self.image_style)
-            self.split_image.setText("No split images loaded")
-        else:
-            self.split_image.setStyleSheet(self.loaded_split_image_style)
-            self.split_image.setPixmap(frame)
-
-    def set_split_name(self, name: str | None):
-        if name is None:
-            self.split_name_label.setText("")
-        else:
-            self.split_name_label.setText(f"Current split: {name}")
-
-    def set_loop_text(self, current_loop: int | None, total_loops: int):
-        if current_loop is None:
-            self.current_loop_label.setText("")
-        elif current_loop == 0:
-            self.current_loop_label.setText("Split does not loop")
-        else:
-            self.current_loop_label.setText(f"Loop {current_loop} of {total_loops}")
-
-    def set_match_percent(self, match_percent: str, percent_type: PercentType):
-        if percent_type == PercentType.CURRENT:
-            label = self.current_match_percent
-        elif percent_type == PercentType.HIGHEST:
-            label = self.highest_match_percent
-        else:
-            label = self.threshold_match_percent
-
-        if match_percent == "--.-":
-            label.setText("--.-")
-        else:
-            match_percent_string = f"{{:.{settings.value('MATCH_PERCENT_DECIMALS')}f}}"
-            label.setText(match_percent_string.format(float(match_percent) * 100))
-
-    def toggle_pause_comparison_button(self):
-        if self.pause_comparison_button.text() == self.pause_comparison_button_pause_text:
-            self.pause_comparison_button.setText(self.pause_comparison_button_unpause_text)
-            self.pause_comparison_button_clicked_signal.emit()
-        else:
-            self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
-            self.unpause_comparison_button_clicked_signal.emit()
-
-    def reset_pause_comparison_button_text(self):
-        self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
+    # Set button status
+    def set_image_directory_button_status(self, status):
+        self.image_directory_button.setEnabled(status)
 
     def set_screenshot_button_status(self, status):
         self.screenshot_button.setEnabled(status)
+
+    def set_reload_video_button_status(self, status):
+        self.reload_video_button.setEnabled(status)
 
     def set_previous_split_button_status(self, status):
         self.previous_split_button.setEnabled(status)
@@ -254,6 +208,12 @@ class GUIMainWindow(QMainWindow):
     def set_pause_comparison_button_status(self, status):
         self.pause_comparison_button.setEnabled(status)
 
+    def set_pause_comparison_button_text_to_pause(self):
+        self.pause_comparison_button.setText(self.pause_comparison_button_pause_text)
+
+    def set_pause_comparison_button_text_to_unpause(self):
+        self.pause_comparison_button.setText(self.pause_comparison_button_unpause_text)
+
     def set_skip_split_button_status(self, status):
         self.skip_split_button.setEnabled(status)
 
@@ -263,16 +223,56 @@ class GUIMainWindow(QMainWindow):
     def set_reset_splits_button_status(self, status):
         self.reset_splits_button.setEnabled(status)
 
-    def screenshot_success_message(self, screenshot_path):
+    # Set label status
+    def set_blank_video_frame(self):
+        self.video_feed.setText(self.video_feed_blank_text)
+
+    def set_live_video_frame(self, frame: QPixmap):
+        self.video_feed.setPixmap(frame)
+
+    def set_blank_split_image(self):
+        self.split_image.setStyleSheet(self.blank_image_style)
+        self.split_image.setText(self.split_image_blank_text)
+
+    def set_live_split_image(self, frame: QPixmap):
+        self.split_image.setStyleSheet(self.live_image_style)
+        self.split_image.setPixmap(frame)
+
+    def set_blank_split_name_label(self):
+        self.split_name_label.setText()
+
+    def set_live_split_name_label(self, name: str):
+        self.split_name_label.setText(f"Current split: {name}")
+
+    def set_blank_loop_label(self):
+        self.current_loop_label.setText()
+
+    def set_no_loop_loop_label(self):
+        self.current_loop_label.setText("Split does not loop")
+
+    def set_live_loop_label_text(self, current: int, total: int):
+        self.current_loop_label.setText(f"Loop {current} of {total}")
+
+    def set_current_match_percent(self, match_percent: str):
+        self.current_match_percent.setText(match_percent)
+
+    def set_highest_match_percent(self, match_percent: str):
+        self.highest_match_percent.setText(match_percent)
+
+    def set_threshold_match_percent(self, match_percent: str):
+        self.threshold_match_percent.setText(match_percent)
+
+    # Dialogs
+    def screenshot_success_message(self, path: str):
         message = QMessageBox()
         message.setText("Screenshot taken")
-        message.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
+        message.setInformativeText(f"Screenshot saved to:\n{path}")
         message.setIcon(QMessageBox.Information)
         message.exec()
 
-    def screenshot_error_message(self, message):
+    def screenshot_error_message(self):
         message = QMessageBox()
         message.setText("Could not take screenshot")
-        message.setInformativeText(message)
+        message.setInformativeText("No video feed detected. Please make sure video feed is active and try again.")
         message.setIcon(QMessageBox.Warning)
         message.exec()
