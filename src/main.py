@@ -10,8 +10,8 @@ from utils import settings
 
 # test all split flags yaAYy
 # Fix settings gui
-# Switch undo and skip buttons in GUI
 # implement hotkeys
+
 
 class PilgrimUniversalAutosplitter:
     def __init__(self) -> None:
@@ -46,16 +46,17 @@ class PilgrimUniversalAutosplitter:
         self.split_directory.split_name_to_gui_signal.connect(self.gui.set_split_name)
         self.split_directory.first_split_signal.connect(self.gui.set_first_split_status)
         self.split_directory.last_split_signal.connect(self.gui.set_last_split_status)
+        self.split_directory.split_dir_path_signal.connect(self.gui.set_split_directory_line_edit_text_status)
 
         self.split_directory.split_image_to_splitter_signal.connect(self.splitter.set_split_image)
 
         # GUI signals
-        self.gui.image_directory_button_signal.connect(lambda: None)
         self.gui.screenshot_button_signal.connect(self.capture.take_screenshot)
         self.gui.reload_video_button_signal.connect(self.capture.connect_to_video_feed)
 
         self.gui.pause_request_signal.connect(self.splitter.set_suspended_status)
 
+        self.gui.image_directory_button_signal.connect(self.split_directory.set_dir_path)
         self.gui.previous_split_button_signal.connect(self.split_directory.load_previous_split_image)
         self.gui.next_split_button_signal.connect(self.split_directory.load_next_split_image)
         self.gui.skip_split_button_signal.connect(self.split_directory.load_next_split_image)
@@ -72,7 +73,7 @@ class PilgrimUniversalAutosplitter:
         self.send_frame_timer = QTimer()
         self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
         self.send_frame_timer.timeout.connect(self.capture.send_frame)
-        self.send_frame_timer.start()   # use self.timer.setInterval(1000 // new_time_here) to change time
+        self.send_frame_timer.start()
 
         self.gui.main_window.show()
         self.pilgrim_universal_autosplitter.exec()        

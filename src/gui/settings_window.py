@@ -1,8 +1,8 @@
-from PyQt5.QtCore import QRect, Qt, QSettings
+from PyQt5.QtCore import QRect, QSettings, Qt
 from PyQt5.QtWidgets import (QCheckBox, QDialog, QDoubleSpinBox, QFrame,
                              QKeySequenceEdit, QLabel, QPushButton, QSpinBox)
 
-from utils import convert_css_to_string, settings
+from utils import settings
 
 
 class GUISettingsWindow(QDialog):
@@ -18,90 +18,90 @@ class GUISettingsWindow(QDialog):
         self.TOP_EDGE_CORRECTION_FRAME = 0
 
         # Import style sheets
-        self.settings_window_style = convert_css_to_string("res/css/main_window.css")
-        self.settings_label_style = convert_css_to_string("res/css/settings_label.css")
-        self.helper_frame_style = convert_css_to_string("res/css/helper_frame.css")
+        # self.settings_window_style = convert_css_to_string("res/css/main_window.css")
+        # self.settings_label_style = convert_css_to_string("res/css/settings_label.css")
+        # self.helper_frame_style = convert_css_to_string("res/css/helper_frame.css")
 
         # Settings window settings
         self.setWindowTitle("Settings")
         self.setFixedSize(341, 372)
-        self.setStyleSheet(self.settings_window_style)
+        # self.setStyleSheet(self.settings_window_style)
 
         # Labels
         self.fps_label = QLabel(self)
         self.fps_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 10 + self.TOP_EDGE_CORRECTION, 131, 31))
         self.fps_label.setText("Frames per second:")
         self.fps_label.setToolTip("Read this many frames per second from video source")
-        self.fps_label.setStyleSheet(self.settings_label_style)
+        # self.fps_label.setStyleSheet(self.settings_label_style)
 
         self.fps_helper_label = QLabel(self)
         self.fps_helper_label.setGeometry(QRect(240 + self.LEFT_EDGE_CORRECTION, 10 + self.TOP_EDGE_CORRECTION, 51, 31))
         self.fps_helper_label.setText("FPS")
-        self.fps_helper_label.setStyleSheet(self.settings_label_style)
+        # self.fps_helper_label.setStyleSheet(self.settings_label_style)
 
         self.open_screenshots_label = QLabel(self)
         self.open_screenshots_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 40 + self.TOP_EDGE_CORRECTION, 141, 31))
         self.open_screenshots_label.setText("Open screenshots:")
         self.open_screenshots_label.setToolTip("When enabled, opens screenshots with the system's default image viewer")
-        self.open_screenshots_label.setStyleSheet(self.settings_label_style)
+        # self.open_screenshots_label.setStyleSheet(self.settings_label_style)
 
         self.default_threshold_label = QLabel(self)
         self.default_threshold_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 70 + self.TOP_EDGE_CORRECTION, 161, 31))
         self.default_threshold_label.setText("Default threshold:")
         self.default_threshold_label.setToolTip("Images must match at least this much to trigger a split, pause, etc.")
-        self.default_threshold_label.setStyleSheet(self.settings_label_style)
+        # self.default_threshold_label.setStyleSheet(self.settings_label_style)
 
         self.default_delay_label = QLabel(self)
         self.default_delay_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 100 + self.TOP_EDGE_CORRECTION, 201, 31))
         self.default_delay_label.setText("Default delay:")
         self.default_delay_label.setToolTip("The default delay between the split threshold being reached and a split, pause, etc.")
-        self.default_delay_label.setStyleSheet(self.settings_label_style)
+        # self.default_delay_label.setStyleSheet(self.settings_label_style)
 
         self.default_delay_helper_label = QLabel(self)
         self.default_delay_helper_label.setGeometry(QRect(240 + self.LEFT_EDGE_CORRECTION, 100 + self.TOP_EDGE_CORRECTION, 51, 31))
         self.default_delay_helper_label.setText("seconds")
-        self.default_delay_helper_label.setStyleSheet(self.settings_label_style)
+        # self.default_delay_helper_label.setStyleSheet(self.settings_label_style)
 
         self.default_pause_label = QLabel(self)
         self.default_pause_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 130 + self.TOP_EDGE_CORRECTION, 191, 31))
         self.default_pause_label.setText("Default pause:")
         self.default_pause_label.setToolTip("The default waiting period after a split and before starting to compare the next image. Set this setting higher to save CPU")
-        self.default_pause_label.setStyleSheet(self.settings_label_style)
+        # self.default_pause_label.setStyleSheet(self.settings_label_style)
 
         self.default_pause_helper_label = QLabel(self)
         self.default_pause_helper_label.setGeometry(QRect(240 + self.LEFT_EDGE_CORRECTION, 130 + self.TOP_EDGE_CORRECTION, 51, 31))
         self.default_pause_helper_label.setText("seconds")
-        self.default_pause_helper_label.setStyleSheet(self.settings_label_style)
+        # self.default_pause_helper_label.setStyleSheet(self.settings_label_style)
 
         self.hotkey_settings_label = QLabel(self)
         self.hotkey_settings_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 160 + self.TOP_EDGE_CORRECTION, 111, 31))
         self.hotkey_settings_label.setText("Hotkey settings:")
-        self.hotkey_settings_label.setStyleSheet(self.settings_label_style)
+        # self.hotkey_settings_label.setStyleSheet(self.settings_label_style)
 
         self.start_split_hotkey_label = QLabel(self)
         self.start_split_hotkey_label.setGeometry(QRect(50 + self.LEFT_EDGE_CORRECTION, 190 + self.TOP_EDGE_CORRECTION, 81, 31))
         self.start_split_hotkey_label.setText("Start, split")
-        self.start_split_hotkey_label.setStyleSheet(self.settings_label_style)
+        # self.start_split_hotkey_label.setStyleSheet(self.settings_label_style)
 
         self.reset_hotkey_label = QLabel(self)
         self.reset_hotkey_label.setGeometry(QRect(50 + self.LEFT_EDGE_CORRECTION, 220 + self.TOP_EDGE_CORRECTION, 61, 31))
         self.reset_hotkey_label.setText("Reset")
-        self.reset_hotkey_label.setStyleSheet(self.settings_label_style)
+        # self.reset_hotkey_label.setStyleSheet(self.settings_label_style)
 
         self.pause_hotkey_label = QLabel(self)
         self.pause_hotkey_label.setGeometry(QRect(50 + self.LEFT_EDGE_CORRECTION, 250 + self.TOP_EDGE_CORRECTION, 61, 31))
         self.pause_hotkey_label.setText("Reset")
-        self.pause_hotkey_label.setStyleSheet(self.settings_label_style)
+        # self.pause_hotkey_label.setStyleSheet(self.settings_label_style)
 
         self.undo_split_hotkey_label = QLabel(self)
         self.undo_split_hotkey_label.setGeometry(QRect(50 + self.LEFT_EDGE_CORRECTION, 180 + self.TOP_EDGE_CORRECTION, 81, 31))
         self.undo_split_hotkey_label.setText("Pause")
-        self.undo_split_hotkey_label.setStyleSheet(self.settings_label_style)
+        # self.undo_split_hotkey_label.setStyleSheet(self.settings_label_style)
 
         self.skip_split_hotkey_label = QLabel(self)
         self.skip_split_hotkey_label.setGeometry(QRect(50 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 71, 31))
         self.skip_split_hotkey_label.setText("Skip split")
-        self.skip_split_hotkey_label.setStyleSheet(self.settings_label_style)
+        # self.skip_split_hotkey_label.setStyleSheet(self.settings_label_style)
 
         # Widgets (spinboxes, checkboxes, and sequence edits)
         self.fps_spinbox = QSpinBox(self)
@@ -167,7 +167,7 @@ class GUISettingsWindow(QDialog):
         self.border_helper_frame.setGeometry(QRect(10 + self.LEFT_EDGE_CORRECTION_FRAME, 10 + self.TOP_EDGE_CORRECTION_FRAME, 322, 351))
         self.border_helper_frame.setFrameShape(QFrame.StyledPanel)
         self.border_helper_frame.setFrameShadow(QFrame.Raised)
-        self.border_helper_frame.setStyleSheet(self.helper_frame_style)
+        # self.border_helper_frame.setStyleSheet(self.helper_frame_style)
         self.border_helper_frame.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         self.cancel_button = QPushButton(self)

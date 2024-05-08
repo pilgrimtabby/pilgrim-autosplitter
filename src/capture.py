@@ -2,6 +2,7 @@ import os
 import platform
 import subprocess
 from pathlib import Path
+import time
 
 import cv2
 import numpy
@@ -28,12 +29,14 @@ class Capture(QObject):
         self.current_split_image = None
         self.splits_loaded = False
         self.video_is_active = False
+        self.count = 0
+        self.time = 0
 
     def connect_to_video_feed(self) -> bool:
         if self.cap:
             self.cap.release()
 
-        self.cap = cv2.VideoCapture("res/test-vid2.mp4")
+        self.cap = cv2.VideoCapture("res/test-vid.mp4")
         # self.cap = cv2.VideoCapture(0)
         if self.cap.isOpened():
             self.video_is_active = True
@@ -44,6 +47,16 @@ class Capture(QObject):
 
     def send_frame(self):
         frame = self.get_and_resize_frame(is_screenshot=False)
+
+        # Measure FPS
+        # if self.time == 0:
+        #     self.time = time.time()
+        # elif time.time() - self.time >= 1:
+        #     self.time = 0
+        #     print(self.count)
+        #     self.count = 0
+        # self.count += 1
+
         if frame is None:
             return
 
@@ -59,6 +72,11 @@ class Capture(QObject):
     def get_and_resize_frame(self, is_screenshot=False) -> numpy.ndarray | None:
         frame = self.cap.read()[1]
         if frame is None:
+            # self.video_is_active = False  # Don't try to reconnect
+            # self.video_is_active_signal.emit(False)
+            # self.send_to_gui_signal.emit(QPixmap())
+            # return None
+
             self.connect_to_video_feed()  # Try to reconnect
             if self.video_is_active:
                 self.send_to_gui_signal.emit(QPixmap())
@@ -79,7 +97,11 @@ class Capture(QObject):
             self.screenshot_result_signal.emit(None)
             return
 
-        screenshot_path = f"{settings.value('LAST_IMAGE_DIR')}/test100000.png"
+        image_dir = settings.value('LAST_IMAGE_DIR')
+        if image_dir is None or not Path(image_dir).is_dir:
+            image_dir = os.path.expanduser("~")
+
+        screenshot_path = f"{image_dir}/test200000.png"
         cv2.imwrite(screenshot_path, frame)
         if Path(screenshot_path).is_file():
             if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
@@ -91,3 +113,5 @@ class Capture(QObject):
                     subprocess.call(["xdg-open", screenshot_path])
             else:
                 self.screenshot_result_signal.emit(screenshot_path)
+        else:
+            print("Not a file@")

@@ -29,6 +29,8 @@ class GUIController(QObject):
         self.splitter_delaying = False
         self.is_first_split = False
         self.is_last_split = False
+        self.show_video_feed_label = False
+        self.show_video_capture_method_label = False
         self.show_comparison_match = False
         self.show_threshold = False
         self.image_directory_button_enabled = False
@@ -112,8 +114,16 @@ class GUIController(QObject):
                 self.set_screenshot_button_enabled_status(False)
 
     def update_labels(self):
+        if self.video_feed_active:
+            self.set_video_feed_label_status(True)
+            self.set_video_capture_method_label_status(True)
+        else:
+            self.set_video_feed_label_status(False)
+            self.set_video_capture_method_label_status(False)
+
         if not self.splits_active:
             self.set_split_name(None)
+            self.set_loop_text(None, None)
 
     def update_all_elements(self):
         self.update_enabled_comparison_data()
@@ -123,8 +133,7 @@ class GUIController(QObject):
     def set_video_feed_active_status(self, status: bool):
         if self.video_feed_active != status:
             self.video_feed_active = status
-            self.update_enabled_comparison_data()
-            self.update_enabled_buttons()
+            self.update_all_elements()
 
     def set_split_image_and_splits_active_status(self, frame: QPixmap):
         if frame.isNull():
@@ -161,18 +170,31 @@ class GUIController(QObject):
             self.is_last_split = status
             self.update_enabled_buttons()
 
+    def set_split_directory_line_edit_text_status(self, path):
+        self.main_window.set_image_directory_line_edit(path)
+
+    def set_video_feed_label_status(self, status):
+        if self.show_video_feed_label != status:
+            self.show_video_feed_label = status
+            self.main_window.set_video_feed_label(status)
+
+    def set_video_capture_method_label_status(self, status):
+        if self.show_video_capture_method_label != status:
+            self.show_video_capture_method_label = status
+            self.main_window.set_video_capture_method_label(status)
+
     def set_show_comparison_match_status(self, status):
         if self.show_comparison_match != status:
             self.show_comparison_match = status
             if not self.show_comparison_match:
-                self.set_match_percent(self.get_match_percent_null_value(), PercentType.CURRENT)
-                self.set_match_percent(self.get_match_percent_null_value(), PercentType.HIGHEST)
+                self.set_match_percent(None, PercentType.CURRENT)
+                self.set_match_percent(None, PercentType.HIGHEST)
 
     def set_show_threshold_status(self, status):
         if self.show_threshold != status:
             self.show_threshold = status
             if not self.show_threshold:
-                self.set_match_percent(self.get_match_percent_null_value(), PercentType.THRESHOLD)
+                self.set_match_percent(None, PercentType.THRESHOLD)
 
     def set_image_directory_button_enabled_status(self, status):
         if self.image_directory_button_enabled != status:
@@ -200,7 +222,6 @@ class GUIController(QObject):
             self.main_window.set_next_split_button_status(status)
 
     def set_pause_comparison_button_enabled_status(self, status):
-        print(status)
         if self.pause_comparison_button_enabled != status:
             self.pause_comparison_button_enabled = status
             self.main_window.set_pause_comparison_button_status(status)
@@ -233,33 +254,24 @@ class GUIController(QObject):
             self.reset_splits_button_enabled = status
             self.main_window.set_reset_splits_button_status(status)
 
-    def set_match_percent(self, match_percent: str, percent_type: PercentType):
+    def set_match_percent(self, match_percent: str | None, percent_type: PercentType):
         if percent_type == PercentType.CURRENT:
             if self.show_comparison_match:
                 self.main_window.set_current_match_percent(self.format_match_percent(match_percent))
             else:
-                self.main_window.set_current_match_percent(self.get_match_percent_null_value())
+                self.main_window.set_current_match_percent(None)
 
         elif percent_type == PercentType.HIGHEST:
             if self.show_comparison_match:
                 self.main_window.set_highest_match_percent(self.format_match_percent(match_percent))
             else:
-                self.main_window.set_highest_match_percent(self.get_match_percent_null_value())
+                self.main_window.set_highest_match_percent(None)
         
         else:  # PercentType.THRESHOLD
             if self.show_threshold:
                 self.main_window.set_threshold_match_percent(self.format_match_percent(match_percent))
             else:
-                self.main_window.set_threshold_match_percent(self.get_match_percent_null_value())
-
-    def get_match_percent_null_value(self):
-        null_value = "--"
-        decimals = settings.value("MATCH_PERCENT_DECIMALS")
-        if decimals > 0:
-            null_value += "."
-            while decimals > 0:
-                null_value += "-"
-        return null_value
+                self.main_window.set_threshold_match_percent(None)
 
     def format_match_percent(self, match_percent: str) -> str:
         format_string = f"{{:.{settings.value('MATCH_PERCENT_DECIMALS')}f}}"

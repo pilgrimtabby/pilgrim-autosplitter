@@ -3,6 +3,7 @@ import pathlib
 
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QFileDialog
 
 from split_image import SplitImage
 
@@ -12,7 +13,7 @@ class SplitDirectory(QObject):
     split_image_to_gui_signal = pyqtSignal(object)
     split_image_to_splitter_signal = pyqtSignal(object)
     loop_information_signal = pyqtSignal(int, int)
-    image_amount_signal = pyqtSignal(int)
+    split_dir_path_signal = pyqtSignal(object)
     image_index_signal = pyqtSignal(int)
     first_split_signal = pyqtSignal(bool)
     last_split_signal = pyqtSignal(bool)
@@ -24,12 +25,18 @@ class SplitDirectory(QObject):
         self.is_last_split = False
 
     def prepare_split_images(self, make_image_list: bool):
+        if self.path is None:
+            self.split_image_to_gui_signal.emit(QPixmap())
+            self.split_image_to_splitter_signal.emit(None)
+            self.split_dir_path_signal.emit(None)
+            return
+
+        self.split_dir_path_signal.emit(self.path)
         if make_image_list:
             self.images = []
             for image in self.get_image_paths():
                 self.images += [SplitImage(image)]
         if self.images:
-            self.image_amount_signal.emit(len(self.images))
             self.load_next_split_image(first_image=True)
         else:
             self.split_image_to_gui_signal.emit(QPixmap())
@@ -81,10 +88,6 @@ class SplitDirectory(QObject):
     def reset_split_images(self):
         self.prepare_split_images(make_image_list=False)
 
-    def set_dir_path(self, path: str):
-        self.path = path
-        self.prepare_split_images(make_image_list=True)
-
     def set_is_first_split(self, status: bool):
         if self.is_first_split != status:
             self.is_first_split = status
@@ -118,3 +121,10 @@ class SplitDirectory(QObject):
             self.set_is_last_split(True)
         else:
             self.set_is_last_split(False)
+
+    def set_dir_path(self):
+        path = QFileDialog.getExistingDirectory(None, "Select splits folder")
+        if self.path != path or self.path is None:
+            self.path = path
+            print(self.path)
+            self.prepare_split_images(make_image_list=True)
