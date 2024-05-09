@@ -16,7 +16,7 @@ settings.setValue("DEFAULT_THRESHOLD", .90)
 settings.setValue("DEFAULT_DELAY", 0)
 settings.setValue("DEFAULT_LOOP_COUNT", 0)
 settings.setValue("DEFAULT_PAUSE", 1)
-settings.setValue("DEFAULT_FPS", 120)
+settings.setValue("DEFAULT_FPS", 60) # my capture card does 60
 settings.setValue("LAST_IMAGE_DIR", "res")
 settings.setValue("OPEN_SCREENSHOT_ON_CAPTURE", False)
 settings.setValue("MATCH_PERCENT_DECIMALS", 0)

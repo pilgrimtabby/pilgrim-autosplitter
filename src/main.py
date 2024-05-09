@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QTimer
 
 from capture import Capture
 from gui.controller import GUIController
@@ -52,7 +52,7 @@ class PilgrimUniversalAutosplitter:
 
         # GUI signals
         self.gui.screenshot_button_signal.connect(self.capture.take_screenshot)
-        self.gui.reload_video_button_signal.connect(self.capture.verify_connection)
+        self.gui.reload_video_button_signal.connect(self.capture.reconnect_video)
 
         self.gui.pause_request_signal.connect(self.splitter.set_suspended_status)
 
@@ -67,9 +67,14 @@ class PilgrimUniversalAutosplitter:
         self.gui.undo_split_button_signal.connect(self.hotkeys.press_undo_hotkey)
         self.gui.reset_splits_button_signal.connect(self.hotkeys.press_reset_hotkey)
 
-        # Activate splits and capture
+        # Start splits and capture
         self.split_directory.prepare_split_images(make_image_list=True)
-        self.capture.verify_connection()
+
+        self.send_frame_timer = QTimer()
+        self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
+        self.send_frame_timer.timeout.connect(lambda: self.capture.send_frame(True))
+        self.send_frame_timer.start()   # use self.timer.setInterval(1000 // new_time_here) to change time
+
 
         self.gui.main_window.show()
         self.pilgrim_universal_autosplitter.exec()        

@@ -1,12 +1,13 @@
 import os
 import platform
 import subprocess
-from pathlib import Path
 import time
+from pathlib import Path
+from threading import Thread
 
 import cv2
 import numpy
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer
+from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 
 from utils import settings
@@ -15,90 +16,47 @@ from utils import settings
 class Capture(QObject):
     send_to_gui_signal = pyqtSignal(QPixmap)
     send_to_splitter_signal = pyqtSignal(numpy.ndarray)
-    cap_open_signal = pyqtSignal(bool)
     screenshot_result_signal = pyqtSignal(object)
     video_is_active_signal = pyqtSignal(bool)
 
-    cap: cv2.VideoCapture
-    most_recent_frame: numpy.ndarray
-
     def __init__(self) -> None:
         super().__init__()
-        self.cap = None
-        self.most_recent_frame = None
-        self.current_split_image = None
-        self.splits_loaded = False
+        self.frame_count= 0
+        self.frame_time = 0
         self.video_is_active = False
-        self.count = 0
-        self.time = 0
-        # self.cap = cv2.VideoCapture("res/test-vid.mp4")
-        self.cap = cv2.VideoCapture(0)
-        self.send_frame_timer = QTimer()
-        self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
-        self.send_frame_timer.timeout.connect(self.send_frame)
+        self.streamer = Streamer(0)
+        # self.streamer = Streamer("res/test-vid.mp4")
 
-    def verify_connection(self) -> bool:
-        if self.cap:
-            self.cap.release()
-
-        self.cap = cv2.VideoCapture(0)
-        if self.cap.isOpened():
-            # self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
-            self.video_is_active = True
-            self.video_is_active_signal.emit(True)
-            self.send_frame_timer.start()
-        else:
-            self.video_is_active = False
-            self.video_is_active_signal.emit(False)
-            self.send_frame_timer.stop()
-
-    def send_frame(self):
-        frame = self.get_and_resize_frame(is_screenshot=False)
-        # Measure FPS
-        # if self.time == 0:
-        #     self.time = time.time()
-        # elif time.time() - self.time >= 1:
-        #     self.time = 0
-        #     print(self.count)
-        #     self.count = 0
-        # self.count += 1
+    def send_frame(self, measure_fps=False):
+        frame = self.streamer.share()
+        
+        if measure_fps:
+            if self.frame_time == 0:
+                self.frame_time = time.time()
+            elif time.time() - self.frame_time >= 1:
+                self.frame_time = 0
+                print(self.frame_count)
+                self.frame_count = 0
+            self.frame_count += 1
 
         if frame is None:
-            return
-
-        self.send_to_gui_signal.emit(self.frame_to_pixmap(frame))
-        self.send_to_splitter_signal.emit(frame)
+            self.set_video_active_status(False)
+            self.send_to_gui_signal.emit(QPixmap())
+        else:
+            self.set_video_active_status(True)
+            self.send_to_gui_signal.emit(self.frame_to_pixmap(frame))
+            self.send_to_splitter_signal.emit(frame)
     
+    def reconnect_video(self):
+        self.streamer.reconnect()
+
     def frame_to_pixmap(self, frame: numpy.ndarray):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
-        frame_pixmap = QPixmap.fromImage(frame_img)
-        return frame_pixmap
+        return QPixmap.fromImage(frame_img)
     
-    def get_and_resize_frame(self, is_screenshot=False) -> numpy.ndarray | None:
-        frame = self.cap.read()[1]
-        if frame is None:
-            # self.video_is_active = False  # Don't try to reconnect
-            # self.video_is_active_signal.emit(False)
-            # self.send_to_gui_signal.emit(QPixmap())
-            # return None
-
-            self.verify_connection()  # Try to reconnect
-            if self.video_is_active:
-                self.send_to_gui_signal.emit(QPixmap())
-                return None
-            else:
-                return self.get_and_resize_frame()
-        
-        if not is_screenshot and (frame == self.most_recent_frame).all():
-            return None
-
-        self.most_recent_frame = frame
-        frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-        return frame
-
     def take_screenshot(self) -> bool:
-        frame = self.get_and_resize_frame(is_screenshot=True)
+        frame = self.streamer.share()
         if frame is None:
             self.screenshot_result_signal.emit(None)
             return
@@ -120,4 +78,50 @@ class Capture(QObject):
             else:
                 self.screenshot_result_signal.emit(screenshot_path)
         else:
-            print("Not a file@")
+            self.screenshot_result_signal.emit(None)
+
+    def set_video_active_status(self, status: bool):
+        if self.video_is_active != status:
+            self.video_is_active = status
+            self.video_is_active_signal.emit(status)
+
+
+class Streamer():
+    def __init__(self, source: int) -> None:
+        self.source = source
+        self.buffer = 1
+        self.cap = cv2.VideoCapture(source)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer)
+        self.frame = None
+        self.exit = False
+
+        self.thread = Thread(target=self.read, args=())
+        self.thread.daemon = True
+        self.thread.start()
+
+    def read(self):
+        while True:
+            if self.exit:
+                break
+
+            if self.cap.isOpened:
+                frame = self.cap.read()[1]
+                if frame is None:
+                    self.frame = None
+                else:
+                    self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+            time.sleep(1 / settings.value("DEFAULT_FPS"))
+
+    def share(self):
+        return self.frame
+    
+    def reconnect(self):
+        self.exit = True
+        self.thread.join()
+        self.cap = cv2.VideoCapture(self.source)
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer)
+        self.exit = False
+    
+        self.thread = Thread(target=self.read, args=())
+        self.thread.daemon = True
+        self.thread.start()
