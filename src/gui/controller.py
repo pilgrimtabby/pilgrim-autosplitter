@@ -3,6 +3,7 @@ from PyQt5.QtGui import QPixmap
 
 from gui.main_window import GUIMainWindow
 from gui.settings_window import GUISettingsWindow
+from gui.style import GUIStyle
 from utils import PercentType, settings
 
 
@@ -16,12 +17,21 @@ class GUIController(QObject):
     skip_split_button_signal = pyqtSignal()
     undo_split_button_signal = pyqtSignal()
     reset_splits_button_signal = pyqtSignal()
+    update_fps_start_signal = pyqtSignal()
+    update_fps_finish_signal = pyqtSignal()
+    update_aspect_ratio_start_signal = pyqtSignal()
+    update_aspect_ratio_finish_signal = pyqtSignal()
+    set_match_percent_decimals_signal = pyqtSignal()
+    updated_default_threshold_signal = pyqtSignal(str, PercentType)
+    updated_default_delay_signal = pyqtSignal()
+    updated_default_pause_signal = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
 
-        self.main_window = GUIMainWindow()
-        self.settings_window = GUISettingsWindow()
+        self.style = GUIStyle()
+        self.main_window = GUIMainWindow(self.style)
+        self.settings_window = GUISettingsWindow(self.style)
 
         self.video_feed_active = False
         self.splits_active = False
@@ -43,7 +53,7 @@ class GUIController(QObject):
         self.undo_split_button_enabled = False
         self.reset_splits_button_enabled = False
 
-        # Handle signals from main_window
+        # Handle signals from GUi
         self.main_window.settings_window_action.triggered.connect(self.settings_window.exec)
         self.main_window.about_window_action.triggered.connect(lambda: None)
 
@@ -56,6 +66,16 @@ class GUIController(QObject):
         self.main_window.skip_split_button.clicked.connect(self.skip_split_button_signal.emit)
         self.main_window.undo_split_button.clicked.connect(self.undo_split_button_signal.emit)
         self.main_window.reset_splits_button.clicked.connect(self.reset_splits_button_signal.emit)
+
+        self.settings_window.save_button.clicked.connect(lambda: self.style.set_global_style([self.main_window.main_window, self.settings_window]))
+        self.settings_window.update_fps_start_signal.connect(self.update_fps_start_signal.emit)
+        self.settings_window.update_fps_finish_signal.connect(self.update_fps_finish_signal.emit)
+        self.settings_window.update_aspect_ratio_start_signal.connect(self.update_aspect_ratio_start_signal.emit)
+        self.settings_window.update_aspect_ratio_finish_signal.connect(self.update_aspect_ratio_finish_signal.emit)
+        self.settings_window.set_match_percent_decimals_signal.connect(self.set_match_percent_decimals_signal.emit)
+        self.settings_window.updated_default_threshold_signal.connect(lambda: self.updated_default_threshold_signal.emit(str(settings.value("DEFAULT_THRESHOLD")), PercentType.THRESHOLD))
+        self.settings_window.updated_default_delay_signal.connect(self.updated_default_delay_signal.emit)
+        self.settings_window.updated_default_pause_signal.connect(self.updated_default_pause_signal.emit)
 
     def update_enabled_comparison_data(self):
         if self.splits_active:
@@ -136,7 +156,7 @@ class GUIController(QObject):
             self.update_all_elements()
 
     def set_split_image_and_splits_active_status(self, frame: QPixmap):
-        if frame.isNull():
+        if frame is None:
             self.main_window.set_blank_split_image()
             if self.splits_active:
                 self.splits_active = False
@@ -284,7 +304,7 @@ class GUIController(QObject):
             self.main_window.screenshot_success_message(path)
 
     def set_video_frame(self, frame: QPixmap):
-        if frame.isNull():
+        if frame is None:
             self.main_window.set_blank_video_frame()
         else:
             self.main_window.set_live_video_frame(frame)

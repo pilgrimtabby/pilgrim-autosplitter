@@ -46,6 +46,9 @@ class Splitter(QObject):
 
         self.split_matcher.set_frame(frame)
         match_percent = self.split_matcher.get_match_percent()
+        if match_percent is None:
+            return
+
         self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT)
         if match_percent > self.highest_match_percent:
             self.highest_match_percent = match_percent
@@ -55,11 +58,11 @@ class Splitter(QObject):
             if self.split_image.below_flag:
                 self.went_above_threshold_flag = True
             else:
-                self.split_matcher.exit()
+                self.split_matcher.exit_thread()
                 self.split()
 
         elif self.went_above_threshold_flag:
-            self.split_matcher.exit()
+            self.split_matcher.exit_thread()
             self.split()
 
     def split(self):
@@ -99,34 +102,45 @@ class Splitter(QObject):
             self.delaying = status
             self.delaying_status_signal.emit(self.delaying)
 
+    def kill_split_matcher(self):
+        if self.split_matcher is not None:
+            self.split_matcher.exit_thread()
+    
+    def restart_split_matcher(self):
+        if self.split_matcher is not None:
+            self.split_matcher.restart_thread()
+
+    def reset_all_match_percents(self):
+        self.highest_match_percent = 0
+        self.match_percent_signal.emit(str(self.split_image.threshold), PercentType.THRESHOLD)
 
 class SplitMatcher:
     def __init__(self, templ, mask) -> None:
         self.frame = None
         self.templ = templ
         self.mask = mask
-        self.match_percent = 0
+        self.match_percent = None
         self.exit = False
         
-        self.thread = Thread(target=self.compare, args=())
+        self.thread = Thread(target=self.compare, args=(1 / settings.value("FPS"),))
         self.thread.daemon = True
         self.thread.start()
 
-    def compare(self):
-        while True:
-            if self.exit:
-                break
+    def compare(self, interval):
+        while not self.exit:
             if self.frame is None:
                 continue
-
-            comparison_frame = cv2.matchTemplate(
-                self.frame,
-                self.templ,
-                cv2.TM_CCORR_NORMED,
-                mask=self.mask
-            )
-            self.match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
-            time.sleep(1 / settings.value("DEFAULT_FPS"))
+            try:
+                comparison_frame = cv2.matchTemplate(
+                    self.frame,
+                    self.templ,
+                    cv2.TM_CCORR_NORMED,
+                    mask=self.mask
+                )
+                self.match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+            except cv2.error:
+                pass
+            time.sleep(interval)
 
     def set_frame(self, frame):
         self.frame = frame
@@ -134,6 +148,15 @@ class SplitMatcher:
     def get_match_percent(self):
         return self.match_percent
 
-    def exit(self):
+    def restart_thread(self):
+        if self.thread.is_alive():
+            self.exit_thread()
+
+        self.thread = Thread(target=self.compare, args=(1 / settings.value("FPS"),))
+        self.thread.daemon = True
+        self.thread.start()
+
+    def exit_thread(self):
         self.exit = True
         self.thread.join()
+        self.exit = False

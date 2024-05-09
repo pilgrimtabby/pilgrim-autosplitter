@@ -9,8 +9,9 @@ from splitter import Splitter
 from utils import settings
 
 # test all split flags yaAYy
-# Fix settings gui
 # implement hotkeys
+# Get split images to resize too
+# make css enhancement adjustments
 
 
 class PilgrimUniversalAutosplitter:
@@ -21,6 +22,7 @@ class PilgrimUniversalAutosplitter:
         self.split_directory = SplitDirectory(settings.value("LAST_IMAGE_DIR"))
         self.hotkeys = Hotkeys()
         self.gui = GUIController()
+        self.send_frame_timer = None
 
         # Capture signals
         self.capture.video_is_active_signal.connect(self.gui.set_video_feed_active_status)
@@ -55,6 +57,9 @@ class PilgrimUniversalAutosplitter:
         self.gui.reload_video_button_signal.connect(self.capture.reconnect_video)
 
         self.gui.pause_request_signal.connect(self.splitter.set_suspended_status)
+        self.gui.set_match_percent_decimals_signal.connect(self.splitter.reset_all_match_percents)
+        self.gui.updated_default_delay_signal.connect(self.split_directory.recalculate_default_delay)
+        self.gui.updated_default_pause_signal.connect(self.split_directory.recalculate_default_pause)
 
         self.gui.image_directory_button_signal.connect(self.split_directory.set_dir_path)
         self.gui.previous_split_button_signal.connect(self.split_directory.load_previous_split_image)
@@ -62,21 +67,40 @@ class PilgrimUniversalAutosplitter:
         self.gui.skip_split_button_signal.connect(self.split_directory.load_next_split_image)
         self.gui.undo_split_button_signal.connect(self.split_directory.load_previous_split_image)
         self.gui.reset_splits_button_signal.connect(self.split_directory.reset_split_images)
+        self.gui.updated_default_threshold_signal.connect(self.split_directory.recalculate_default_threshold)
+        self.gui.updated_default_threshold_signal.connect(self.splitter.match_percent_signal.emit)
+        self.gui.updated_default_delay_signal.connect(self.split_directory.recalculate_default_delay)
+        self.gui.updated_default_pause_signal.connect(self.split_directory.recalculate_default_pause)
 
         self.gui.skip_split_button_signal.connect(self.hotkeys.press_skip_hotkey)
         self.gui.undo_split_button_signal.connect(self.hotkeys.press_undo_hotkey)
         self.gui.reset_splits_button_signal.connect(self.hotkeys.press_reset_hotkey)
 
-        # Start splits and capture
-        self.split_directory.prepare_split_images(make_image_list=True)
+        self.gui.update_fps_start_signal.connect(self.capture.kill_streamer)
+        self.gui.update_fps_start_signal.connect(self.splitter.kill_split_matcher)
+        self.gui.update_fps_finish_signal.connect(self.change_frame_rate)
+        self.gui.update_fps_finish_signal.connect(self.capture.restart_streamer)
+        self.gui.update_fps_finish_signal.connect(self.splitter.restart_split_matcher)
 
+        self.gui.update_aspect_ratio_start_signal.connect(self.capture.kill_streamer)
+        self.gui.update_aspect_ratio_start_signal.connect(self.splitter.kill_split_matcher)
+        self.gui.update_aspect_ratio_finish_signal.connect(self.split_directory.resize_images)
+        self.gui.update_aspect_ratio_finish_signal.connect(self.capture.restart_streamer)
+        self.gui.update_aspect_ratio_finish_signal.connect(self.splitter.restart_split_matcher)
+
+        # Start program
+        self.split_directory.prepare_split_images(make_image_list=True)
+        
         self.send_frame_timer = QTimer()
-        self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
+        self.send_frame_timer.setInterval(1000 // settings.value("FPS"))
         self.send_frame_timer.timeout.connect(lambda: self.capture.send_frame(True))
         self.send_frame_timer.start()
 
         self.gui.main_window.show()
-        self.pilgrim_universal_autosplitter.exec()        
+        self.pilgrim_universal_autosplitter.exec()
+
+    def change_frame_rate(self):
+        self.send_frame_timer.setInterval(1000 // settings.value("FPS"))
 
 
 if __name__ == "__main__":

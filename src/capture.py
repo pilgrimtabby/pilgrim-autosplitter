@@ -14,7 +14,7 @@ from utils import settings
 
 
 class Capture(QObject):
-    send_to_gui_signal = pyqtSignal(QPixmap)
+    send_to_gui_signal = pyqtSignal(object)
     send_to_splitter_signal = pyqtSignal(numpy.ndarray)
     screenshot_result_signal = pyqtSignal(object)
     video_is_active_signal = pyqtSignal(bool)
@@ -41,14 +41,26 @@ class Capture(QObject):
 
         if frame is None:
             self.set_video_active_status(False)
-            self.send_to_gui_signal.emit(QPixmap())
+            self.send_to_gui_signal.emit(None)
         else:
             self.set_video_active_status(True)
             self.send_to_gui_signal.emit(self.frame_to_pixmap(frame))
             self.send_to_splitter_signal.emit(frame)
     
+    # Kill Streamer thread and create new Streamer object
     def reconnect_video(self):
-        self.streamer.reconnect()
+        self.streamer.exit_thread()
+        self.streamer = Streamer(0)
+
+    # Kill streamer thread then start new thread in same streamer instance
+    def kill_streamer(self):
+        if self.streamer is not None:
+            self.streamer.exit_thread()
+    
+    # Restart streamer thread
+    def restart_streamer(self):
+        if self.streamer is not None:
+            self.streamer.restart_thread()
 
     def frame_to_pixmap(self, frame: numpy.ndarray):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -61,7 +73,7 @@ class Capture(QObject):
             self.screenshot_result_signal.emit(None)
             return
 
-        image_dir = settings.value('LAST_IMAGE_DIR')
+        image_dir = settings.value("LAST_IMAGE_DIR")
         if image_dir is None or not Path(image_dir).is_dir:
             image_dir = os.path.expanduser("~")
 
@@ -95,33 +107,32 @@ class Streamer():
         self.frame = None
         self.exit = False
 
-        self.thread = Thread(target=self.read, args=())
+        self.thread = Thread(target=self.read, args=(1 / settings.value("FPS"),))
         self.thread.daemon = True
         self.thread.start()
 
-    def read(self):
-        while True:
-            if self.exit:
-                break
-
+    def read(self, interval):
+        while not self.exit:
             if self.cap.isOpened:
                 frame = self.cap.read()[1]
                 if frame is None:
                     self.frame = None
                 else:
                     self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-            time.sleep(1 / settings.value("DEFAULT_FPS"))
+            time.sleep(interval)
 
     def share(self):
         return self.frame
-    
-    def reconnect(self):
-        self.exit = True
-        self.thread.join()
-        self.cap = cv2.VideoCapture(self.source)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer)
-        self.exit = False
-    
-        self.thread = Thread(target=self.read, args=())
+
+    def restart_thread(self):
+        if self.thread.is_alive():
+            self.exit_thread()
+            
+        self.thread = Thread(target=self.read, args=(1 / settings.value("FPS"),))
         self.thread.daemon = True
         self.thread.start()
+
+    def exit_thread(self):
+        self.exit = True
+        self.thread.join()
+        self.exit = False

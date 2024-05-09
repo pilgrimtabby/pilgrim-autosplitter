@@ -6,6 +6,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog
 
 from split_image import SplitImage
+from utils import settings
 
 
 class SplitDirectory(QObject):
@@ -26,7 +27,7 @@ class SplitDirectory(QObject):
 
     def prepare_split_images(self, make_image_list: bool):
         if self.path is None:
-            self.split_image_to_gui_signal.emit(QPixmap())
+            self.split_image_to_gui_signal.emit(None)
             self.split_image_to_splitter_signal.emit(None)
             self.split_dir_path_signal.emit(None)
             return
@@ -39,7 +40,7 @@ class SplitDirectory(QObject):
         if self.images:
             self.load_next_split_image(first_image=True)
         else:
-            self.split_image_to_gui_signal.emit(QPixmap())
+            self.split_image_to_gui_signal.emit(None)
             self.split_image_to_splitter_signal.emit(None)
             
     def load_next_split_image(self, first_image=False):
@@ -124,7 +125,32 @@ class SplitDirectory(QObject):
 
     def set_dir_path(self):
         path = QFileDialog.getExistingDirectory(None, "Select splits folder")
-        if self.path != path or self.path is None:
+        if path != "" and (self.path != path or self.path is None):
             self.path = path
             print(self.path)
             self.prepare_split_images(make_image_list=True)
+
+    def recalculate_default_delay(self):
+        for image in self.images:
+            if image.delay_is_default:
+                image.delay_duration = settings.value("DEFAULT_DELAY")
+
+    def recalculate_default_pause(self):
+        for image in self.images:
+            if image.pause_is_default:
+                image.pause_duration = settings.value("DEFAULT_PAUSE")
+
+    def recalculate_default_threshold(self):
+        for image in self.images:
+            if image.threshold_is_default:
+                image.threshold = settings.value("DEFAULT_THRESHOLD")
+
+    def recalculate_default_loop_count(self):
+        for image in self.images:
+            if image.loop_count_is_default:
+                image.loop_count = settings.value("DEFAULT_LOOP_COUNT")
+
+    def resize_images(self):
+        for image in self.images:
+            image.image = image.get_and_resize_image()
+            image.alpha = image.get_alpha()
