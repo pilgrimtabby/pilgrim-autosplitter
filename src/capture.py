@@ -39,6 +39,7 @@ class Capture(QObject):
         self.cap = cv2.VideoCapture("res/test-vid.mp4")
         # self.cap = cv2.VideoCapture(0)
         if self.cap.isOpened():
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
             self.video_is_active = True
             self.video_is_active_signal.emit(True)
         else:
@@ -47,7 +48,6 @@ class Capture(QObject):
 
     def send_frame(self):
         frame = self.get_and_resize_frame(is_screenshot=False)
-
         # Measure FPS
         # if self.time == 0:
         #     self.time = time.time()
