@@ -52,7 +52,7 @@ class PilgrimUniversalAutosplitter:
 
         # GUI signals
         self.gui.screenshot_button_signal.connect(self.capture.take_screenshot)
-        self.gui.reload_video_button_signal.connect(self.capture.connect_to_video_feed)
+        self.gui.reload_video_button_signal.connect(self.capture.verify_connection)
 
         self.gui.pause_request_signal.connect(self.splitter.set_suspended_status)
 
@@ -69,11 +69,7 @@ class PilgrimUniversalAutosplitter:
 
         # Activate splits and capture
         self.split_directory.prepare_split_images(make_image_list=True)
-        self.capture.connect_to_video_feed()
-        self.send_frame_timer = QTimer()
-        self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
-        self.send_frame_timer.timeout.connect(self.capture.send_frame)
-        self.send_frame_timer.start()
+        self.capture.verify_connection()
 
         self.gui.main_window.show()
         self.pilgrim_universal_autosplitter.exec()        

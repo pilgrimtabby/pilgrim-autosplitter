@@ -1,14 +1,8 @@
-
-################
-
-# FIRST QTHREAD ATTEMPT
-
-################
 import queue
 import cv2
 import numpy
 from pynput import keyboard
-from PyQt5.QtCore import QObject, QTimer, pyqtSignal, QThread, pyqtSlot
+from PyQt5.QtCore import QObject, QTimer, pyqtSignal, QThread
 
 from utils import PercentType
 
@@ -29,8 +23,7 @@ class Splitter(QObject):
         self.splits_active = False
         self.suspended = False
         self.delaying = False
-        self.splits_paused = False
-        self.frame_queue = queue.SimpleQueue()
+        self.comparison_frame_queue = queue.SimpleQueue()
         self.keyboard = keyboard.Controller()
 
     def set_split_image(self, image):
@@ -43,40 +36,42 @@ class Splitter(QObject):
         else:
             self.splits_active = False
 
-    def get_comparison_frame(self, frame: numpy.ndarray):
-        self.worker = ComparisonFrameWorker(frame, self.split_image.image[:,:,0:3], self.split_image.alpha)
-        self.thread = QThread(self)
-
-        self.worker.frame_generated_signal.connect(self.put_on_queue)
-        self.worker.moveToThread(self.thread)
-
-        self.worker.finished_signal.connect(self.thread.quit)
-        self.thread.started.connect(self.worker.get_comparison_frame)
-        self.thread.start()
-
-    def put_on_queue(self, frame):
-        self.frame_queue.put(frame)
-
-    def compare_frame(self):
-        if self.frame_queue.empty():
+    def compare_frame(self, frame: numpy.ndarray):
+        if not self.splits_active or not self.video_feed_active or self.suspended:
             return
-        comparison_frame = self.frame_queue.get_nowait()
-        match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
-        self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT)
-        if match_percent > self.highest_match_percent:
-            self.highest_match_percent = match_percent
-            self.match_percent_signal.emit(str(self.highest_match_percent), PercentType.HIGHEST)
 
-        if match_percent >= self.split_image.threshold:
-            if self.split_image.below_flag:
-                self.went_above_threshold_flag = True
-            else:
-                if not self.splits_paused:
+        self.worker_thread = QThread()
+        self.worker = ComparisonFrameWorker(frame, self.split_image.image[:,:,0:3], self.split_image.alpha)
+        self.worker.moveToThread(self.worker_thread)
+
+        self.worker.finished_signal.connect(self.worker.deleteLater)
+        self.worker_thread.started.connect(self.worker.get_comparison_frame)
+        self.worker.frame_generated_signal.connect(self.add_to_queue)
+        self.worker_thread.start()
+        self.check_queue()
+
+    def add_to_queue(self, frame: numpy.ndarray):
+        self.comparison_frame_queue.put(frame)
+
+    def check_queue(self):
+        if not self.comparison_frame_queue.empty():
+            comparison_frame = self.comparison_frame_queue.get()
+            match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+            self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT)
+            if match_percent > self.highest_match_percent:
+                self.highest_match_percent = match_percent
+                self.match_percent_signal.emit(str(self.highest_match_percent), PercentType.HIGHEST)
+
+            if match_percent >= self.split_image.threshold:
+                if self.split_image.below_flag:
+                    self.went_above_threshold_flag = True
+                else:
+                    self.reset_queue()
                     self.split()
-                    self.splits_paused = True
 
-        elif self.went_above_threshold_flag:
-            self.split()
+            elif self.went_above_threshold_flag:
+                self.reset_queue()
+                self.split()
 
     def split(self):
         total_down_time = self.split_image.delay_duration + self.split_image.pause_duration
@@ -109,7 +104,6 @@ class Splitter(QObject):
             self.highest_match_percent = 0
             self.suspended = status
             self.suspended_status_signal.emit(self.suspended)
-            self.splits_paused = status
 
     def set_delay_status(self, status: bool):
         if self.delaying != status:
@@ -127,23 +121,18 @@ class Splitter(QObject):
 class ComparisonFrameWorker(QObject):
     frame_generated_signal = pyqtSignal(numpy.ndarray)
     finished_signal = pyqtSignal()
-    started = pyqtSignal()
 
     def __init__(self, frame: numpy.ndarray, templ: numpy.ndarray, mask: numpy.ndarray) -> None:
         super().__init__()
         self.frame = frame
         self.templ = templ
         self.mask = mask
-        self.started.emit()
 
-    @pyqtSlot()
     def get_comparison_frame(self):
-        self.frame_generated_signal.emit(
-            cv2.matchTemplate(
-                self.frame,
-                self.templ,
-                cv2.TM_CCORR_NORMED,
-                mask=self.mask
-            )
+        frame = cv2.matchTemplate(
+            self.frame,
+            self.templ,
+            cv2.TM_CCORR_NORMED,
+            mask=self.mask
         )
-        self.finished_signal.emit()
+        self.frame_generated_signal.emit(frame)

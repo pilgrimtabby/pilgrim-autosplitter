@@ -38,12 +38,12 @@ class GUIMainWindow(QMainWindow):
         # Text labels
         self.video_feed_label = QLabel(self.main_window)
         self.video_feed_label.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 480, 31))
-        self.video_feed_label.setText("he ee")
+        self.video_feed_label.setText("")
         self.video_feed_label.setAlignment(Qt.AlignCenter)
 
         self.video_capture_method_label = QLabel(self.main_window)
         self.video_capture_method_label.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 280 + self.TOP_EDGE_CORRECTION, 480, 31))
-        self.video_capture_method_label.setText("hey there")
+        self.video_capture_method_label.setText("")
         self.video_capture_method_label.setAlignment(Qt.AlignCenter)
 
         self.split_name_label = QLabel(self.main_window)

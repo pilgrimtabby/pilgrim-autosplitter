@@ -6,7 +6,7 @@ import time
 
 import cv2
 import numpy
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 
 from utils import settings
@@ -31,20 +31,26 @@ class Capture(QObject):
         self.video_is_active = False
         self.count = 0
         self.time = 0
+        # self.cap = cv2.VideoCapture("res/test-vid.mp4")
+        self.cap = cv2.VideoCapture(0)
+        self.send_frame_timer = QTimer()
+        self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
+        self.send_frame_timer.timeout.connect(self.send_frame)
 
-    def connect_to_video_feed(self) -> bool:
+    def verify_connection(self) -> bool:
         if self.cap:
             self.cap.release()
 
-        self.cap = cv2.VideoCapture("res/test-vid.mp4")
-        # self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(0)
         if self.cap.isOpened():
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+            # self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
             self.video_is_active = True
             self.video_is_active_signal.emit(True)
+            self.send_frame_timer.start()
         else:
             self.video_is_active = False
             self.video_is_active_signal.emit(False)
+            self.send_frame_timer.stop()
 
     def send_frame(self):
         frame = self.get_and_resize_frame(is_screenshot=False)
@@ -77,7 +83,7 @@ class Capture(QObject):
             # self.send_to_gui_signal.emit(QPixmap())
             # return None
 
-            self.connect_to_video_feed()  # Try to reconnect
+            self.verify_connection()  # Try to reconnect
             if self.video_is_active:
                 self.send_to_gui_signal.emit(QPixmap())
                 return None
