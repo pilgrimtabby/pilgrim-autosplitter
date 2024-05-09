@@ -1,9 +1,11 @@
+from threading import Thread
+import time
 import cv2
 import numpy
 from pynput import keyboard
 from PyQt5.QtCore import QObject, QTimer, pyqtSignal
 
-from utils import PercentType
+from utils import PercentType, settings
 
 
 class Splitter(QObject):
@@ -21,6 +23,7 @@ class Splitter(QObject):
         self.splits_active = False
         self.suspended = False
         self.delaying = False
+        self.split_matcher = None
         self.keyboard = keyboard.Controller()
 
     def set_split_image(self, image):
@@ -30,6 +33,10 @@ class Splitter(QObject):
             self.highest_match_percent = 0
             self.went_above_threshold_flag = False
             self.match_percent_signal.emit(str(self.split_image.threshold), PercentType.THRESHOLD)
+
+            templ = self.split_image.image[:,:,0:3]
+            mask = self.split_image.alpha
+            self.split_matcher = SplitMatcher(templ, mask)
         else:
             self.splits_active = False
 
@@ -37,13 +44,8 @@ class Splitter(QObject):
         if not self.splits_active or not self.video_feed_active or self.suspended:
             return
 
-        comparison_frame = cv2.matchTemplate(
-            frame,
-            self.split_image.image[:,:,0:3],
-            cv2.TM_CCORR_NORMED,
-            mask=self.split_image.alpha
-        )
-        match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+        self.split_matcher.set_frame(frame)
+        match_percent = self.split_matcher.get_match_percent()
         self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT)
         if match_percent > self.highest_match_percent:
             self.highest_match_percent = match_percent
@@ -53,9 +55,11 @@ class Splitter(QObject):
             if self.split_image.below_flag:
                 self.went_above_threshold_flag = True
             else:
+                self.split_matcher.exit()
                 self.split()
 
         elif self.went_above_threshold_flag:
+            self.split_matcher.exit()
             self.split()
 
     def split(self):
@@ -94,3 +98,42 @@ class Splitter(QObject):
         if self.delaying != status:
             self.delaying = status
             self.delaying_status_signal.emit(self.delaying)
+
+
+class SplitMatcher:
+    def __init__(self, templ, mask) -> None:
+        self.frame = None
+        self.templ = templ
+        self.mask = mask
+        self.match_percent = 0
+        self.exit = False
+        
+        self.thread = Thread(target=self.compare, args=())
+        self.thread.daemon = True
+        self.thread.start()
+
+    def compare(self):
+        while True:
+            if self.exit:
+                break
+            if self.frame is None:
+                continue
+
+            comparison_frame = cv2.matchTemplate(
+                self.frame,
+                self.templ,
+                cv2.TM_CCORR_NORMED,
+                mask=self.mask
+            )
+            self.match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+            time.sleep(1 / settings.value("DEFAULT_FPS"))
+
+    def set_frame(self, frame):
+        self.frame = frame
+
+    def get_match_percent(self):
+        return self.match_percent
+
+    def exit(self):
+        self.exit = True
+        self.thread.join()

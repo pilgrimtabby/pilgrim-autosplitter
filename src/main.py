@@ -73,8 +73,7 @@ class PilgrimUniversalAutosplitter:
         self.send_frame_timer = QTimer()
         self.send_frame_timer.setInterval(1000 // settings.value("DEFAULT_FPS"))
         self.send_frame_timer.timeout.connect(lambda: self.capture.send_frame(True))
-        self.send_frame_timer.start()   # use self.timer.setInterval(1000 // new_time_here) to change time
-
+        self.send_frame_timer.start()
 
         self.gui.main_window.show()
         self.pilgrim_universal_autosplitter.exec()        
