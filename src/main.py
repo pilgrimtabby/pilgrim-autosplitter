@@ -10,7 +10,6 @@ from utils import settings
 
 # test all split flags yaAYy
 # implement hotkeys
-# Get split images to resize too
 # make css enhancement adjustments
 
 

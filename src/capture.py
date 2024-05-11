@@ -10,7 +10,7 @@ import numpy
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 
-from utils import settings
+from utils import settings, frame_to_pixmap
 
 
 class Capture(QObject):
@@ -45,7 +45,7 @@ class Capture(QObject):
             self.send_to_gui_signal.emit(None)
         else:
             self.set_video_active_status(True)
-            self.send_to_gui_signal.emit(self.frame_to_pixmap(frame))
+            self.send_to_gui_signal.emit(frame_to_pixmap(frame))
             self.send_to_splitter_signal.emit(frame)
     
     # Kill Streamer thread and create new Streamer object
@@ -80,11 +80,6 @@ class Capture(QObject):
                 tries += 1
         
         return 0
-
-    def frame_to_pixmap(self, frame: numpy.ndarray):
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
-        return QPixmap.fromImage(frame_img)
     
     def take_screenshot(self) -> bool:
         frame = self.streamer.share()

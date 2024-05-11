@@ -2,12 +2,20 @@ import os
 from enum import Enum, auto
 
 from PyQt5.QtCore import QSettings
+import cv2
+import numpy
+from PyQt5.QtGui import QImage, QPixmap
 
 
 class PercentType(Enum):
     CURRENT = auto()
     HIGHEST = auto()
     THRESHOLD = auto()
+
+def frame_to_pixmap(frame: numpy.ndarray):
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
+    return QPixmap.fromImage(frame_img)
 
 
 settings = QSettings("pilgrim_tabby", "Pilgrim Universal Autosplitter")

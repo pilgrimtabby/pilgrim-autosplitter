@@ -3,16 +3,15 @@ import re
 
 import cv2
 import numpy
-from PyQt5.QtGui import QPixmap
 
-from utils import settings
+from utils import settings, frame_to_pixmap
 
 class SplitImage:
     def __init__(self, image_path) -> None:
         self.path = image_path
         self.name = pathlib.Path(image_path).stem
-        self.pixmap = QPixmap(image_path)
         self.image = self.get_and_resize_image()
+        self.pixmap = frame_to_pixmap(self.image)
         self.alpha = self.get_alpha()
         self.below_flag, self.dummy_flag, self.pause_flag = self.get_flags_from_name()
         self.delay_duration, self.delay_is_default = self.get_delay_from_name()
@@ -24,14 +23,16 @@ class SplitImage:
         image = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
         image = cv2.resize(image, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
         return image
-
+    
     def get_alpha(self):
         # see __read_image_bytes() in AutoSplit/AutoSplitImage.py. Not sure why this works
         # Apparently adds alpha to images if not already present
         if self.image.shape[2] == 3:
-            self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2BGRA)
+            image = cv2.cvtColor(self.image, cv2.COLOR_BGR2BGRA)
+        else:
+            image = self.image
 
-        alpha = self.image[:,:,3]
+        alpha = image[:,:,3]
         return cv2.merge([alpha, alpha, alpha])
     
     def get_flags_from_name(self):

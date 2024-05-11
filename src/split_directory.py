@@ -2,11 +2,10 @@ import glob
 import pathlib
 
 from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog
 
 from split_image import SplitImage
-from utils import settings
+from utils import frame_to_pixmap, settings
 
 
 class SplitDirectory(QObject):
@@ -127,8 +126,8 @@ class SplitDirectory(QObject):
         path = QFileDialog.getExistingDirectory(None, "Select splits folder")
         if path != "" and (self.path != path or self.path is None):
             self.path = path
-            print(self.path)
             self.prepare_split_images(make_image_list=True)
+            settings.setValue("LAST_IMAGE_DIR", self.path)
 
     def recalculate_default_delay(self):
         for image in self.images:
@@ -153,4 +152,6 @@ class SplitDirectory(QObject):
     def resize_images(self):
         for image in self.images:
             image.image = image.get_and_resize_image()
+            image.pixmap = frame_to_pixmap(image.image)
             image.alpha = image.get_alpha()
+            self.split_image_to_gui_signal.emit(self.images[self.current_index].pixmap)
