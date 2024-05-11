@@ -15,12 +15,12 @@ class GUIMainWindow(QMainWindow):
         super().__init__()
 
         # Constants (to facilitate moving things around)
-        self.LEFT_EDGE_CORRECTION = -35
+        self.LEFT_EDGE_CORRECTION = -44
         self.TOP_EDGE_CORRECTION = -215
 
         # Main window
-        self.setWindowTitle(f"Pilgrim Universal Autosplitter v{settings.value('VERSION_NUMBER')}")
-        self.setFixedSize(1020, 570)
+        self.setWindowTitle(f"Pilgrim Autosplitter v{settings.value('VERSION_NUMBER')}")
+        self.setFixedSize(1002, 570)
         self.main_window = QWidget(self)
         self.style = style
         self.style.set_style(self.main_window)
@@ -35,16 +35,10 @@ class GUIMainWindow(QMainWindow):
 
         # Text labels
         self.video_feed_label = QLabel(self.main_window)
-        self.video_feed_label.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 480, 31))
+        self.video_feed_label.setGeometry(QRect(260 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
         self.video_feed_label.setText("")
         self.video_feed_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.video_feed_label.setAlignment(Qt.AlignCenter)
-
-        self.video_capture_method_label = QLabel(self.main_window)
-        self.video_capture_method_label.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 280 + self.TOP_EDGE_CORRECTION, 480, 31))
-        self.video_capture_method_label.setText("")
-        self.video_capture_method_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.video_capture_method_label.setAlignment(Qt.AlignCenter)
 
         self.split_name_label = QLabel(self.main_window)
         self.split_name_label.setGeometry(QRect(550 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 480, 31))
@@ -117,6 +111,16 @@ class GUIMainWindow(QMainWindow):
         self.image_directory_button.setText("Select split image folder:")
         self.image_directory_button.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 180, 30))
 
+        self.hide_video_button = QPushButton(self.main_window)
+        self.hide_video_button.setText("Hide video")
+        self.hide_video_button.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 270 + self.TOP_EDGE_CORRECTION, 100, 31))
+        self.hide_video_button.setEnabled(False)
+
+        self.next_source_button = QPushButton(self.main_window)
+        self.next_source_button.setText("Next source")
+        self.next_source_button.setGeometry(QRect(440 + self.LEFT_EDGE_CORRECTION, 270 + self.TOP_EDGE_CORRECTION, 100, 31))
+        self.next_source_button.setEnabled(False)
+
         self.screenshot_button = QPushButton(self.main_window)
         self.screenshot_button.setGeometry(QRect(340 + self.LEFT_EDGE_CORRECTION, 680 + self.TOP_EDGE_CORRECTION, 171, 41))
         self.screenshot_button.setText("Take screenshot")
@@ -188,7 +192,7 @@ class GUIMainWindow(QMainWindow):
         self.about_window_action = QAction("&Help", self)
         self.about_window_action.setShortcut("Ctrl+shift+H")
 
-        self.file_menu = self.menu_bar.addMenu("&Pilgrim UA")
+        self.file_menu = self.menu_bar.addMenu("&Pilgrim Autosplitter")
         self.file_menu.addAction(self.settings_window_action)
         self.file_menu.addAction(self.settings_window_action)
 
@@ -200,6 +204,12 @@ class GUIMainWindow(QMainWindow):
 
     def set_screenshot_button_status(self, status):
         self.screenshot_button.setEnabled(status)
+
+    def set_hide_video_button_status(self, status):
+        self.hide_video_button.setEnabled(status)
+
+    def set_next_source_button_status(self, status):
+        self.next_source_button.setEnabled(status)
 
     def set_reload_video_button_status(self, status):
         self.reload_video_button.setEnabled(status)
@@ -248,6 +258,12 @@ class GUIMainWindow(QMainWindow):
             self.video_feed.setObjectName("image_label_active")
             self.style.set_style(self.main_window)
 
+    def set_video_feed_label(self, video_is_active: bool):
+        if video_is_active:
+            self.video_feed_label.setText("Video feed")
+        else:
+            self.video_feed_label.setText("")
+
     def set_blank_split_image(self):
         if self.split_image.text() == "":  # There is a pixmap overriding the text
             self.split_image.setText(self.split_image_blank_text)
@@ -260,18 +276,6 @@ class GUIMainWindow(QMainWindow):
         if split_image_text != "":  # There is text, so there is no image
             self.split_image.setObjectName("image_label_active")
             self.style.set_style(self.main_window)
-
-    def set_video_feed_label(self, video_is_active: bool):
-        if video_is_active:
-            self.video_feed_label.setText("Video feed")
-        else:
-            self.video_feed_label.setText("")
-
-    def set_video_capture_method_label(self, video_is_active: bool):
-        if video_is_active:
-            self.video_capture_method_label.setText("Capture method: USB capture card")
-        else:
-            self.video_capture_method_label.setText("")
 
     def set_blank_split_name_label(self):
         self.split_name_label.setText("")

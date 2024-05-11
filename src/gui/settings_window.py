@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
                              QFrame, QKeySequenceEdit, QLabel, QPushButton,
                              QSpinBox)
 
-from utils import PercentType, settings
+from utils import settings
 
 
 class GUISettingsWindow(QDialog):
@@ -358,33 +358,3 @@ class GUISettingsWindow(QDialog):
         screenshot_hotkey = self.screenshot_hotkey_sequence_edit.keySequence()
         if screenshot_hotkey != settings.value("SCREENSHOT_HOTKEY"):
             settings.setValue("SCREENSHOT_HOTKEY", screenshot_hotkey)
-
-    def get_camera_indexes(self):
-        pass
-        # if platform.system == "Windows":
-        #     from pygrabber.dshow_graph import FilterGraph
-        #     index_list, name_list = [], []
-        #     cameras = FilterGraph().get_input_devices()
-
-        #     # this is definitely broken
-        #     count = 0
-        #     while count < len(cameras):
-        #         index_list[count] = cameras[count]
-        #         name_list[count] = cameras[count]
-
-        #     return index_list, name_list
-        
-        # else:
-        # open_ports = []
-        # unopen_ports = []
-        # port = 0
-
-        # while len(unopen_ports) < 3:
-        #     test_cam = cv2.VideoCapture(port)
-        #     if test_cam.isOpened():
-        #         open_ports.append(port)
-        #     else:
-        #         unopen_ports.append(port)
-        #     port += 1
-    
-        # return open_ports

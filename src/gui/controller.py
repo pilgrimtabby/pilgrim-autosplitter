@@ -10,6 +10,8 @@ from utils import PercentType, settings
 class GUIController(QObject):
     image_directory_button_signal = pyqtSignal()
     screenshot_button_signal = pyqtSignal()
+    hide_video_button_signal = pyqtSignal()
+    next_source_button_signal = pyqtSignal()
     reload_video_button_signal = pyqtSignal()
     previous_split_button_signal = pyqtSignal()
     next_split_button_signal = pyqtSignal()
@@ -40,11 +42,12 @@ class GUIController(QObject):
         self.is_first_split = False
         self.is_last_split = False
         self.show_video_feed_label = False
-        self.show_video_capture_method_label = False
         self.show_comparison_match = False
         self.show_threshold = False
         self.image_directory_button_enabled = False
         self.screenshot_button_enabled = False
+        self.hide_video_button_enabled = False
+        self.next_source_button_enabled = False
         self.reload_video_button_enabled = False
         self.previous_split_button_enabled = False
         self.next_split_button_enabled = False
@@ -59,6 +62,8 @@ class GUIController(QObject):
 
         self.main_window.image_directory_button.clicked.connect(self.image_directory_button_signal.emit)
         self.main_window.screenshot_button.clicked.connect(self.screenshot_button_signal.emit)
+        self.main_window.hide_video_button.clicked.connect(self.hide_video_button_signal.emit)
+        self.main_window.next_source_button.clicked.connect(self.next_source_button_signal.emit)
         self.main_window.reload_video_button.clicked.connect(self.reload_video_button_signal.emit)
         self.main_window.previous_split_button.clicked.connect(self.previous_split_button_signal.emit)
         self.main_window.next_split_button.clicked.connect(self.next_split_button_signal.emit)
@@ -111,6 +116,8 @@ class GUIController(QObject):
 
             if self.video_feed_active:
                 self.set_screenshot_button_enabled_status(True)
+                self.set_hide_video_button_enabled_status(True)
+                self.set_next_source_button_enabled_status(True)
 
                 if self.splitter_delaying:
                     self.set_pause_comparison_button_enabled_status(False)
@@ -119,6 +126,8 @@ class GUIController(QObject):
 
             else:
                 self.set_screenshot_button_enabled_status(False)
+                self.set_hide_video_button_enabled_status(False)
+                self.set_next_source_button_enabled_status(False)
                 self.set_pause_comparison_button_enabled_status(False)
 
         else:
@@ -130,16 +139,18 @@ class GUIController(QObject):
             self.set_pause_comparison_button_enabled_status(False)
             if self.video_feed_active:
                 self.set_screenshot_button_enabled_status(True)
+                self.set_hide_video_button_enabled_status(True)
+                self.set_next_source_button_enabled_status(True)
             else:
                 self.set_screenshot_button_enabled_status(False)
+                self.set_hide_video_button_enabled_status(False)
+                self.set_next_source_button_enabled_status(False)
 
     def update_labels(self):
         if self.video_feed_active:
             self.set_video_feed_label_status(True)
-            self.set_video_capture_method_label_status(True)
         else:
             self.set_video_feed_label_status(False)
-            self.set_video_capture_method_label_status(False)
 
         if not self.splits_active:
             self.set_split_name(None)
@@ -198,11 +209,6 @@ class GUIController(QObject):
             self.show_video_feed_label = status
             self.main_window.set_video_feed_label(status)
 
-    def set_video_capture_method_label_status(self, status):
-        if self.show_video_capture_method_label != status:
-            self.show_video_capture_method_label = status
-            self.main_window.set_video_capture_method_label(status)
-
     def set_show_comparison_match_status(self, status):
         if self.show_comparison_match != status:
             self.show_comparison_match = status
@@ -225,6 +231,16 @@ class GUIController(QObject):
         if self.screenshot_button_enabled != status:
             self.screenshot_button_enabled = status
             self.main_window.set_screenshot_button_status(status)
+    
+    def set_hide_video_button_enabled_status(self, status):
+        if self.hide_video_button_enabled != status:
+            self.hide_video_button_enabled = status
+            self.main_window.set_hide_video_button_status(status)
+
+    def set_next_source_button_enabled_status(self, status):
+        if self.next_source_button_enabled != status:
+            self.next_source_button_enabled = status
+            self.main_window.set_next_source_button_status(status)
 
     def set_reload_video_button_enabled_status(self, status):
         if self.reload_video_button_enabled != status:

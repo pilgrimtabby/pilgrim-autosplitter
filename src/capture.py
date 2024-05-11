@@ -23,8 +23,9 @@ class Capture(QObject):
         super().__init__()
         self.frame_count= 0
         self.frame_time = 0
+        self.source_index = settings.value("LAST_CAPTURE_SOURCE_INDEX")
         self.video_is_active = False
-        self.streamer = Streamer(0)
+        self.streamer = Streamer(self.source_index)
         # self.streamer = Streamer("res/test-vid.mp4")
 
     def send_frame(self, measure_fps=False):
@@ -50,7 +51,7 @@ class Capture(QObject):
     # Kill Streamer thread and create new Streamer object
     def reconnect_video(self):
         self.streamer.exit_thread()
-        self.streamer = Streamer(0)
+        self.streamer = Streamer(self.source_index)
 
     # Kill streamer thread then start new thread in same streamer instance
     def kill_streamer(self):
@@ -61,6 +62,24 @@ class Capture(QObject):
     def restart_streamer(self):
         if self.streamer is not None:
             self.streamer.restart_thread()
+
+    def get_next_source(self):
+        self.source_index = self.next_valid_source_index()
+        settings.setValue("LAST_CAPTURE_SOURCE_INDEX", self.source_index)
+        self.reconnect_video()
+
+    def next_valid_source_index(self):
+        test_source = self.source_index + 1
+        tries = 0
+        while tries < 3:
+            test_cap = cv2.VideoCapture(test_source)
+            if test_cap.isOpened():
+                return test_source
+            else:
+                test_source += 1
+                tries += 1
+        
+        return 0
 
     def frame_to_pixmap(self, frame: numpy.ndarray):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -99,10 +118,10 @@ class Capture(QObject):
 
 
 class Streamer():
-    def __init__(self, source: int) -> None:
-        self.source = source
+    def __init__(self, source_index: int) -> None:
+        self.source_index = source_index
         self.buffer = 1
-        self.cap = cv2.VideoCapture(source)
+        self.cap = cv2.VideoCapture(source_index)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer)
         self.frame = None
         self.exit = False

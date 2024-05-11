@@ -62,6 +62,8 @@ class PilgrimUniversalAutosplitter:
         self.gui.updated_default_pause_signal.connect(self.split_directory.recalculate_default_pause)
 
         self.gui.image_directory_button_signal.connect(self.split_directory.set_dir_path)
+        self.gui.hide_video_button_signal.connect(lambda: None)
+        self.gui.next_source_button_signal.connect(self.capture.get_next_source)
         self.gui.previous_split_button_signal.connect(self.split_directory.load_previous_split_image)
         self.gui.next_split_button_signal.connect(self.split_directory.load_next_split_image)
         self.gui.skip_split_button_signal.connect(self.split_directory.load_next_split_image)
@@ -93,7 +95,7 @@ class PilgrimUniversalAutosplitter:
         
         self.send_frame_timer = QTimer()
         self.send_frame_timer.setInterval(1000 // settings.value("FPS"))
-        self.send_frame_timer.timeout.connect(lambda: self.capture.send_frame(True))
+        self.send_frame_timer.timeout.connect(lambda: self.capture.send_frame(False))
         self.send_frame_timer.start()
 
         self.gui.main_window.show()
