@@ -60,16 +60,13 @@ class GUIStyle:
                 background: $widget_fill_color;
                 border: 1px solid $text_and_borders;
             }
-            QLabel#image_label_overlay {
-                background-color: rgba(134, 134, 134, 0.1);
-                border: 0px solid $text_and_borders;
+            QLabel#split_image_overlay {
+                background-color: rgba(134, 134, 134, 0.7);
+                border: 1px solid $text_and_borders;
             }
             
-            QLineEdit#line_edit_default {
+            QLineEdit {
                 color: $disabled_button_text_color;
-            }
-            QLineEdit#line_edit_live {
-                color: $text_and_borders;
             }
 
             QComboBox {
@@ -93,6 +90,16 @@ class GUIStyle:
                 border: 2px solid grey;
                 border-radius: 5px;
                 min-width: 80px;
+            }
+
+            QComboBox#aspect_ratio_combo_box {
+                min-width: 120px;
+            }
+
+            QComboBox#aspect_ratio_combo_box QAbstractItemView {
+                border: 2px solid grey;
+                border-radius: 5px;
+                min-width: 140px;
             }
             """
         ).substitute(self.style_dict_dark)
@@ -130,16 +137,13 @@ class GUIStyle:
                 background: $widget_fill_color;
                 border: 1px solid $text_and_borders;
             }
-            QLabel#image_label_overlay {
+            QLabel#split_image_overlay {
                 background-color: rgba(134, 134, 134, 0.1);
-                border: 0px solid $text_and_borders;
+                border: 1px solid $text_and_borders;
             }
             
-            QLineEdit#line_edit_default {
+            QLineEdit {
                 color: $disabled_button_text_color;
-            }
-            QLineEdit#line_edit_live {
-                color: $text_and_borders;
             }
             """
         ).substitute(self.style_dict_light)

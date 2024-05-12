@@ -10,7 +10,7 @@ from utils import PercentType, settings
 class GUIController(QObject):
     image_directory_button_signal = pyqtSignal()
     screenshot_button_signal = pyqtSignal()
-    hide_video_button_signal = pyqtSignal()
+    minimal_view_button_signal = pyqtSignal()
     next_source_button_signal = pyqtSignal()
     reload_video_button_signal = pyqtSignal()
     previous_split_button_signal = pyqtSignal()
@@ -46,7 +46,7 @@ class GUIController(QObject):
         self.show_threshold = False
         self.image_directory_button_enabled = False
         self.screenshot_button_enabled = False
-        self.hide_video_button_enabled = False
+        self.minimal_view_button_enabled = False
         self.next_source_button_enabled = False
         self.reload_video_button_enabled = False
         self.previous_split_button_enabled = False
@@ -56,31 +56,36 @@ class GUIController(QObject):
         self.undo_split_button_enabled = False
         self.reset_splits_button_enabled = False
 
-        # Handle signals from GUi
+        # Handle signals from GUI
         self.main_window.settings_window_action.triggered.connect(self.settings_window.exec)
+        self.main_window.settings_window_action.triggered.connect(self.settings_window.reset_settings)
         self.main_window.about_window_action.triggered.connect(lambda: None)
 
         self.main_window.image_directory_button.clicked.connect(self.image_directory_button_signal.emit)
         self.main_window.screenshot_button.clicked.connect(self.screenshot_button_signal.emit)
-        self.main_window.hide_video_button.clicked.connect(self.hide_video_button_signal.emit)
+        self.main_window.minimal_view_button.clicked.connect(self.minimal_view_button_signal.emit)
         self.main_window.next_source_button.clicked.connect(self.next_source_button_signal.emit)
         self.main_window.reload_video_button.clicked.connect(self.reload_video_button_signal.emit)
         self.main_window.previous_split_button.clicked.connect(self.previous_split_button_signal.emit)
         self.main_window.next_split_button.clicked.connect(self.next_split_button_signal.emit)
         self.main_window.pause_comparison_button.clicked.connect(self.process_pause_request)
+        self.main_window.set_pause_comparison_button_status_signal.connect(self.set_pause_comparison_button_text)
         self.main_window.skip_split_button.clicked.connect(self.skip_split_button_signal.emit)
         self.main_window.undo_split_button.clicked.connect(self.undo_split_button_signal.emit)
         self.main_window.reset_splits_button.clicked.connect(self.reset_splits_button_signal.emit)
+        self.main_window.update_video_feed_label_signal.connect(lambda: self.set_video_feed_label_status(status=self.video_feed_active, override=True))
 
         self.settings_window.save_button.clicked.connect(lambda: self.style.set_global_style([self.main_window.main_window, self.settings_window]))
         self.settings_window.update_fps_start_signal.connect(self.update_fps_start_signal.emit)
         self.settings_window.update_fps_finish_signal.connect(self.update_fps_finish_signal.emit)
         self.settings_window.update_aspect_ratio_start_signal.connect(self.update_aspect_ratio_start_signal.emit)
         self.settings_window.update_aspect_ratio_finish_signal.connect(self.update_aspect_ratio_finish_signal.emit)
+        self.settings_window.update_aspect_ratio_finish_signal.connect(self.main_window.set_layout)
         self.settings_window.set_match_percent_decimals_signal.connect(self.set_match_percent_decimals_signal.emit)
         self.settings_window.updated_default_threshold_signal.connect(lambda: self.updated_default_threshold_signal.emit(str(settings.value("DEFAULT_THRESHOLD")), PercentType.THRESHOLD))
         self.settings_window.updated_default_delay_signal.connect(self.updated_default_delay_signal.emit)
         self.settings_window.updated_default_pause_signal.connect(self.updated_default_pause_signal.emit)
+        self.settings_window.updated_global_hotkeys_signal.connect(lambda: None)
 
     def update_enabled_comparison_data(self):
         if self.splits_active:
@@ -96,6 +101,8 @@ class GUIController(QObject):
     def update_enabled_buttons(self):
         self.set_image_directory_button_enabled_status(True)
         self.set_reload_video_button_enabled_status(True)
+        self.set_next_source_button_enabled_status(True)
+        self.set_minimal_view_button_enabled_status(True)
 
         if self.splits_active:
             self.set_reset_splits_button_enabled_status(True)
@@ -116,8 +123,6 @@ class GUIController(QObject):
 
             if self.video_feed_active:
                 self.set_screenshot_button_enabled_status(True)
-                self.set_hide_video_button_enabled_status(True)
-                self.set_next_source_button_enabled_status(True)
 
                 if self.splitter_delaying:
                     self.set_pause_comparison_button_enabled_status(False)
@@ -126,8 +131,6 @@ class GUIController(QObject):
 
             else:
                 self.set_screenshot_button_enabled_status(False)
-                self.set_hide_video_button_enabled_status(False)
-                self.set_next_source_button_enabled_status(False)
                 self.set_pause_comparison_button_enabled_status(False)
 
         else:
@@ -139,19 +142,20 @@ class GUIController(QObject):
             self.set_pause_comparison_button_enabled_status(False)
             if self.video_feed_active:
                 self.set_screenshot_button_enabled_status(True)
-                self.set_hide_video_button_enabled_status(True)
+                self.set_minimal_view_button_enabled_status(True)
                 self.set_next_source_button_enabled_status(True)
             else:
                 self.set_screenshot_button_enabled_status(False)
-                self.set_hide_video_button_enabled_status(False)
+                self.set_minimal_view_button_enabled_status(False)
                 self.set_next_source_button_enabled_status(False)
 
-    def update_labels(self):
+    def update_video_feed_label(self):
         if self.video_feed_active:
             self.set_video_feed_label_status(True)
         else:
             self.set_video_feed_label_status(False)
 
+    def update_split_labels(self):
         if not self.splits_active:
             self.set_split_name(None)
             self.set_loop_text(None, None)
@@ -159,7 +163,8 @@ class GUIController(QObject):
     def update_all_elements(self):
         self.update_enabled_comparison_data()
         self.update_enabled_buttons()
-        self.update_labels()
+        self.update_video_feed_label()
+        self.update_split_labels()
 
     def set_video_feed_active_status(self, status: bool):
         if self.video_feed_active != status:
@@ -179,12 +184,13 @@ class GUIController(QObject):
                 self.update_enabled_comparison_data()
                 self.update_enabled_buttons()
 
-    def set_splitter_suspended_status(self, status: bool):
+    def set_splitter_suspended_status(self, status: bool, delay_duration, pause_duration):
         if self.splitter_suspended != status:
             self.splitter_suspended = status
             self.update_enabled_comparison_data()
             self.update_enabled_buttons()
             self.set_pause_comparison_button_text()
+            self.main_window.set_split_image_overlay_status(status, delay_duration, pause_duration)
 
     def set_splitter_delaying_status(self, status: bool):
         if self.splitter_delaying != status:
@@ -204,8 +210,8 @@ class GUIController(QObject):
     def set_split_directory_line_edit_text_status(self, path):
         self.main_window.set_image_directory_line_edit(path)
 
-    def set_video_feed_label_status(self, status):
-        if self.show_video_feed_label != status:
+    def set_video_feed_label_status(self, status: bool, override=True):
+        if override or self.show_video_feed_label != status:
             self.show_video_feed_label = status
             self.main_window.set_video_feed_label(status)
 
@@ -232,10 +238,10 @@ class GUIController(QObject):
             self.screenshot_button_enabled = status
             self.main_window.set_screenshot_button_status(status)
     
-    def set_hide_video_button_enabled_status(self, status):
-        if self.hide_video_button_enabled != status:
-            self.hide_video_button_enabled = status
-            self.main_window.set_hide_video_button_status(status)
+    def set_minimal_view_button_enabled_status(self, status):
+        if self.minimal_view_button_enabled != status:
+            self.minimal_view_button_enabled = status
+            self.main_window.set_minimal_view_button_status(status)
 
     def set_next_source_button_enabled_status(self, status):
         if self.next_source_button_enabled != status:

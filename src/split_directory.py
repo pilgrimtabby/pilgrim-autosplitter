@@ -86,7 +86,7 @@ class SplitDirectory(QObject):
         return sorted(paths)
     
     def reset_split_images(self):
-        self.prepare_split_images(make_image_list=False)
+        self.prepare_split_images(make_image_list=True)
 
     def set_is_first_split(self, status: bool):
         if self.is_first_split != status:
@@ -152,6 +152,7 @@ class SplitDirectory(QObject):
     def resize_images(self):
         for image in self.images:
             image.image = image.get_and_resize_image()
-            image.pixmap = frame_to_pixmap(image.image)
             image.alpha = image.get_alpha()
+            image.pixmap = frame_to_pixmap(image.image, is_split=True)
+            self.split_image_to_splitter_signal.emit(self.images[self.current_index])
             self.split_image_to_gui_signal.emit(self.images[self.current_index].pixmap)

@@ -8,10 +8,6 @@ from split_directory import SplitDirectory
 from splitter import Splitter
 from utils import settings
 
-# test all split flags yaAYy
-# implement hotkeys
-# make css enhancement adjustments
-
 
 class PilgrimUniversalAutosplitter:
     def __init__(self) -> None:
@@ -61,7 +57,7 @@ class PilgrimUniversalAutosplitter:
         self.gui.updated_default_pause_signal.connect(self.split_directory.recalculate_default_pause)
 
         self.gui.image_directory_button_signal.connect(self.split_directory.set_dir_path)
-        self.gui.hide_video_button_signal.connect(lambda: None)
+        self.gui.minimal_view_button_signal.connect(lambda: None)
         self.gui.next_source_button_signal.connect(self.capture.get_next_source)
         self.gui.previous_split_button_signal.connect(self.split_directory.load_previous_split_image)
         self.gui.next_split_button_signal.connect(self.split_directory.load_next_split_image)

@@ -8,7 +8,6 @@ from threading import Thread
 import cv2
 import numpy
 from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap
 
 from utils import settings, frame_to_pixmap
 
@@ -25,10 +24,16 @@ class Capture(QObject):
         self.frame_time = 0
         self.source_index = settings.value("LAST_CAPTURE_SOURCE_INDEX")
         self.video_is_active = False
-        self.streamer = Streamer(self.source_index)
-        # self.streamer = Streamer("res/test-vid.mp4")
+        if settings.value("START_WITH_VIDEO"):
+            self.streamer = Streamer(self.source_index)
+            # self.streamer = Streamer("res/test-vid.mp4")
+        else:
+            self.streamer = None
 
     def send_frame(self, measure_fps=False):
+        if self.streamer is None:
+            return
+
         frame = self.streamer.share()
         
         if measure_fps:
@@ -50,7 +55,8 @@ class Capture(QObject):
     
     # Kill Streamer thread and create new Streamer object
     def reconnect_video(self):
-        self.streamer.exit_thread()
+        if self.streamer is not None:
+            self.streamer.exit_thread()
         self.streamer = Streamer(self.source_index)
 
     # Kill streamer thread then start new thread in same streamer instance
@@ -91,7 +97,7 @@ class Capture(QObject):
         if image_dir is None or not Path(image_dir).is_dir:
             image_dir = os.path.expanduser("~")
 
-        screenshot_path = f"{image_dir}/test200000.png"
+        screenshot_path = f"{image_dir}/{self.get_unique_number(image_dir)}_screenshot.png"
         cv2.imwrite(screenshot_path, frame)
         if Path(screenshot_path).is_file():
             if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
@@ -106,6 +112,16 @@ class Capture(QObject):
         else:
             self.screenshot_result_signal.emit(None)
 
+    def get_unique_number(self, dir: str):
+        file_int = 1
+        while True:
+            leading_zeros = "0" * (3 - len(str(file_int)))
+            file_number = f"{leading_zeros}{file_int}"
+            if Path(f"{dir}/{file_number}_screenshot.png").is_file():
+                file_int += 1
+            else:
+                return file_number
+
     def set_video_active_status(self, status: bool):
         if self.video_is_active != status:
             self.video_is_active = status
@@ -116,7 +132,7 @@ class Streamer():
     def __init__(self, source_index: int) -> None:
         self.source_index = source_index
         self.buffer = 1
-        self.cap = cv2.VideoCapture(source_index)
+        self.cap = cv2.VideoCapture(self.source_index)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer)
         self.frame = None
         self.exit = False

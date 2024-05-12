@@ -11,8 +11,8 @@ class SplitImage:
         self.path = image_path
         self.name = pathlib.Path(image_path).stem
         self.image = self.get_and_resize_image()
-        self.pixmap = frame_to_pixmap(self.image)
         self.alpha = self.get_alpha()
+        self.pixmap = frame_to_pixmap(self.image, is_split=True)
         self.below_flag, self.dummy_flag, self.pause_flag = self.get_flags_from_name()
         self.delay_duration, self.delay_is_default = self.get_delay_from_name()
         self.pause_duration, self.pause_is_default = self.get_pause_from_name()
@@ -22,17 +22,13 @@ class SplitImage:
     def get_and_resize_image(self) -> numpy.ndarray:
         image = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
         image = cv2.resize(image, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+        # Add alpha to images if not already present (ie if image has only 3 channels, not 4)
+        if image.shape[2] == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
         return image
     
     def get_alpha(self):
-        # see __read_image_bytes() in AutoSplit/AutoSplitImage.py. Not sure why this works
-        # Apparently adds alpha to images if not already present
-        if self.image.shape[2] == 3:
-            image = cv2.cvtColor(self.image, cv2.COLOR_BGR2BGRA)
-        else:
-            image = self.image
-
-        alpha = image[:,:,3]
+        alpha = self.image[:,:,3]
         return cv2.merge([alpha, alpha, alpha])
     
     def get_flags_from_name(self):

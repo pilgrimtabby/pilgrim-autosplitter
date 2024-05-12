@@ -9,7 +9,7 @@ from utils import PercentType, settings
 
 
 class Splitter(QObject):
-    suspended_status_signal = pyqtSignal(bool)
+    suspended_status_signal = pyqtSignal(bool, float, float)
     delaying_status_signal = pyqtSignal(bool)
     request_next_split_image_signal = pyqtSignal()
     match_percent_signal = pyqtSignal(str, PercentType)
@@ -36,6 +36,8 @@ class Splitter(QObject):
 
             templ = self.split_image.image[:,:,0:3]
             mask = self.split_image.alpha
+            if self.split_matcher:
+                self.split_matcher.exit_thread()
             self.split_matcher = SplitMatcher(templ, mask)
         else:
             self.splits_active = False
@@ -49,7 +51,7 @@ class Splitter(QObject):
         if match_percent is None:
             return
 
-        self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT)
+        self.match_percent_signal.emit(str(match_percent), PercentType.CURRENT) ## It's returning the same value every frame -- why?
         if match_percent > self.highest_match_percent:
             self.highest_match_percent = match_percent
             self.match_percent_signal.emit(str(self.highest_match_percent), PercentType.HIGHEST)
@@ -68,7 +70,7 @@ class Splitter(QObject):
     def split(self):
         total_down_time = self.split_image.delay_duration + self.split_image.pause_duration
         if total_down_time > 0:
-            self.set_suspended_status(True)
+            self.set_suspended_status(True, self.split_image.delay_duration, self.split_image.pause_duration)
             if self.split_image.delay_duration > 0:
                 self.set_delay_status(True)
             QTimer.singleShot(int(self.split_image.delay_duration * 1000), self.split_action)
@@ -91,11 +93,11 @@ class Splitter(QObject):
             self.highest_match_percent = 0
             self.video_feed_active = status
 
-    def set_suspended_status(self, status: bool):
+    def set_suspended_status(self, status: bool, delay_duration=0.0, pause_duration=0.0):
         if self.suspended != status:
             self.highest_match_percent = 0
             self.suspended = status
-            self.suspended_status_signal.emit(self.suspended)
+            self.suspended_status_signal.emit(self.suspended, delay_duration, pause_duration)
 
     def set_delay_status(self, status: bool):
         if self.delaying != status:

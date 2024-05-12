@@ -16,6 +16,7 @@ class GUISettingsWindow(QDialog):
     updated_default_threshold_signal = pyqtSignal()
     updated_default_delay_signal = pyqtSignal()
     updated_default_pause_signal = pyqtSignal()
+    updated_global_hotkeys_signal = pyqtSignal()
 
     def __init__(self, style):
         super().__init__()
@@ -28,13 +29,13 @@ class GUISettingsWindow(QDialog):
 
         # Settings window settings
         self.setWindowTitle("Settings")
-        self.setFixedSize(610, 302)
+        self.setFixedSize(610, 332)
         self.style = style
         self.style.set_style(self)
 
         # Border
         self.border_helper_frame = QFrame(self)
-        self.border_helper_frame.setGeometry(QRect(10 + self.LEFT_EDGE_CORRECTION_FRAME, 10 + self.TOP_EDGE_CORRECTION_FRAME, 590, 282))
+        self.border_helper_frame.setGeometry(QRect(10 + self.LEFT_EDGE_CORRECTION_FRAME, 10 + self.TOP_EDGE_CORRECTION_FRAME, 590, 312))
         self.border_helper_frame.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.border_helper_frame.setObjectName("border")
 
@@ -81,14 +82,20 @@ class GUISettingsWindow(QDialog):
         self.aspect_ratio_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.aspect_ratio_label.setToolTip("This affects how images are displayed on the GUI and matched with split images. However, you can use 16:9 when playing games at 4:3, or vice versa.")
 
-        self.capture_source_label = QLabel(self)
-        self.capture_source_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 220 + self.TOP_EDGE_CORRECTION, 191, 31))
-        self.capture_source_label.setText("Capture source:")
-        self.capture_source_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.capture_source_label.setToolTip("Coming soon!")
+        self.global_hotkeys_label = QLabel(self)
+        self.global_hotkeys_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 220 + self.TOP_EDGE_CORRECTION, 191, 31))
+        self.global_hotkeys_label.setText("Global hotkeys:")
+        self.global_hotkeys_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.global_hotkeys_label.setToolTip("If this is off, the application will still send keypresses, but any buttons you press when the splitter isn't in focus won't change the splitter's GUI.")
+
+        self.start_with_video_label = QLabel(self)
+        self.start_with_video_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 250 + self.TOP_EDGE_CORRECTION, 191, 31))
+        self.start_with_video_label.setText("Open video on start:")
+        self.start_with_video_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.start_with_video_label.setToolTip("Try to open video feed on bootup. Note that this could open a webcam (or any video device attached to your computer), which is harmless but could be surprising!")
 
         self.theme_label = QLabel(self)
-        self.theme_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 250 + self.TOP_EDGE_CORRECTION, 191, 31))
+        self.theme_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 280 + self.TOP_EDGE_CORRECTION, 191, 31))
         self.theme_label.setText("Theme:")
         self.theme_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.theme_label.setToolTip("Does anyone actually use light mode?")
@@ -177,28 +184,40 @@ class GUISettingsWindow(QDialog):
 
         self.aspect_ratio_combo_box = QComboBox(self)
         self.aspect_ratio_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 194 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT - 4))
-        self.aspect_ratio_combo_box.addItems(["4:3", "16:9"])
+        self.aspect_ratio_combo_box.addItems(["4:3 (480x360)", "4:3 (320x240)", "16:9 (512x288)", "16:9 (432x243)"])
         self.aspect_ratio_combo_box.setCurrentIndex(-1)
-        if settings.value("ASPECT_RATIO") == "4:3":
+        if settings.value("ASPECT_RATIO") == "4:3 (480x360)":
             self.aspect_ratio_combo_box.setCurrentIndex(0)
-        elif settings.value("ASPECT_RATIO") == "16:9":
+        elif settings.value("ASPECT_RATIO") == "4:3 (320x240)":
             self.aspect_ratio_combo_box.setCurrentIndex(1)
+        elif settings.value("ASPECT_RATIO") == "16:9 (512x288)":
+            self.aspect_ratio_combo_box.setCurrentIndex(2)
+        elif settings.value("ASPECT_RATIO") == "16:9 (432x243)":
+            self.aspect_ratio_combo_box.setCurrentIndex(3)
+        self.aspect_ratio_combo_box.setObjectName("aspect_ratio_combo_box")
 
-        self.capture_source_combo_box = QComboBox(self)
-        self.capture_source_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT - 4))
-        self.capture_source_combo_box.setPlaceholderText("N/A")
-        self.capture_source_combo_box.setEnabled(False)
+        self.global_hotkeys_checkbox = QCheckBox(self)
+        self.global_hotkeys_checkbox.setGeometry(QRect(158 + self.LEFT_EDGE_CORRECTION, 222 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH - 7, LEFT_SIDE_WIDGET_HEIGHT + 2))
+        if settings.value("GLOBAL_HOTKEYS"):
+            self.global_hotkeys_checkbox.setCheckState(Qt.Checked)
+        else:
+            self.global_hotkeys_checkbox.setCheckState(Qt.Unchecked)
+
+        self.start_with_video_checkbox = QCheckBox(self)
+        self.start_with_video_checkbox.setGeometry(QRect(158 + self.LEFT_EDGE_CORRECTION, 252 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH - 7, LEFT_SIDE_WIDGET_HEIGHT + 2))
+        if settings.value("START_WITH_VIDEO"):
+            self.start_with_video_checkbox.setCheckState(Qt.Checked)
+        else:
+            self.start_with_video_checkbox.setCheckState(Qt.Unchecked)
 
         self.theme_combo_box = QComboBox(self)
-        self.theme_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 254 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT - 4))
-        self.theme_combo_box.addItems(["dark", "light", "system"])
+        self.theme_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 284 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT - 4))
+        self.theme_combo_box.addItems(["dark", "light"])
         self.theme_combo_box.setCurrentIndex(-1)
         if settings.value("THEME") == "dark":
             self.theme_combo_box.setCurrentIndex(0)
         elif settings.value("THEME") == "light":
             self.theme_combo_box.setCurrentIndex(1)
-        elif settings.value("THEME") == "system":
-            self.theme_combo_box.setCurrentIndex(2)
 
         self.start_split_hotkey_sequence_edit = QKeySequenceEdit(self)
         self.start_split_hotkey_sequence_edit.setGeometry(QRect(410 + self.LEFT_EDGE_CORRECTION, 40 + self.TOP_EDGE_CORRECTION, 121, 31))
@@ -262,17 +281,54 @@ class GUISettingsWindow(QDialog):
         self.screenshot_hotkey_sequence_edit_button.setObjectName("clear_button")
 
         self.cancel_button = QPushButton(self)
-        self.cancel_button.setGeometry(QRect(319 + self.LEFT_EDGE_CORRECTION, 236 + self.TOP_EDGE_CORRECTION, 111, 31))
+        self.cancel_button.setGeometry(QRect(319 + self.LEFT_EDGE_CORRECTION, 236 + self.TOP_EDGE_CORRECTION, 111, 62))
         self.cancel_button.setText("Cancel")
-        self.cancel_button.clicked.connect(self.done)
+        self.cancel_button.clicked.connect(self.close)
         self.cancel_button.setObjectName("cancel_button")
 
         self.save_button = QPushButton(self)
-        self.save_button.setGeometry(QRect(459 + self.LEFT_EDGE_CORRECTION, 236 + self.TOP_EDGE_CORRECTION, 111, 31))
+        self.save_button.setGeometry(QRect(459 + self.LEFT_EDGE_CORRECTION, 236 + self.TOP_EDGE_CORRECTION, 111, 62))
         self.save_button.setText("Save")
         self.save_button.clicked.connect(self.save_new_settings)
         self.save_button.clicked.connect(self.done)
         self.save_button.setObjectName("save_button")
+
+    def closeEvent(self, event):
+        self.reset_settings()
+
+    def reset_settings(self):
+        self.fps_spinbox.setProperty("value", settings.value("FPS"))
+        if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
+            self.open_screenshots_checkbox.setCheckState(Qt.Checked)
+        else:
+            self.open_screenshots_checkbox.setCheckState(Qt.Unchecked)
+        self.default_threshold_double_spinbox.setProperty("value", str(float(settings.value("DEFAULT_THRESHOLD") * 100)))
+        self.match_percent_decimals_spinbox.setProperty("value", settings.value("MATCH_PERCENT_DECIMALS"))
+        self.default_delay_double_spinbox.setProperty("value", settings.value("DEFAULT_DELAY"))
+        self.default_pause_double_spinbox.setProperty("value", settings.value("DEFAULT_PAUSE"))
+        if settings.value("ASPECT_RATIO") == "4:3 (480x360)":
+            self.aspect_ratio_combo_box.setCurrentIndex(0)
+        elif settings.value("ASPECT_RATIO") == "4:3 (320x240)":
+            self.aspect_ratio_combo_box.setCurrentIndex(1)
+        elif settings.value("ASPECT_RATIO") == "16:9 (512x288)":
+            self.aspect_ratio_combo_box.setCurrentIndex(2)
+        elif settings.value("ASPECT_RATIO") == "16:9 (432x243)":
+            self.aspect_ratio_combo_box.setCurrentIndex(3)
+        if settings.value("THEME") == "dark":
+            self.theme_combo_box.setCurrentIndex(0)
+        elif settings.value("THEME") == "light":
+            self.theme_combo_box.setCurrentIndex(1)
+        self.start_split_hotkey_sequence_edit.setKeySequence(settings.value("SPLIT_HOTKEY"))
+        self.reset_hotkey_sequence_edit.setKeySequence(settings.value("RESET_HOTKEY"))
+        self.pause_hotkey_sequence_edit.setKeySequence(settings.value("PAUSE_HOTKEY"))
+        self.undo_split_hotkey_sequence_edit.setKeySequence(settings.value("UNDO_HOTKEY"))
+        self.skip_split_hotkey_sequence_edit.setKeySequence(settings.value("SKIP_HOTKEY"))
+        self.screenshot_hotkey_sequence_edit.setKeySequence(settings.value("SCREENSHOT_HOTKEY"))
+        if settings.value("GLOBAL_HOTKEYS"):
+            self.global_hotkeys_checkbox.setCheckState(Qt.Checked)
+        else:
+            self.global_hotkeys_checkbox.setCheckState(Qt.Unchecked)
+
 
     def save_new_settings(self):
         fps = self.fps_spinbox.value()
@@ -312,19 +368,40 @@ class GUISettingsWindow(QDialog):
         aspect_ratio = self.aspect_ratio_combo_box.currentText()
         if aspect_ratio != settings.value("ASPECT_RATIO"):
             self.update_aspect_ratio_start_signal.emit()
-            if aspect_ratio == "4:3":
-                settings.setValue("ASPECT_RATIO", "4:3")
+            if aspect_ratio == "4:3 (480x360)":
+                settings.setValue("ASPECT_RATIO", "4:3 (480x360)")
                 settings.setValue("FRAME_WIDTH", 480)
                 settings.setValue("FRAME_HEIGHT", 360)
-            else:
-                settings.setValue("ASPECT_RATIO", "16:9")
+            if aspect_ratio == "4:3 (320x240)":
+                settings.setValue("ASPECT_RATIO", "4:3 (320x240)")
+                settings.setValue("FRAME_WIDTH", 320)
+                settings.setValue("FRAME_HEIGHT", 240)
+            if aspect_ratio == "16:9 (512x288)":
+                settings.setValue("ASPECT_RATIO", "16:9 (512x288)")
                 settings.setValue("FRAME_WIDTH", 512)
                 settings.setValue("FRAME_HEIGHT", 288)
+            if aspect_ratio == "16:9 (432x243)":
+                settings.setValue("ASPECT_RATIO", "16:9 (432x243)")
+                settings.setValue("FRAME_WIDTH", 432)
+                settings.setValue("FRAME_HEIGHT", 243)
             self.update_aspect_ratio_finish_signal.emit()
 
-        capture_source = self.capture_source_combo_box.currentText()
-        if capture_source != settings.value("CAPTURE_SOURCE"):
-            settings.setValue("CAPTURE_SOURCE", capture_source)
+        global_hotkeys_value = self.global_hotkeys_checkbox.checkState()
+        if global_hotkeys_value == 0:
+            global_hotkeys = False
+        else:
+            global_hotkeys = True
+        if global_hotkeys != settings.value("GLOBAL_HOTKEYS"):
+            settings.setValue("GLOBAL_HOTKEYS", global_hotkeys)
+            self.updated_global_hotkeys_signal.emit()
+
+        start_with_video_value = self.start_with_video_checkbox.checkState()
+        if start_with_video_value == 0:
+            start_with_video = False
+        else:
+            start_with_video = True
+        if start_with_video != settings.value("START_WITH_VIDEO"):
+            settings.setValue("START_WITH_VIDEO", start_with_video)
 
         theme = self.theme_combo_box.currentText()
         if theme != settings.value("THEME"):
@@ -332,8 +409,6 @@ class GUISettingsWindow(QDialog):
                 settings.setValue("THEME", "dark")
             elif theme == "light":
                 settings.setValue("THEME", "light")
-            else:  #system
-                settings.setValue("THEME", "system")
 
         split_hotkey = self.start_split_hotkey_sequence_edit.keySequence()
         if split_hotkey != settings.value("SPLIT_HOTKEY"):
