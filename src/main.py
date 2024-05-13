@@ -1,3 +1,4 @@
+import platform
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
 
@@ -12,6 +13,10 @@ from utils import settings
 class PilgrimUniversalAutosplitter:
     def __init__(self) -> None:
         self.pilgrim_universal_autosplitter = QApplication([])
+        if platform.system == "Windows":
+            self.pilgrim_universal_autosplitter.setStyle("Windows")
+        else:
+            self.pilgrim_universal_autosplitter.setStyle("fusion")
         self.capture = Capture()
         self.splitter = Splitter()
         self.split_directory = SplitDirectory(settings.value("LAST_IMAGE_DIR"))

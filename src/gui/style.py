@@ -31,6 +31,9 @@ class GUIStyle:
                 background-color: $default_background;
             }
 
+            QWidget#combo_box {
+                selection-background-color: $widget_fill_color;
+            }
             QFrame#border {
                 border: 1px solid $text_and_borders;
             }
@@ -41,17 +44,35 @@ class GUIStyle:
                 background-color: $hover_button_fill_color;
             }
             QPushButton:pressed {
-                padding-top: 3px;
-                padding-left: 3px;
+                padding-top: 2px;
+                padding-left: 2px;
             }
             QPushButton:disabled {
                 color: $disabled_button_text_color;
             }
+            QPushButton:focus {
+            }
             QPushButton#save_button {
             }
 
-            QKeySequenceEdit {
-                color: 3px solid purple;
+            QCheckBox {
+                background-color: $widget_fill_color;
+                border: 0px solid blue;
+                border-radius: 2px;
+            }
+            QLineEdit {
+                color: $disabled_button_text_color;
+            }
+
+            KeyLineEdit {
+                border: 1px solid #404040;
+                border-radius: 3px;
+                background-color: $button_fill_color;
+                color: white;
+                padding-left: 2px;
+            }
+            KeyLineEdit:focus {
+                border: 1px solid #3EA0EC;
             }
 
             QLabel#image_label_active {
@@ -66,42 +87,18 @@ class GUIStyle:
                 background-color: rgba(134, 134, 134, 0.7);
                 border: 1px solid $text_and_borders;
             }
-            
-            QLineEdit {
-                color: $disabled_button_text_color;
+            QLabel#checkbox_helper {
+                border: 1px solid white;
+                background-color: rgba(0, 0, 0, 0);
+                border-radius: 2px;
+            }
+            QLabel#spinbox_helper:hover {
+                background-color: $widget_fill_color;
             }
 
-            QComboBox {
-                background-color: #3D3D3D;
-                selection-background-color: $hover_button_fill_color;
-                padding-top: 2px;
-                padding-left: 5px;
-                border: none;
-            }
-            
-            QComboBox:disabled {
+            QSpinBox,
+            QDoubleSpinBox {
                 background-color: $button_fill_color;
-                color: $disabled_button_text_color;
-            }
-
-            QComboBox:hover {
-                background-color: $button_fill_color;
-            }
-
-            QComboBox QAbstractItemView {
-                border: 2px solid grey;
-                border-radius: 5px;
-                min-width: 80px;
-            }
-
-            QComboBox#aspect_ratio_combo_box {
-                min-width: 120px;
-            }
-
-            QComboBox#aspect_ratio_combo_box QAbstractItemView {
-                border: 2px solid grey;
-                border-radius: 5px;
-                min-width: 140px;
             }
             """
         ).substitute(self.style_dict_dark)

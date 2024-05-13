@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap
 
 from gui.main_window import GUIMainWindow
@@ -31,6 +31,7 @@ class GUIController(QObject):
     undo_split_shortcut_signal = pyqtSignal()
     skip_split_shortcut_signal = pyqtSignal()
     screenshot_shortcut_signal = pyqtSignal()
+    close_app_signal = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -62,8 +63,6 @@ class GUIController(QObject):
 
         # Handle signals from GUI
         self.main_window.settings_window_action.triggered.connect(self.settings_window.exec)
-        self.main_window.settings_window_action.triggered.connect(self.settings_window.reset_settings)
-        self.main_window.about_window_action.triggered.connect(lambda: None)
 
         self.main_window.image_directory_button.clicked.connect(self.image_directory_button_signal.emit)
         self.main_window.screenshot_button.clicked.connect(self.screenshot_button_signal.emit)
@@ -93,7 +92,7 @@ class GUIController(QObject):
         self.settings_window.updated_default_threshold_signal.connect(lambda: self.updated_default_threshold_signal.emit(str(settings.value("DEFAULT_THRESHOLD")), PercentType.THRESHOLD))
         self.settings_window.updated_default_delay_signal.connect(self.updated_default_delay_signal.emit)
         self.settings_window.updated_default_pause_signal.connect(self.updated_default_pause_signal.emit)
-        self.settings_window.updated_global_hotkeys_signal.connect(lambda: None)
+        self.settings_window.close_app_signal.connect(self.main_window.close)
 
     def update_enabled_comparison_data(self):
         if self.splits_active:
@@ -107,11 +106,6 @@ class GUIController(QObject):
             self.set_show_comparison_match_status(False)
 
     def update_enabled_buttons(self):
-        self.set_image_directory_button_enabled_status(True)
-        self.set_reload_video_button_enabled_status(True)
-        self.set_next_source_button_enabled_status(True)
-        self.set_minimal_view_button_enabled_status(True)
-
         if self.splits_active:
             self.set_reset_splits_button_enabled_status(True)
 
@@ -150,12 +144,8 @@ class GUIController(QObject):
             self.set_pause_comparison_button_enabled_status(False)
             if self.video_feed_active:
                 self.set_screenshot_button_enabled_status(True)
-                self.set_minimal_view_button_enabled_status(True)
-                self.set_next_source_button_enabled_status(True)
             else:
                 self.set_screenshot_button_enabled_status(False)
-                self.set_minimal_view_button_enabled_status(False)
-                self.set_next_source_button_enabled_status(False)
 
     def update_video_feed_label(self):
         if self.video_feed_active:

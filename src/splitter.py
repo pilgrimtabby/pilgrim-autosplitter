@@ -114,7 +114,14 @@ class Splitter(QObject):
 
     def reset_all_match_percents(self):
         self.highest_match_percent = 0
-        self.match_percent_signal.emit(str(self.split_image.threshold), PercentType.THRESHOLD)
+        if self.split_image is None:
+            self.match_percent_signal.emit("", PercentType.CURRENT)
+            self.match_percent_signal.emit("", PercentType.HIGHEST)
+            self.match_percent_signal.emit("", PercentType.THRESHOLD)
+        else:
+            self.match_percent_signal.emit("0", PercentType.CURRENT)
+            self.match_percent_signal.emit("0", PercentType.HIGHEST)
+            self.match_percent_signal.emit(str(self.split_image.threshold), PercentType.THRESHOLD)
 
 class SplitMatcher:
     def __init__(self, templ, mask) -> None:

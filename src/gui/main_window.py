@@ -28,6 +28,8 @@ class GUIMainWindow(QMainWindow):
         self.setCentralWidget(self.main_window)
         self.set_keyboard_shortcuts()
         self.style = style
+        self.close_window_shortcut = QShortcut("ctrl+w", self)
+        self.close_window_shortcut.activated.connect(self.close)
         
         # Layout variables
         self.current_split_name = None
@@ -144,13 +146,11 @@ class GUIMainWindow(QMainWindow):
         self.minimal_view_button = QPushButton(self.main_window)
         self.minimal_view_button_default_text = "Minimal view"
         self.minimal_view_button_minimal_text = "Full view"
-        self.minimal_view_button.setEnabled(False)
         self.minimal_view_button.clicked.connect(self.set_minimal_view_status)
         self.minimal_view_button.clicked.connect(self.set_layout)
 
         self.next_source_button = QPushButton(self.main_window)
         self.next_source_button.setText("Next source")
-        self.next_source_button.setEnabled(False)
 
         self.screenshot_button = QPushButton(self.main_window)
         self.screenshot_button.setText("Take screenshot")
@@ -158,7 +158,6 @@ class GUIMainWindow(QMainWindow):
 
         self.reload_video_button = QPushButton(self.main_window)
         self.reload_video_button.setText("Reconnect video")
-        self.reload_video_button.setEnabled(True)
 
         self.previous_split_button = QPushButton(self.main_window)
         self.previous_split_button.setText("<")
