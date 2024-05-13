@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication
 
 from capture import Capture
 from gui.controller import GUIController
@@ -70,8 +70,6 @@ class PilgrimUniversalAutosplitter:
         self.gui.updated_default_pause_signal.connect(self.split_directory.recalculate_default_pause)
 
         self.gui.skip_split_button_signal.connect(self.hotkeys.press_skip_hotkey)
-        self.gui.undo_split_button_signal.connect(self.hotkeys.press_undo_hotkey)
-        self.gui.reset_splits_button_signal.connect(self.hotkeys.press_reset_hotkey)
 
         self.gui.update_fps_start_signal.connect(self.capture.kill_streamer)
         self.gui.update_fps_start_signal.connect(self.splitter.kill_split_matcher)

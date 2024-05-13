@@ -9,7 +9,7 @@ import cv2
 import numpy
 from PyQt5.QtCore import QObject, pyqtSignal
 
-from utils import settings, frame_to_pixmap
+from utils import frame_to_pixmap, settings
 
 
 class Capture(QObject):

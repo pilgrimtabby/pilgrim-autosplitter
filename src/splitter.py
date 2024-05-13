@@ -1,5 +1,6 @@
-from threading import Thread
 import time
+from threading import Thread
+
 import cv2
 import numpy
 from pynput import keyboard
@@ -82,7 +83,6 @@ class Splitter(QObject):
         if self.split_image.pause_flag:
             self.split_action_pause_signal.emit()
         elif not self.split_image.dummy_flag:
-            self.split_action_split_signal.emit()
             self.keyboard.press(keyboard.Key.space)
 
         self.set_delay_status(False)

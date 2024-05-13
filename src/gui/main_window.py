@@ -1,9 +1,10 @@
 import time
 import webbrowser
-from PyQt5.QtCore import QRect, Qt, pyqtSignal, QTimer
+
+from PyQt5.QtCore import QRect, Qt, QTimer, pyqtSignal, QEvent
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QMessageBox, QPushButton, QWidget)
+                             QMessageBox, QPushButton, QShortcut, QWidget)
 
 from utils import settings
 
@@ -12,6 +13,10 @@ from utils import settings
 class GUIMainWindow(QMainWindow):
     set_pause_comparison_button_status_signal = pyqtSignal()
     update_video_feed_label_signal = pyqtSignal()
+    reset_shortcut_signal = pyqtSignal()
+    undo_split_shortcut_signal = pyqtSignal()
+    skip_split_shortcut_signal = pyqtSignal()
+    screenshot_shortcut_signal = pyqtSignal()
 
     def __init__(self, style):
         super().__init__()
@@ -19,8 +24,10 @@ class GUIMainWindow(QMainWindow):
         # Set title and window structure
         self.setWindowTitle(f"Pilgrim Autosplitter v{settings.value('VERSION_NUMBER')}")
         self.main_window = QWidget(self)
-        self.style = style
+        self.main_window.setFocusPolicy(Qt.StrongFocus)
         self.setCentralWidget(self.main_window)
+        self.set_keyboard_shortcuts()
+        self.style = style
         
         # Layout variables
         self.current_split_name = None
@@ -412,6 +419,19 @@ class GUIMainWindow(QMainWindow):
         message.setIcon(QMessageBox.Warning)
         message.exec()
 
+    # Keyboard shortcuts
+    def set_keyboard_shortcuts(self):
+        pass
+        # self.reset_shortcut = QShortcut(settings.value("RESET_HOTKEY"), self)
+        # self.undo_split_shortcut = QShortcut(settings.value("UNDO_HOTKEY"), self)
+        # self.skip_split_shortcut = QShortcut(settings.value("SKIP_HOTKEY"), self)
+        # self.screenshot_shortcut = QShortcut(settings.value("SCREENSHOT_HOTKEY"), self)
+
+        # self.reset_shortcut.activated.connect(self.reset_shortcut_signal.emit)
+        # self.undo_split_shortcut.activated.connect(self.undo_split_shortcut_signal.emit)
+        # self.skip_split_shortcut.activated.connect(self.skip_split_shortcut_signal.emit)
+        # self.screenshot_shortcut.activated.connect(self.screenshot_shortcut_signal.emit)
+
     # Set layout
     def set_layout(self, on_init=False):
         self.update_video_feed_label_signal.emit()
@@ -634,3 +654,11 @@ class GUIMainWindow(QMainWindow):
         self.undo_split_button.setText(self.default_undo_split_button_text)
         self.skip_split_button.setText(self.default_skip_split_button_text)
         self.reset_splits_button.setText(self.default_reset_splits_button_text)
+
+    # Use this to create a widget that will read a single key press, save it as a shortcut
+    # Use a dict to translate to applescript on mac, wincom32 or something on windows
+    # def event(self, event):
+    #     if (event.type() == QEvent.KeyPress):
+    #         print(f'{event.key()}: "{event.text()}",')
+    #         return True
+    #     return QWidget.event(self, event)

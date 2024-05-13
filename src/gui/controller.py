@@ -27,6 +27,10 @@ class GUIController(QObject):
     updated_default_threshold_signal = pyqtSignal(str, PercentType)
     updated_default_delay_signal = pyqtSignal()
     updated_default_pause_signal = pyqtSignal()
+    reset_key_pressed_signal = pyqtSignal()
+    undo_split_shortcut_signal = pyqtSignal()
+    skip_split_shortcut_signal = pyqtSignal()
+    screenshot_shortcut_signal = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -74,6 +78,10 @@ class GUIController(QObject):
         self.main_window.undo_split_button.clicked.connect(self.undo_split_button_signal.emit)
         self.main_window.reset_splits_button.clicked.connect(self.reset_splits_button_signal.emit)
         self.main_window.update_video_feed_label_signal.connect(lambda: self.set_video_feed_label_status(status=self.video_feed_active, override=True))
+        self.main_window.reset_shortcut_signal.connect(self.request_reset)
+        self.main_window.undo_split_shortcut_signal.connect(self.request_undo_split)
+        self.main_window.skip_split_shortcut_signal.connect(self.request_skip_split)
+        self.main_window.screenshot_shortcut_signal.connect(self.request_screenshot)
 
         self.settings_window.save_button.clicked.connect(lambda: self.style.set_global_style([self.main_window.main_window, self.settings_window]))
         self.settings_window.update_fps_start_signal.connect(self.update_fps_start_signal.emit)
@@ -344,3 +352,19 @@ class GUIController(QObject):
             self.main_window.set_no_loop_loop_label()
         else:
             self.main_window.set_live_loop_label_text(current_loop, total_loops)
+
+    def request_reset(self):
+        if self.splits_active:
+            self.reset_splits_button_signal.emit()
+
+    def request_undo_split(self):
+        if self.splits_active:
+            self.undo_split_button_signal.emit()
+
+    def request_skip_split(self):
+        if self.splits_active:
+            self.skip_split_button_signal.emit()
+
+    def request_screenshot(self):
+        if self.video_feed_active:
+            self.screenshot_button_signal.emit()

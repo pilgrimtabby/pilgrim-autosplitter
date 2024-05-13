@@ -1,7 +1,7 @@
 from PyQt5.QtCore import QRect, Qt, pyqtSignal
 from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
                              QFrame, QKeySequenceEdit, QLabel, QPushButton,
-                             QSpinBox)
+                             QSpinBox, QWidget)
 
 from utils import settings
 
@@ -286,6 +286,12 @@ class GUISettingsWindow(QDialog):
         self.cancel_button.clicked.connect(self.close)
         self.cancel_button.setObjectName("cancel_button")
 
+        self.cancel_button = QPushButton(self)
+        self.cancel_button.setGeometry(QRect(319 + self.LEFT_EDGE_CORRECTION, 236 + self.TOP_EDGE_CORRECTION, 111, 62))
+        self.cancel_button.setText("Cancel")
+        self.cancel_button.clicked.connect(self.close)
+        self.cancel_button.setObjectName("cancel_button")
+
         self.save_button = QPushButton(self)
         self.save_button.setGeometry(QRect(459 + self.LEFT_EDGE_CORRECTION, 236 + self.TOP_EDGE_CORRECTION, 111, 62))
         self.save_button.setText("Save")
@@ -433,3 +439,9 @@ class GUISettingsWindow(QDialog):
         screenshot_hotkey = self.screenshot_hotkey_sequence_edit.keySequence()
         if screenshot_hotkey != settings.value("SCREENSHOT_HOTKEY"):
             settings.setValue("SCREENSHOT_HOTKEY", screenshot_hotkey)
+
+    def event(self, event):
+        if (event.type() == QEvent.KeyPress):
+            print(f'{event.key()}: "{event.text()}",')
+            return True
+        return QWidget.event(self, event)

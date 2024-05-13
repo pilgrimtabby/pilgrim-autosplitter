@@ -1,5 +1,7 @@
 from string import Template
+
 from utils import settings
+
 
 class GUIStyle: 
     def __init__(self):
