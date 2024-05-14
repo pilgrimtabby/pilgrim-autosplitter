@@ -7,60 +7,61 @@ from gui.style import GUIStyle
 from utils import PercentType, settings
 
 
-class GUIController(QObject):
-    image_directory_button_signal = pyqtSignal()
-    screenshot_button_signal = pyqtSignal()
-    minimal_view_button_signal = pyqtSignal()
-    next_source_button_signal = pyqtSignal()
-    reload_video_button_signal = pyqtSignal()
-    previous_split_button_signal = pyqtSignal()
-    next_split_button_signal = pyqtSignal()
-    pause_request_signal = pyqtSignal(bool)
-    skip_split_button_signal = pyqtSignal()
-    undo_split_button_signal = pyqtSignal()
-    reset_splits_button_signal = pyqtSignal()
-    update_fps_start_signal = pyqtSignal()
-    update_fps_finish_signal = pyqtSignal()
-    update_aspect_ratio_start_signal = pyqtSignal()
-    update_aspect_ratio_finish_signal = pyqtSignal()
-    set_match_percent_decimals_signal = pyqtSignal()
-    updated_default_threshold_signal = pyqtSignal(str, PercentType)
-    updated_default_delay_signal = pyqtSignal()
-    updated_default_pause_signal = pyqtSignal()
-    reset_key_pressed_signal = pyqtSignal()
-    split_shortcut_signal = pyqtSignal()
-    undo_split_shortcut_signal = pyqtSignal()
-    skip_split_shortcut_signal = pyqtSignal()
-    screenshot_shortcut_signal = pyqtSignal()
-    close_app_signal = pyqtSignal()
-
+class GUIController():
     def __init__(self) -> None:
-        super().__init__()
-
         self.style = GUIStyle()
         self.main_window = GUIMainWindow(self.style)
         self.settings_window = GUISettingsWindow(self.style)
 
-        self.video_feed_active = False
-        self.splits_active = False
-        self.splitter_suspended = False
-        self.splitter_delaying = False
-        self.is_first_split = False
-        self.is_last_split = False
-        self.show_video_feed_label = False
-        self.show_comparison_match = False
-        self.show_threshold = False
-        self.image_directory_button_enabled = False
-        self.screenshot_button_enabled = False
-        self.minimal_view_button_enabled = False
-        self.next_source_button_enabled = False
-        self.reload_video_button_enabled = False
-        self.previous_split_button_enabled = False
-        self.next_split_button_enabled = False
-        self.pause_comparison_button_enabled = False
-        self.skip_split_button_enabled = False
-        self.undo_split_button_enabled = False
-        self.reset_splits_button_enabled = False
+        #######################
+        #                     #
+        # Main window signals #
+        #                     #
+        #######################
+
+        # Buttons
+        self.main_window.image_directory_button.clicked.connect()
+        self.main_window.minimal_view_button.clicked.connect()
+        self.main_window.next_source_button.clicked.connect()
+        self.main_window.screenshot_button.clicked.connect()
+        self.main_window.reload_video_button.clicked.connect()
+        self.main_window.previous_split_button.clicked.connect()
+        self.main_window.next_split_button.clicked.connect()
+        self.main_window.pause_comparison_button.clicked.connect()
+        self.main_window.undo_split_button.clicked.connect()
+        self.main_window.skip_split_button.clicked.connect()
+        self.main_window.reset_splits_button.clicked.connect()
+
+        # Menu bar actions
+        self.main_window.settings_action.triggered.connect()
+        self.main_window.help_action.triggered.connect()
+
+        # Keyboard shortcuts
+        self.main_window.close_window_shortcut.activated.connect()
+        self.main_window.split_shortcut.activated.connect()
+        self.main_window.reset_shortcut.activated.connect()
+        self.main_window.undo_split_shortcut.activated.connect()
+        self.main_window.skip_split_shortcut.activated.connect()
+        self.main_window.previous_split_shortcut.activated.connect()
+        self.main_window.next_split_shortcut.activated.connect()
+        self.main_window.screenshot_shortcut.activated.connect()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         # Handle signals from GUI
         self.main_window.settings_window_action.triggered.connect(self.settings_window.exec)
