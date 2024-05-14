@@ -1,3 +1,4 @@
+import webbrowser
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap
 
@@ -9,7 +10,7 @@ from utils import PercentType, settings
 
 class GUIController():
     def __init__(self) -> None:
-        self.style = GUIStyle()
+        self.style = GUIStyle()    # fix the style related stuff
         self.main_window = GUIMainWindow(self.style)
         self.settings_window = GUISettingsWindow(self.style)
 
@@ -34,10 +35,8 @@ class GUIController():
 
         # Menu bar actions
         self.main_window.settings_action.triggered.connect()
-        self.main_window.help_action.triggered.connect()
 
         # Keyboard shortcuts
-        self.main_window.close_window_shortcut.activated.connect()
         self.main_window.split_shortcut.activated.connect()
         self.main_window.reset_shortcut.activated.connect()
         self.main_window.undo_split_shortcut.activated.connect()
@@ -46,8 +45,18 @@ class GUIController():
         self.main_window.next_split_shortcut.activated.connect()
         self.main_window.screenshot_shortcut.activated.connect()
 
+        ###########################
+        #                         #
+        # Settings window signals #
+        #                         #
+        ###########################
 
-
+        # Close all windows with ctrl+q
+        self.settings_window.close_app_shortcut.activated.connect(self.settings_window.close)
+        self.settings_window.close_app_shortcut.activated.connect(self.main_window.close)
+        
+        ######## Implement this from scraps
+        self.settings_window.save_button.clicked.connect(self.save_settings)
 
 
 

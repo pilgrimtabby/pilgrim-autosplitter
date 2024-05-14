@@ -136,6 +136,7 @@ class GUIMainWindow(QMainWindow):
 
         # Program shortcuts
         self.close_window_shortcut = QShortcut("ctrl+w", self)
+        self.close_window_shortcut.activated.connect(self.close)
 
         # UI shortcuts
         self.split_shortcut = QShortcut(self)
