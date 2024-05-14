@@ -13,6 +13,7 @@ from utils import settings
 class GUIMainWindow(QMainWindow):
     set_pause_comparison_button_status_signal = pyqtSignal()
     update_video_feed_label_signal = pyqtSignal()
+    split_shortcut_signal = pyqtSignal()
     reset_shortcut_signal = pyqtSignal()
     undo_split_shortcut_signal = pyqtSignal()
     skip_split_shortcut_signal = pyqtSignal()
@@ -26,10 +27,7 @@ class GUIMainWindow(QMainWindow):
         self.main_window = QWidget(self)
         self.main_window.setFocusPolicy(Qt.StrongFocus)
         self.setCentralWidget(self.main_window)
-        self.set_keyboard_shortcuts()
         self.style = style
-        self.close_window_shortcut = QShortcut("ctrl+w", self)
-        self.close_window_shortcut.activated.connect(self.close)
         
         # Layout variables
         self.current_split_name = None
@@ -203,6 +201,28 @@ class GUIMainWindow(QMainWindow):
         # Style and layout
         self.style.set_style(self.main_window)
         self.set_layout(on_init=True)
+
+        # Set up keyboard shortcuts
+        self.close_window_shortcut = QShortcut("ctrl+w", self)
+        self.close_window_shortcut.activated.connect(self.close)
+
+        self.split_shortcut = QShortcut(self)
+        self.reset_shortcut = QShortcut(self)
+        self.undo_split_shortcut = QShortcut(self)
+        self.skip_split_shortcut = QShortcut(self)
+        self.previous_split_shortcut = QShortcut(self)
+        self.next_split_shortcut = QShortcut(self)
+        self.screenshot_shortcut = QShortcut(self)
+
+        self.split_shortcut.activated.connect(self.split_shortcut_signal.emit)
+        self.reset_shortcut.activated.connect(self.reset_shortcut_signal.emit)
+        self.undo_split_shortcut.activated.connect(self.undo_split_shortcut_signal.emit)
+        self.skip_split_shortcut.activated.connect(self.skip_split_shortcut_signal.emit)
+        self.previous_split_shortcut.activated.connect(self.previous_split_button.click)
+        self.next_split_shortcut.activated.connect(self.next_split_button.click)
+        self.screenshot_shortcut.activated.connect(self.screenshot_shortcut_signal.emit)
+
+        self.set_shortcuts()
 
     # Set button status
     def set_image_directory_button_status(self, status):
@@ -419,17 +439,20 @@ class GUIMainWindow(QMainWindow):
         message.exec()
 
     # Keyboard shortcuts
-    def set_keyboard_shortcuts(self):
-        pass
-        # self.reset_shortcut = QShortcut(settings.value("RESET_HOTKEY"), self)
-        # self.undo_split_shortcut = QShortcut(settings.value("UNDO_HOTKEY"), self)
-        # self.skip_split_shortcut = QShortcut(settings.value("SKIP_HOTKEY"), self)
-        # self.screenshot_shortcut = QShortcut(settings.value("SCREENSHOT_HOTKEY"), self)
-
-        # self.reset_shortcut.activated.connect(self.reset_shortcut_signal.emit)
-        # self.undo_split_shortcut.activated.connect(self.undo_split_shortcut_signal.emit)
-        # self.skip_split_shortcut.activated.connect(self.skip_split_shortcut_signal.emit)
-        # self.screenshot_shortcut.activated.connect(self.screenshot_shortcut_signal.emit)
+    def set_shortcuts(self):
+        for shortcut, key_sequence in {
+            self.split_shortcut: settings.value("SPLIT_HOTKEY_KEY_SEQUENCE"),
+            self.reset_shortcut: settings.value("RESET_HOTKEY_KEY_SEQUENCE"),
+            self.undo_split_shortcut: settings.value("UNDO_HOTKEY_KEY_SEQUENCE"),
+            self.skip_split_shortcut: settings.value("SKIP_HOTKEY_KEY_SEQUENCE"),
+            self.previous_split_shortcut: settings.value("PREVIOUS_HOTKEY_KEY_SEQUENCE"),
+            self.next_split_shortcut: settings.value("NEXT_HOTKEY_KEY_SEQUENCE"),
+            self.screenshot_shortcut: settings.value("SCREENSHOT_HOTKEY_KEY_SEQUENCE"),
+        }.items():
+            if key_sequence is None:
+                pass
+            else:
+                shortcut.setKey(key_sequence)
 
     # Set layout
     def set_layout(self, on_init=False):
@@ -654,10 +677,16 @@ class GUIMainWindow(QMainWindow):
         self.skip_split_button.setText(self.default_skip_split_button_text)
         self.reset_splits_button.setText(self.default_reset_splits_button_text)
 
-    # Use this to create a widget that will read a single key press, save it as a shortcut
-    # Use a dict to translate to applescript on mac, wincom32 or something on windows
+    # Get Q keycode for key
     # def event(self, event):
     #     if (event.type() == QEvent.KeyPress):
     #         print(f'{event.key()}: "{event.text()}",')
+    #         return True
+    #     return QWidget.event(self, event)
+
+    # Get osascript code for key
+    # def event(self, event):
+    #     if (event.type() == QEvent.KeyPress):
+    #         print(f'{event.nativeVirtualKey()}: "{event.text()}",')
     #         return True
     #     return QWidget.event(self, event)

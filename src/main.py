@@ -68,6 +68,7 @@ class PilgrimUniversalAutosplitter:
         self.gui.next_split_button_signal.connect(self.split_directory.load_next_split_image)
         self.gui.skip_split_button_signal.connect(self.split_directory.load_next_split_image)
         self.gui.undo_split_button_signal.connect(self.split_directory.load_previous_split_image)
+        self.gui.split_shortcut_signal.connect(self.splitter.split)
         self.gui.reset_splits_button_signal.connect(self.split_directory.reset_split_images)
         self.gui.updated_default_threshold_signal.connect(self.split_directory.recalculate_default_threshold)
         self.gui.updated_default_threshold_signal.connect(self.splitter.match_percent_signal.emit)

@@ -28,6 +28,7 @@ class GUIController(QObject):
     updated_default_delay_signal = pyqtSignal()
     updated_default_pause_signal = pyqtSignal()
     reset_key_pressed_signal = pyqtSignal()
+    split_shortcut_signal = pyqtSignal()
     undo_split_shortcut_signal = pyqtSignal()
     skip_split_shortcut_signal = pyqtSignal()
     screenshot_shortcut_signal = pyqtSignal()
@@ -77,6 +78,7 @@ class GUIController(QObject):
         self.main_window.undo_split_button.clicked.connect(self.undo_split_button_signal.emit)
         self.main_window.reset_splits_button.clicked.connect(self.reset_splits_button_signal.emit)
         self.main_window.update_video_feed_label_signal.connect(lambda: self.set_video_feed_label_status(status=self.video_feed_active, override=True))
+        self.main_window.split_shortcut_signal.connect(self.split_request)
         self.main_window.reset_shortcut_signal.connect(self.request_reset)
         self.main_window.undo_split_shortcut_signal.connect(self.request_undo_split)
         self.main_window.skip_split_shortcut_signal.connect(self.request_skip_split)
@@ -93,6 +95,7 @@ class GUIController(QObject):
         self.settings_window.updated_default_delay_signal.connect(self.updated_default_delay_signal.emit)
         self.settings_window.updated_default_pause_signal.connect(self.updated_default_pause_signal.emit)
         self.settings_window.close_app_signal.connect(self.main_window.close)
+        self.settings_window.set_shortcut_signal.connect(self.main_window.set_shortcuts)
 
     def update_enabled_comparison_data(self):
         if self.splits_active:
@@ -343,16 +346,20 @@ class GUIController(QObject):
         else:
             self.main_window.set_live_loop_label_text(current_loop, total_loops)
 
+    def split_request(self):
+        if self.video_feed_active and self.splits_active and not self.splitter_suspended and not self.splitter_delaying:
+            self.split_shortcut_signal.emit()
+
     def request_reset(self):
         if self.splits_active:
             self.reset_splits_button_signal.emit()
 
     def request_undo_split(self):
-        if self.splits_active:
+        if self.splits_active and not self.is_first_split:
             self.undo_split_button_signal.emit()
 
     def request_skip_split(self):
-        if self.splits_active:
+        if self.splits_active and not self.is_last_split:
             self.skip_split_button_signal.emit()
 
     def request_screenshot(self):

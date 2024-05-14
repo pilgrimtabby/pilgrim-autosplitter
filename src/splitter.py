@@ -61,14 +61,13 @@ class Splitter(QObject):
             if self.split_image.below_flag:
                 self.went_above_threshold_flag = True
             else:
-                self.split_matcher.exit_thread()
                 self.split()
 
         elif self.went_above_threshold_flag:
-            self.split_matcher.exit_thread()
             self.split()
 
     def split(self):
+        self.split_matcher.exit_thread()
         total_down_time = self.split_image.delay_duration + self.split_image.pause_duration
         if total_down_time > 0:
             self.set_suspended_status(True, self.split_image.delay_duration, self.split_image.pause_duration)
