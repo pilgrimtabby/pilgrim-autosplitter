@@ -62,6 +62,7 @@ class GUIStyle:
             }
             QLineEdit {
                 color: $disabled_button_text_color;
+                padding-left: 5px;
             }
 
             KeyLineEdit {

@@ -5,6 +5,7 @@ from PyQt5.QtGui import QPixmap
 from gui.main_window import GUIMainWindow
 from gui.settings_window import GUISettingsWindow
 from gui.style import GUIStyle
+from split_directory import SplitDirectory
 from utils import PercentType, settings
 
 
@@ -12,18 +13,28 @@ class GUIController():
     def __init__(self) -> None:
         self.style = GUIStyle()    # fix the style related stuff
         self.main_window = GUIMainWindow(self.style)
+        self.main_window.set_layout(self.splitter_suspended())
         self.settings_window = GUISettingsWindow(self.style)
+        self.split_directory = SplitDirectory()
 
-        #######################
-        #                     #
-        # Main window signals #
-        #                     #
-        #######################
+        ###########
+        #         #
+        # Signals #
+        #         #
+        ###########
 
-        # Buttons
-        self.main_window.image_directory_button.clicked.connect()
-        self.main_window.minimal_view_button.clicked.connect()
+        # Image directory button
+        self.main_window.image_directory_button.clicked.connect(self.split_directory.set_dir_path)
+        self.main_window.image_directory_button.clicked.connect(self.main_window.set_split_directory_line_edit_text)
+
+        # Minimal view / full view button
+        self.main_window.minimal_view_button.clicked.connect(self.toggle_min_view_settings_value)
+        self.main_window.minimal_view_button.clicked.connect(self.main_window.toggle_min_view_button_text)
+        self.main_window.minimal_view_button.clicked.connect(lambda: self.main_window.set_layout(self.splitter_suspended()))
+
+        # Next source button
         self.main_window.next_source_button.clicked.connect()
+
         self.main_window.screenshot_button.clicked.connect()
         self.main_window.reload_video_button.clicked.connect()
         self.main_window.previous_split_button.clicked.connect()
@@ -58,20 +69,46 @@ class GUIController():
         ######## Implement this from scraps
         self.settings_window.save_button.clicked.connect(self.save_settings)
 
+    ##################
+    #                #
+    # Getter Methods #
+    #                #
+    ##################
+
+    def video_feed_active(self):
+        pass
+
+    def splits_active(self):
+        pass
+
+    def splitter_delaying(self):
+        pass
+
+    def splitter_suspended(self):   #### CHANGE ALL REFERENCES OF "PAUSED" TO "SUSPENDED"
+        pass
+
+    def is_first_split(self):
+        pass
+
+    def is_last_split(self):
+        pass
+
+    ##################
+    #                #
+    # Setter Methods #
+    #                #
+    ##################
+
+    def toggle_min_view_settings_value(self):
+        if settings.value("SHOW_MIN_VIEW"):
+            settings.setValue("SHOW_MIN_VIEW", False)
+        else:
+            settings.setValue("SHOW_MIN_VIEW", True)
 
 
 
 
-
-
-
-
-
-
-
-
-
-
+    def old(self):
         # Handle signals from GUI
         self.main_window.settings_window_action.triggered.connect(self.settings_window.exec)
 

@@ -6,73 +6,49 @@ from pathlib import Path
 from threading import Thread
 
 import cv2
-import numpy
-from PyQt5.QtCore import QObject, pyqtSignal
 
-from utils import frame_to_pixmap, settings
+from utils import settings
 
 
-class Capture(QObject):
-    send_to_gui_signal = pyqtSignal(object)
-    send_to_splitter_signal = pyqtSignal(numpy.ndarray)
-    screenshot_result_signal = pyqtSignal(object)
-    video_is_active_signal = pyqtSignal(bool)
-
+class Capture():
     def __init__(self) -> None:
-        super().__init__()
-        self.frame_count= 0
-        self.frame_time = 0
         self.source_index = settings.value("LAST_CAPTURE_SOURCE_INDEX")
-        self.video_is_active = False
+        self.frame = None
         if settings.value("START_WITH_VIDEO"):
-            self.streamer = Streamer(self.source_index)
-            # self.streamer = Streamer("res/test-vid.mp4")
+            self.start_capture()
         else:
-            self.streamer = None
-
-    def send_frame(self, measure_fps=False):
-        if self.streamer is None:
-            return
-
-        frame = self.streamer.share()
-        
-        if measure_fps:
-            if self.frame_time == 0:
-                self.frame_time = time.time()
-            elif time.time() - self.frame_time >= 1:
-                self.frame_time = 0
-                print(self.frame_count)
-                self.frame_count = 0
-            self.frame_count += 1
-
-        if frame is None:
-            self.set_video_active_status(False)
-            self.send_to_gui_signal.emit(None)
+            self.frame_grabber = None
+    
+    def start_capture(self):
+        if self.frame_grabber is not None:
+            self.frame_grabber.safe_exit()
+        new_cap = self.get_new_capture()
+        if new_cap is not None:
+            self.frame_grabber = self._FrameGrabber(new_cap)
+    
+    def get_new_capture(self):
+        cap = cv2.VideoCapture(self.source_index)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        if cap.isOpened():
+            return cap
         else:
-            self.set_video_active_status(True)
-            self.send_to_gui_signal.emit(frame_to_pixmap(frame))
-            self.send_to_splitter_signal.emit(frame)
-    
-    # Kill Streamer thread and create new Streamer object
-    def reconnect_video(self):
-        if self.streamer is not None:
-            self.streamer.exit_thread()
-        self.streamer = Streamer(self.source_index)
+            return None
 
-    # Kill streamer thread then start new thread in same streamer instance
-    def kill_streamer(self):
-        if self.streamer is not None:
-            self.streamer.exit_thread()
-    
-    # Restart streamer thread
-    def restart_streamer(self):
-        if self.streamer is not None:
-            self.streamer.restart_thread()
+    def get_frame(self):
+        if self.frame_grabber.cap.isOpened():
+            self.frame = self.frame_grabber.get_frame()            
+        else:
+            self.frame = None
+            self.frame_grabber.safe_exit()
 
-    def get_next_source(self):
+    def stop_capture(self):
+        if self.frame_grabber is not None:
+            self.frame_grabber.safe_exit()
+    
+    def start_capture_from_next_source(self):
         self.source_index = self.next_valid_source_index()
         settings.setValue("LAST_CAPTURE_SOURCE_INDEX", self.source_index)
-        self.reconnect_video()
+        self.start_capture()
 
     def next_valid_source_index(self):
         test_source = self.source_index + 1
@@ -84,13 +60,11 @@ class Capture(QObject):
             else:
                 test_source += 1
                 tries += 1
-        
         return 0
     
     def take_screenshot(self) -> bool:
-        frame = self.streamer.share()
-        if frame is None:
-            self.screenshot_result_signal.emit(None)
+        if self.frame is None:
+            self.screenshot_result_signal.emit(None)  ## Fix this
             return
 
         image_dir = settings.value("LAST_IMAGE_DIR")
@@ -98,7 +72,7 @@ class Capture(QObject):
             image_dir = os.path.expanduser("~")
 
         screenshot_path = f"{image_dir}/{self.get_unique_number(image_dir)}_screenshot.png"
-        cv2.imwrite(screenshot_path, frame)
+        cv2.imwrite(screenshot_path, self.frame)
         if Path(screenshot_path).is_file():
             if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
                 if platform.system() == "Windows":
@@ -108,9 +82,9 @@ class Capture(QObject):
                 else:
                     subprocess.call(["xdg-open", screenshot_path])
             else:
-                self.screenshot_result_signal.emit(screenshot_path)
+                self.screenshot_result_signal.emit(screenshot_path)  # Fix this
         else:
-            self.screenshot_result_signal.emit(None)
+            self.screenshot_result_signal.emit(None)  ## Fix this
 
     def get_unique_number(self, dir: str):
         file_int = 1
@@ -122,47 +96,27 @@ class Capture(QObject):
             else:
                 return file_number
 
-    def set_video_active_status(self, status: bool):
-        if self.video_is_active != status:
-            self.video_is_active = status
-            self.video_is_active_signal.emit(status)
+    class _FrameGrabber:   ### make this more precise with time.whatever
+        def __init__(self, cap) -> None:    
+            self.cap = cap
+            self.frame = None  # In case other thread calls _grab_frame too soon
 
+            self.thread = Thread(target=self._grab_frame, args=(1 / settings.value("FPS"),))
+            self.thread.daemon = True
+            self.thread.start()
 
-class Streamer():
-    def __init__(self, source_index: int) -> None:
-        self.source_index = source_index
-        self.buffer = 1
-        self.cap = cv2.VideoCapture(self.source_index)
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, self.buffer)
-        self.frame = None
-        self.exit = False
-
-        self.thread = Thread(target=self.read, args=(1 / settings.value("FPS"),))
-        self.thread.daemon = True
-        self.thread.start()
-
-    def read(self, interval):
-        while not self.exit:
-            if self.cap.isOpened:
+        def _grab_frame(self, interval):
+            while self.cap.isOpened:
                 frame = self.cap.read()[1]
-                if frame is None:
-                    self.frame = None
-                else:
-                    self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-            time.sleep(interval)
+                if frame is None:   # Something happened to the video feed, kill the thread
+                    self.cap.release()
+                self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+                time.sleep(interval)
 
-    def share(self):
-        return self.frame
+        def get_frame(self):
+            return self.frame
 
-    def restart_thread(self):
-        if self.thread.is_alive():
-            self.exit_thread()
-            
-        self.thread = Thread(target=self.read, args=(1 / settings.value("FPS"),))
-        self.thread.daemon = True
-        self.thread.start()
-
-    def exit_thread(self):
-        self.exit = True
-        self.thread.join()
-        self.exit = False
+        def safe_exit(self):
+            if self.thread.is_alive():
+                self.cap.release()
+                self.thread.join()
