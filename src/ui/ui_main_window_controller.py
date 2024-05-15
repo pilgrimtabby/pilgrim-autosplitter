@@ -5,7 +5,7 @@ from PyQt5.QtGui import QPixmap
 from gui.main_window import GUIMainWindow
 from gui.settings_window import GUISettingsWindow
 from gui.style import GUIStyle
-from split_directory import SplitDirectory
+from splitter.split_dir import SplitDirectory
 from utils import PercentType, settings
 
 
@@ -68,6 +68,18 @@ class GUIController():
         
         ######## Implement this from scraps
         self.settings_window.save_button.clicked.connect(self.save_settings)
+
+
+    # HANDLE THIS SOMEWHERE
+    # def set_dir_path(self):
+    #     path = QFileDialog.getExistingDirectory(None, "Select splits folder")
+    #     if path != "" and (self.dir_path != path or self.dir_path is None):
+    #         self.dir_path = path
+    #         self.prepare_split_images(make_image_list=True)
+    #         settings.setValue("LAST_IMAGE_DIR", self.dir_path)
+
+
+
 
     ##################
     #                #

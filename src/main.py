@@ -2,11 +2,11 @@ import platform
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication
 
-from capture import Capture
+from frame_capture import Capture
 from gui.controller import GUIController
-from hotkeys import Hotkeys
-from split_directory import SplitDirectory
-from splitter import Splitter
+from unused.hotkeys import Hotkeys
+from splitter.split_dir import SplitDirectory
+from frame_compare import Splitter
 from utils import settings
 
 
