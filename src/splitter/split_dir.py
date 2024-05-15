@@ -41,6 +41,8 @@ class SplitDir:
 
         else:
             self.current_loop += 1
+
+        return self.current_image_index
         
     def previous_split_image(self):
         if self.current_loop == 0:
@@ -54,6 +56,8 @@ class SplitDir:
             
         else:
             self.current_loop -= 1
+
+        return self.current_image_index
         
     def reset_split_images(self):
         self.current_image_index = 0

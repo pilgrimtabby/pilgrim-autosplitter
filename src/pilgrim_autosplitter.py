@@ -10,7 +10,7 @@ from frame_compare import Splitter
 from utils import settings
 
 
-class PilgrimUniversalAutosplitter:
+class PilgrimAutosplitter:
     def __init__(self) -> None:
         self.pilgrim_universal_autosplitter = QApplication([])
         if platform.system == "Windows":
@@ -105,4 +105,4 @@ class PilgrimUniversalAutosplitter:
 
 
 if __name__ == "__main__":
-    PilgrimUniversalAutosplitter()
+    PilgrimAutosplitter()
