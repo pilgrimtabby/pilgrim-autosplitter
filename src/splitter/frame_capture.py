@@ -12,34 +12,7 @@ from utils import settings
 
 class FrameCapture:
     def __init__(self) -> None:
-        self.frame = None
-    #     self.cap = self._get_new_capture_source()
-    #     self._capture_thread = Thread(target=self._capture, args=(1 / settings.value("FPS"),))
-    #     self._capture_thread.daemon = True
-    #     self._capture_thread.start()
-
-    # def _get_new_capture_source(self):
-    #     cap = cv2.VideoCapture(settings.value("LAST_CAPTURE_SOURCE_INDEX"))
-    #     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    #     return cap
-    
-    # def _capture(self, interval):
-    #     start_time = time.perf_counter()
-    #     while self.cap.isOpened():
-    #         current_time = time.perf_counter()
-    #         if current_time - start_time >= interval:
-    #             start_time = current_time
-    #             frame = self.cap.read()[1]
-    #             if frame is None:   # Something happened to the video feed, kill the thread
-    #                 self.frame = None
-    #                 self.cap.release()
-    #             else:
-    #                 self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-
-    # def safe_exit_capture_thread(self):
-    #     if self._capture_thread.is_alive():
-    #         self.cap.release()
-    #         self._capture_thread.join()
+        pass
 
     def next_capture_source(self):
         source = settings.value("LAST_CAPTURE_SOURCE_INDEX") + 1

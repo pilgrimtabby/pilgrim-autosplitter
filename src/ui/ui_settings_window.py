@@ -1,8 +1,9 @@
-from PyQt5.QtCore import QRect, Qt, pyqtSignal, QEvent
-from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
-                             QFrame, QKeySequenceEdit, QLabel, QPushButton,
-                             QSpinBox, QWidget, QAction, QLineEdit, QShortcut, QGraphicsDropShadowEffect)
+from PyQt5.QtCore import QEvent, QRect, Qt
 from PyQt5.QtGui import QColor, QKeySequence
+from PyQt5.QtWidgets import (QAction, QCheckBox, QComboBox, QDialog,
+                             QDoubleSpinBox, QFrame, QGraphicsDropShadowEffect,
+                             QLabel, QLineEdit, QPushButton, QShortcut,
+                             QSpinBox, QWidget)
 
 from utils import settings
 

@@ -4,6 +4,7 @@ import re
 
 import cv2
 import numpy
+from PyQt5.QtWidgets import QFileDialog
 
 from utils import frame_to_pixmap, settings
 
@@ -28,6 +29,7 @@ class SplitDir:
         for image_path in sorted(image_paths):
             split_images += [self._SplitImage(image_path)]
         return split_images
+    
             
     def next_split_image(self):
         current_image = self.list[self.current_image_index]
@@ -62,6 +64,31 @@ class SplitDir:
     def reset_split_images(self):
         self.current_image_index = 0
         self.current_loop = 0
+
+    def set_image_directory_path(self):
+        path = QFileDialog.getExistingDirectory(None, "Select splits folder", settings.value("LAST_IMAGE_DIR"))
+        if path != "" and self.dir_path != path:
+            settings.setValue("LAST_IMAGE_DIR", path)
+            self.dir_path = path
+            # Open the new split images in the gui
+            self.reset_split_images()
+            self.list = self.get_split_images()
+
+    def set_default_threshold(self):
+        for image in self.list:
+            if image.threshold_is_default:
+                image.threshold = settings.value("DEFAULT_THRESHOLD")
+
+    def set_default_delay(self):
+        for image in self.list:
+            if image.delay_is_default:
+                image.delay_duration = settings.value("DEFAULT_DELAY")
+
+    def set_default_pause(self):
+        for image in self.list:
+            if image.pause_is_default:
+                image.pause_duration = settings.value("DEFAULT_PAUSE")
+
 
     class _SplitImage:
         def __init__(self, image_path) -> None:

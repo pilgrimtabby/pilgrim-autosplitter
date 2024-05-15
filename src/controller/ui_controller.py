@@ -1,60 +1,86 @@
-import webbrowser
-from PyQt5.QtCore import QObject, pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import QTimer
 
-from gui.main_window import GUIMainWindow
-from gui.settings_window import GUISettingsWindow
-from gui.style import GUIStyle
-from splitter.split_dir import SplitDirectory
+from ui.ui_main_window import GUIMainWindow
+from ui.ui_settings_window import GUISettingsWindow
+from ui.ui_style import GUIStyle
 from utils import PercentType, settings
 
 
-class GUIController():
-    def __init__(self) -> None:
+class UIController:
+    def __init__(self, splitter) -> None:
+        self.splitter = splitter
+        self.last_split_image_index = None
+
         self.style = GUIStyle()    # fix the style related stuff
         self.main_window = GUIMainWindow(self.style)
         self.main_window.set_layout(self.splitter_suspended())
         self.settings_window = GUISettingsWindow(self.style)
-        self.split_directory = SplitDirectory()
 
-        ###########
-        #         #
-        # Signals #
-        #         #
-        ###########
+        #######################
+        #                     #
+        # Main Window Signals #
+        #                     #
+        #######################
 
-        # Image directory button
-        self.main_window.image_directory_button.clicked.connect(self.split_directory.set_dir_path)
+        # Image directory button clicked
+        self.main_window.image_directory_button.clicked.connect(self.splitter.splits.set_image_directory_path)
         self.main_window.image_directory_button.clicked.connect(self.main_window.set_split_directory_line_edit_text)
 
-        # Minimal view / full view button
-        self.main_window.minimal_view_button.clicked.connect(self.toggle_min_view_settings_value)
+        # Minimal view / full view button clicked
+        self.main_window.minimal_view_button.clicked.connect(lambda: settings.setValue("SHOW_MIN_VIEW", not settings.value("SHOW_MIN_VIEW")))
         self.main_window.minimal_view_button.clicked.connect(self.main_window.toggle_min_view_button_text)
-        self.main_window.minimal_view_button.clicked.connect(lambda: self.main_window.set_layout(self.splitter_suspended()))
+        self.main_window.minimal_view_button.clicked.connect(lambda: self.main_window.set_layout(splitter_paused=self.splitter.suspended))
 
-        # Next source button
-        self.main_window.next_source_button.clicked.connect()
+        # Next source button clicked
+        self.main_window.next_source_button.clicked.connect(self.splitter.next_capture_source)
+        self.main_window.next_source_button.clicked.connect(self.splitter.safe_exit_all_threads)
+        self.main_window.next_source_button.clicked.connect(self.splitter.start)
 
+        # Screenshot button clicked
         self.main_window.screenshot_button.clicked.connect()
-        self.main_window.reload_video_button.clicked.connect()
-        self.main_window.previous_split_button.clicked.connect()
-        self.main_window.next_split_button.clicked.connect()
-        self.main_window.pause_comparison_button.clicked.connect()
-        self.main_window.undo_split_button.clicked.connect()
-        self.main_window.skip_split_button.clicked.connect()
-        self.main_window.reset_splits_button.clicked.connect()
 
-        # Menu bar actions
-        self.main_window.settings_action.triggered.connect()
+        # Reload video button clicked
+        self.main_window.reload_video_button.clicked.connect(self.splitter.safe_exit_all_threads)
+        self.main_window.reload_video_button.clicked.connect(self.splitter.start)
 
-        # Keyboard shortcuts
-        self.main_window.split_shortcut.activated.connect()
-        self.main_window.reset_shortcut.activated.connect()
-        self.main_window.undo_split_shortcut.activated.connect()
-        self.main_window.skip_split_shortcut.activated.connect()
-        self.main_window.previous_split_shortcut.activated.connect()
-        self.main_window.next_split_shortcut.activated.connect()
-        self.main_window.screenshot_shortcut.activated.connect()
+        # Pause comparison / unpause comparison button clicked
+        self.main_window.pause_comparison_button.clicked.connect(self.splitter.toggle_suspended)
+
+        # Split keyboard shortcut entered
+        self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+
+        # Undo split button clicked
+        self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+        ##### send undo button keystroke
+
+        # Undo split keyboard shortcut entered
+        self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
+
+        # Skip split button clicked
+        self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
+        ##### send skip button keystroke
+
+        # Skip split keyboard shortcut entered
+        self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+
+        # Previous split button clicked
+        self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+
+        # Next split button entered
+        self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
+
+        # Reset button clicked
+        self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
+        self.last_split_image_index = None
+        ##### Send reset keyboard shortcut
+
+        # Reset splits keyboard shortcut entered
+        self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
+        self.last_split_image_index = None
+
+        # Settings menu bar action triggered
+        self.main_window.settings_action.triggered.connect(self.settings_window.exec)
 
         ###########################
         #                         #
@@ -62,60 +88,195 @@ class GUIController():
         #                         #
         ###########################
 
-        # Close all windows with ctrl+q
+        # Quit app keyboard shortcut entered (ctrl+q)
         self.settings_window.close_app_shortcut.activated.connect(self.settings_window.close)
         self.settings_window.close_app_shortcut.activated.connect(self.main_window.close)
         
-        ######## Implement this from scraps
+        # Save button clicked
         self.settings_window.save_button.clicked.connect(self.save_settings)
 
+        ##########################
+        #                        #
+        # Get info from splitter #
+        #                        #
+        ##########################
 
-    # HANDLE THIS SOMEWHERE
-    # def set_dir_path(self):
-    #     path = QFileDialog.getExistingDirectory(None, "Select splits folder")
-    #     if path != "" and (self.dir_path != path or self.dir_path is None):
-    #         self.dir_path = path
-    #         self.prepare_split_images(make_image_list=True)
-    #         settings.setValue("LAST_IMAGE_DIR", self.dir_path)
+        self.update_ui_timer = QTimer()
+        self.update_ui_timer.setInterval(1000 // settings.value("FPS"))
+        self.update_ui_timer.timeout.connect(self.get_info_from_splitter)
+        self.update_ui_timer.start()
 
-
-
-
-    ##################
-    #                #
-    # Getter Methods #
-    #                #
-    ##################
-
-    def video_feed_active(self):
-        pass
-
-    def splits_active(self):
-        pass
-
-    def splitter_delaying(self):
-        pass
-
-    def splitter_suspended(self):   #### CHANGE ALL REFERENCES OF "PAUSED" TO "SUSPENDED"
-        pass
-
-    def is_first_split(self):
-        pass
-
-    def is_last_split(self):
-        pass
-
-    ##################
-    #                #
-    # Setter Methods #
-    #                #
-    ##################
-
-    def toggle_min_view_settings_value(self):
-        if settings.value("SHOW_MIN_VIEW"):
-            settings.setValue("SHOW_MIN_VIEW", False)
+    def get_info_from_splitter(self):
+        # Video display
+        if self.splitter.frame_pixmap is None:
+            if self.main_window.video_feed_display.text() == "":  # There is currently an image being displayed
+                self.main_window.video_feed_display.setText(self.main_window.video_feed_default_text)
         else:
-            settings.setValue("SHOW_MIN_VIEW", True)
+            self.main_window.video_feed_display.setPixmap(self.splitter.frame_pixmap)
+
+        # Split image
+        if self.last_split_image_index is None or self.last_split_image_index != self.splitter.current_split_index:
+            if self.splitter.current_split_index is None:
+                self.main_window.split_image_display.setText(self.main_window.split_image_default_text)
+            else:
+                self.main_window.split_image_display.setPixmap(self.splitter.splits[self.splitter.splits.current_split_index].pixmap)
+
+        
+
+    def save_settings(self):
+        self.settings_window.setFocus(True)  # Take focus off widgets
+
+        fps = self.settings_window.fps_spinbox.value()
+        if fps != settings.value("FPS"):
+            video_active = self.splitter.capture_thread.is_alive()
+            settings.setValue("FPS", fps)
+            self.update_ui_timer.setInterval(1000 // fps)
+            self.splitter.safe_exit_all_threads()
+            if video_active:
+                self.splitter.start()
+
+        open_screenshots_value = self.settings_window.open_screenshots_checkbox.checkState()
+        if open_screenshots_value == 0:
+            open_screenshots = False
+        else:
+            open_screenshots = True
+        if open_screenshots != settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
+            settings.setValue("OPEN_SCREENSHOT_ON_CAPTURE", open_screenshots)
+
+        default_threshold = float(self.settings_window.default_threshold_double_spinbox.value()) / 100
+        if default_threshold != settings.value("DEFAULT_THRESHOLD"):
+            settings.setValue("DEFAULT_THRESHOLD", default_threshold)
+            self.splitter.splits.set_default_threshold()
+
+        ##### FIX THIS
+        match_percent_decimals = self.settings_window.match_percent_decimals_spinbox.value()
+        if match_percent_decimals != settings.value("MATCH_PERCENT_DECIMALS"):
+            settings.setValue("MATCH_PERCENT_DECIMALS", match_percent_decimals)
+            # self.settings_window.set_match_percent_decimals_signal.emit()
+
+        default_delay = self.settings_window.default_delay_double_spinbox.value()
+        if default_delay != settings.value("DEFAULT_DELAY"):
+            settings.setValue("DEFAULT_DELAY", default_delay)
+            self.splitter.splits.set_default_delay()
+
+        default_pause = self.settings_window.default_pause_double_spinbox.value()
+        if default_pause != settings.value("DEFAULT_PAUSE"):
+            settings.setValue("DEFAULT_PAUSE", default_pause)
+            self.splitter.splits.set_default_pause()
+
+        aspect_ratio = self.settings_window.aspect_ratio_combo_box.currentText()
+        if aspect_ratio != settings.value("ASPECT_RATIO"):
+            self.settings_window.update_aspect_ratio_start_signal.emit()
+            if aspect_ratio == "4:3 (480x360)":
+                settings.setValue("ASPECT_RATIO", "4:3 (480x360)")
+                settings.setValue("FRAME_WIDTH", 480)
+                settings.setValue("FRAME_HEIGHT", 360)
+            if aspect_ratio == "4:3 (320x240)":
+                settings.setValue("ASPECT_RATIO", "4:3 (320x240)")
+                settings.setValue("FRAME_WIDTH", 320)
+                settings.setValue("FRAME_HEIGHT", 240)
+            if aspect_ratio == "16:9 (512x288)":
+                settings.setValue("ASPECT_RATIO", "16:9 (512x288)")
+                settings.setValue("FRAME_WIDTH", 512)
+                settings.setValue("FRAME_HEIGHT", 288)
+            if aspect_ratio == "16:9 (432x243)":
+                settings.setValue("ASPECT_RATIO", "16:9 (432x243)")
+                settings.setValue("FRAME_WIDTH", 432)
+                settings.setValue("FRAME_HEIGHT", 243)
+            self.main_window.set_layout(splitter_paused=self.splitter.suspended)
+
+        start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
+        if start_with_video_value == 0:
+            start_with_video = False
+        else:
+            start_with_video = True
+        if start_with_video != settings.value("START_WITH_VIDEO"):
+            settings.setValue("START_WITH_VIDEO", start_with_video)
+
+        ##### MAKE SURE THIS SETS THE CSS CORRECTLY
+        theme = self.settings_window.theme_combo_box.currentText()
+        if theme != settings.value("THEME"):
+            if theme == "dark":
+                settings.setValue("THEME", "dark")
+            elif theme == "light":
+                settings.setValue("THEME", "light")
+
+        hotkey_changed = False
+        hotkey_text, hotkey_key_sequence = self.settings_window.start_split_hotkey_line_edit.text(), self.settings_window.start_split_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("SPLIT_HOTKEY_TEXT"):
+            settings.setValue("SPLIT_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("SPLIT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.reset_hotkey_line_edit.text(), self.settings_window.reset_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("RESET_HOTKEY_TEXT"):
+            settings.setValue("RESET_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("RESET_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.pause_hotkey_line_edit.text(), self.settings_window.pause_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("PAUSE_HOTKEY_TEXT"):
+            settings.setValue("PAUSE_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("PAUSE_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.undo_split_hotkey_line_edit.text(), self.settings_window.undo_split_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("UNDO_HOTKEY_TEXT"):
+            settings.setValue("UNDO_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("UNDO_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.skip_split_hotkey_line_edit.text(), self.settings_window.skip_split_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("SKIP_HOTKEY_TEXT"):
+            settings.setValue("SKIP_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("SKIP_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.previous_split_hotkey_line_edit.text(), self.settings_window.previous_split_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("PREVIOUS_HOTKEY_TEXT"):
+            settings.setValue("PREVIOUS_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("PREVIOUS_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.next_split_hotkey_line_edit.text(), self.settings_window.next_split_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("NEXT_HOTKEY_TEXT"):
+            settings.setValue("NEXT_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("NEXT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        hotkey_text, hotkey_key_sequence = self.settings_window.screenshot_hotkey_line_edit.text(), self.settings_window.screenshot_hotkey_line_edit.key_sequence
+        if hotkey_text != settings.value("SCREENSHOT_HOTKEY_TEXT"):
+            settings.setValue("SCREENSHOT_HOTKEY_TEXT", hotkey_text)
+            settings.setValue("SCREENSHOT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+            hotkey_changed = True
+
+        if hotkey_changed:
+            self.main_window.set_ui_shortcut_keybindings()
+
+
+    ## Handle changing buttons and stuff in the pilgrim_autosplitter.py's timer. maintain a bunch of local variables whose
+    ## only purpose is to activate the methods that update buttons and labels
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

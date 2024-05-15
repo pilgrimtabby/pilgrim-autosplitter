@@ -1,28 +1,26 @@
-import copy
 import threading
 import time
 
 import cv2
+from PyQt5.QtGui import QPixmap
+
 from splitter.split_dir import SplitDir
-from utils import settings
-
-from utils import settings
-
+from utils import settings, frame_to_pixmap
 
 
 class Splitter:
     def __init__(self) -> None:
-        # Splitter variables
-        self.ui_controller = UIController()
+        self.ui_controller = None  # Passed in by pilgrim_autosplitter.py
 
-        self._interval = 1 / settings.value("FPS")
+        self.interval = 1 / settings.value("FPS")
         self.delaying = False
         self.suspended = False
 
         # _capture_thread variables
         self.frame = None
+        self.frame_pixmap = None
         self._cap = None
-        self._capture_thread = None
+        self.capture_thread = None
 
         # _compare_thread variables
         self.splits = SplitDir()
@@ -36,19 +34,19 @@ class Splitter:
         self._compare_thread_finished = False
 
     def start(self):
-        self.safe_exit_capture_thread()  # This kills _compare_thread too
+        self.safe_exit_all_threads()
         self.start_capture_thread()
-        if len(self.splits.list) > 0:
-            self.start_compare_thread
+        if len(self.splits.list) > 0:  # Start comparisons if there are splits loaded
+            self.start_compare_thread()
 
     def start_capture_thread(self):
         self._cap = self._get_new_capture_source()
-        self._capture_thread = threading.Thread(target=self._capture, args=(self._interval,))
-        self._capture_thread.daemon = True
-        self._capture_thread.start()
+        self.capture_thread = threading.Thread(target=self._capture, args=(self.interval,))
+        self.capture_thread.daemon = True
+        self.capture_thread.start()
 
     def start_compare_thread(self):
-        self._compare_thread = threading.Thread(target=self._compare, args=(self._interval,))
+        self._compare_thread = threading.Thread(target=self._compare, args=(self.interval,))
         self._compare_thread.daemon = True
         self._compare_thread.start()
 
@@ -60,18 +58,23 @@ class Splitter:
                 start_time = current_time
                 frame = self._cap.read()[1]
                 if frame is None:   # Something happened to the video feed, kill the thread
-                    self.frame = None
                     self._cap.release()
                 else:
                     self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-        
+                    self.frame_pixmap = frame_to_pixmap(self.frame)
+
+        self.frame = None
+        self.frame_pixmap = None
         # Kill comparer if capture goes down
         self.safe_exit_compare_thread()
 
     def _compare(self, interval):
-        time_to_split = self._look_for_match(interval)
-        if time_to_split:
-            self._split()
+        still_going = True
+        while still_going:
+            still_going = self._look_for_match(interval)
+            if still_going:
+                self._split()
+
 
     def _look_for_match(self, interval):
         self.current_match_percent = 0
@@ -81,7 +84,9 @@ class Splitter:
 
         start_time = time.perf_counter()
         self._compare_thread_finished = False   # Do i need this?
-        while not self._compare_thread_finished and len(self.splits.list > 0):
+        self.current_match_percent = 0
+        self.highest_match_percent = 0
+        while not self._compare_thread_finished:  # Make sure to kill this once all split images are gone !!!
             current_time = time.perf_counter()
             if current_time - start_time >= interval:
                 start_time = current_time
@@ -112,6 +117,8 @@ class Splitter:
                     time_to_split = True
                     break
         
+        self.current_match_percent = None
+        self.highest_match_percent = None
         return time_to_split
 
     def _split(self):
@@ -136,10 +143,10 @@ class Splitter:
             time.sleep(suspended_duration)
             self.suspended = False
 
-
-    def safe_exit_capture_thread(self):
-        self._cap.release()   # Need to check if not already released first?
-        self._capture_thread.join()
+    def safe_exit_all_threads(self):
+        self._cap.release()
+        self.capture_thread.join()
+        self._compare_thread.join()
 
     def safe_exit_compare_thread(self):
         self._compare_thread_finished = True
@@ -149,3 +156,28 @@ class Splitter:
         cap = cv2.VideoCapture(settings.value("LAST_CAPTURE_SOURCE_INDEX"))
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         return cap
+
+    def next_capture_source(self):
+        source = settings.value("LAST_CAPTURE_SOURCE_INDEX") + 1
+        found_valid_source = False
+        tries = 0
+        while tries < 3:
+            test_cap = cv2.VideoCapture(source)
+            if test_cap.isOpened():
+                found_valid_source = True
+                break
+            else:
+                source += 1
+                tries += 1
+        if not found_valid_source:
+            source = 0  # Give up, go back to first possible index
+        settings.setValue("LAST_CAPTURE_SOURCE_INDEX", source)
+
+    def toggle_suspended(self):
+        if self.suspended:
+            self.suspended = False
+            self.safe_exit_compare_thread()
+            self.start_compare_thread()
+        else:
+            self.suspended = True
+            self.safe_exit_compare_thread()

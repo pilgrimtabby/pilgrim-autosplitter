@@ -57,6 +57,7 @@ class GUIMainWindow(QMainWindow):
 
         self.video_feed_display = QLabel(self.container)
         self.video_feed_display.setAlignment(Qt.AlignCenter)
+        self.video_feed_default_text = "No video feed detected"
 
         # Split image
         self.split_name_label = QLabel(self.container)
@@ -69,6 +70,7 @@ class GUIMainWindow(QMainWindow):
 
         self.split_image_display = QLabel(self.container)
         self.split_image_display.setAlignment(Qt.AlignCenter)
+        self.split_image_default_text = "No split images loaded"
 
         self.split_image_overlay = QLabel(self.container)
         self.split_image_overlay.setAlignment(Qt.AlignCenter)
@@ -146,6 +148,13 @@ class GUIMainWindow(QMainWindow):
         self.previous_split_shortcut = QShortcut(self)
         self.next_split_shortcut = QShortcut(self)
         self.screenshot_shortcut = QShortcut(self)
+
+        # These shortcuts don't have an analagous LiveSplit hotkey, so it's safe to connect them directly to the buttons
+        self.previous_split_shortcut.activated.connect(self.previous_split_button.click)
+        self.next_split_shortcut.activated.connect(self.next_split_button.click)
+        self.screenshot_shortcut.activated.connect(self.screenshot_button.click)
+
+        # Assign shortcuts
         self.set_ui_shortcut_keybindings()
 
     ##################
