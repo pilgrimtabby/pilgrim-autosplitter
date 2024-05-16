@@ -49,17 +49,21 @@ class UIMainWindow(QMainWindow):
         self.split_directory_button = QPushButton("Select split image folder:", self.container)
 
         self.split_directory_line_edit = QLineEdit(self.container)
+        self.split_directory_line_edit.setText(settings.value("LAST_IMAGE_DIR"))
         self.split_directory_line_edit.setEnabled(False)
 
         # Video feed
         self.video_feed_label = QLabel(self.container)
         self.video_feed_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.video_feed_label.setAlignment(Qt.AlignCenter)
+        self.video_feed_label_live_text = "Video feed"
+        self.video_feed_label_down_text_min = "Video status:   down"
+        self.video_feed_label_live_text_min = "Video status:   healthy"
 
         self.video_feed_display = QLabel(self.container)
         self.video_feed_display.setAlignment(Qt.AlignCenter)
         self.video_feed_display.setObjectName("image_label_inactive")
-        self.video_feed_default_text = "No video feed detected"
+        self.video_feed_default_text = "No video feed detected"        
 
         # Split image
         self.split_name_label = QLabel(self.container)
@@ -73,7 +77,7 @@ class UIMainWindow(QMainWindow):
         self.split_image_display = QLabel(self.container)
         self.split_image_display.setAlignment(Qt.AlignCenter)
         self.split_image_display.setObjectName("image_label_inactive")
-        self.split_image_default_text = "No split images loaded"
+        self.split_image_default_text = "No split iamges loaded"
 
         self.split_image_overlay = QLabel(self.container)
         self.split_image_overlay.setAlignment(Qt.AlignCenter)

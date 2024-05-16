@@ -27,7 +27,7 @@ class Splitter:
         # _compare_thread variables
         self.splits = SplitDir()  # Referenced by ui_controller to set status of various ui elements
         self.current_match_percent = None  # Referenced by ui_controller to set match percent information
-        self.highest_match_percent = None  # Referenced by ui_controller to set match percent information
+        self.highest_match_percent = None  # Referenced by ui_controller to set match percent information, and set by ui_controller ever time it calls split_dir.next_split_image or split_dir.previous_split_image
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
 
@@ -76,7 +76,7 @@ class Splitter:
             if still_going:
                 self._split()
 
-    def _look_for_match(self):
+    def _look_for_match(self):   ##### Make safe from Nones
         self.current_match_percent = 0
         self.highest_match_percent = 0
 
@@ -87,9 +87,11 @@ class Splitter:
             current_time = time.perf_counter()
             if current_time - start_time >= self.interval:
                 start_time = current_time
+
                 current_frame = self._frame  # Prevent a None slipping through from the capture thread
                 if current_frame is None:
                     continue
+
                 try:
                     comparison_frame = cv2.matchTemplate(
                         current_frame,
@@ -120,7 +122,6 @@ class Splitter:
         return match_found
 
     def _split(self):
-        print("Splitting")
         delay_duration = self.splits.list[self.splits.current_image_index].delay_duration
         if delay_duration > 0:
 
@@ -158,8 +159,7 @@ class Splitter:
     # Called by ui_controller.set_image_directory_path when that method creates a new split directory for this class
     # Called by ui_controller before starting the splitter
     def safe_exit_all_threads(self):
-        if self._cap is not None:
-            self._capture_thread_finished = True
+        self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
 

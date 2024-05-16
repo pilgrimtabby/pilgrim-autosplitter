@@ -1,5 +1,4 @@
-import time
-from PyQt5.QtCore import QTimer, pyqtSlot
+from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QFileDialog
 
 from splitter.split_dir import SplitDir
@@ -34,8 +33,8 @@ class UIController:
 
         # Next source button clicked
         self.main_window.next_source_button.clicked.connect(self.splitter.next_capture_source)
-        self.main_window.next_source_button.clicked.connect(self.splitter.safe_exit_all_threads)  ## Not actually exiting splitter thread
-        self.main_window.next_source_button.clicked.connect(self.splitter.start)  ### Make sure splitter thread only starts if video thread has started!!
+        self.main_window.next_source_button.clicked.connect(self.splitter.safe_exit_all_threads)
+        self.main_window.next_source_button.clicked.connect(self.splitter.start)
 
         # Screenshot button clicked
         self.main_window.screenshot_button.clicked.connect(self.splitter.take_screenshot)
@@ -50,26 +49,33 @@ class UIController:
 
         # Split keyboard shortcut entered
         self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+        self.main_window.split_shortcut.activated.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Undo split button clicked
         self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+        self.main_window.undo_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
         ##### send undo button keystroke
 
         # Undo split keyboard shortcut entered
         self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
+        self.main_window.undo_split_shortcut.activated.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Skip split button clicked
         self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
+        self.main_window.skip_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
         ##### send skip button keystroke
 
         # Skip split keyboard shortcut entered
         self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+        self.main_window.skip_split_shortcut.activated.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Previous split button clicked
         self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+        self.main_window.previous_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
-        # Next split button entered
+        # Next split button clicked
         self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
+        self.main_window.next_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Reset button clicked
         self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
@@ -103,8 +109,7 @@ class UIController:
 
         self.update_ui_timer = QTimer()
         self.update_ui_timer.setInterval(1000 // settings.value("FPS")) # This takes about 1/10000 of a second on average
-        self.update_ui_timer.timeout.connect(self._poller.update_labels)
-        self.update_ui_timer.timeout.connect(self._poller.update_buttons_and_hotkeys)
+        self.update_ui_timer.timeout.connect(self._poller.update_ui)
         self.update_ui_timer.start()
 
     # Called when select splits directory button pressed
@@ -116,12 +121,32 @@ class UIController:
             self.main_window.set_split_directory_line_edit_text()
 
             video_active = self.splitter.capture_thread.is_alive()
-            self.splitter.safe_exit_all_threads
+            self.splitter.safe_exit_all_threads()
             self.splitter.splits = SplitDir()
             if video_active:
                 self.splitter.start()
 
-            self._current_split_image_index = -1
+            # Reconnect signals to new SplitDir instance
+            self.main_window.split_shortcut.activated.disconnect()
+            self.main_window.undo_split_button.clicked.disconnect()
+            self.main_window.undo_split_shortcut.activated.disconnect()
+            self.main_window.skip_split_button.clicked.disconnect()
+            self.main_window.skip_split_shortcut.activated.disconnect()
+            self.main_window.previous_split_button.clicked.disconnect()
+            self.main_window.next_split_button.clicked.disconnect()
+            self.main_window.reset_splits_button.clicked.disconnect()
+            self.main_window.reset_shortcut.activated.disconnect()
+
+            self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+            self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+            self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
+            self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
+            self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+            self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+            self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
+            self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
+            self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
+
         self.update_ui_timer.start()
 
     # Called when settings window save button pressed
@@ -149,10 +174,6 @@ class UIController:
         match_percent_decimals = self.settings_window.match_percent_decimals_spinbox.value()
         if match_percent_decimals != settings.value("MATCH_PERCENT_DECIMALS"):
             settings.setValue("MATCH_PERCENT_DECIMALS", match_percent_decimals)
-            # Reset saved match percent values in poller
-            self._poller.current_current_match_percent = -1
-            self._poller.current_highest_match_percent = -1
-            self._poller.current_threshold_match_percent = -1
 
         default_delay = self.settings_window.default_delay_double_spinbox.value()
         if default_delay != settings.value("DEFAULT_DELAY"):
@@ -183,7 +204,6 @@ class UIController:
                 settings.setValue("FRAME_WIDTH", 432)
                 settings.setValue("FRAME_HEIGHT", 243)
             self.main_window.set_layout(splitter_paused=self.splitter.suspended)
-            # self._poller.current_split_image_index = -1 # Force ui to display new image
 
         start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
         if start_with_video_value == 0:
@@ -262,23 +282,55 @@ class UIController:
             self._current_video_active = False
             self._current_splitter_delaying = False
 
+        def update_ui(self):
+            self.get_current_state()
+            self.update_labels()
+            self.update_buttons_and_hotkeys()
+
+        # Check if split list empty, video active, splitter delaying
+        def get_current_state(self):
+            # Check if split image list empty
+            if self._current_split_list_empty and len(self._splitter.splits.list) > 0 or not self._current_split_list_empty and len(self._splitter.splits.list) == 0:
+                self._current_split_list_empty = not self._current_split_list_empty
+
+            # Check if video active
+            if self._current_video_active and not self._splitter.capture_thread.is_alive() or not self._current_video_active and self._splitter.capture_thread.is_alive():
+                self._current_video_active = not self._current_video_active
+
+            # Check if splitter is delaying
+            if self._current_splitter_delaying and not self._splitter.delaying or not self._current_splitter_delaying and self._splitter.delaying:
+                self._current_splitter_delaying = not self._current_splitter_delaying
+
         def update_labels(self) -> None:
-            self.start = time.perf_counter()
+            current_image_index = self._splitter.splits.current_image_index
 
             # Video feed
-            if self._splitter.frame_pixmap is None:
-                self._main_window.video_feed_display.setText(self._main_window.video_feed_default_text)
+            if not settings.value("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
+                if self._splitter.frame_pixmap is None:
+                    self._main_window.video_feed_display.setText(self._main_window.video_feed_default_text)
+                else:
+                    self._main_window.video_feed_display.setPixmap(self._splitter.frame_pixmap)
+
+            # Video label
+            if settings.value("SHOW_MIN_VIEW"):
+                if self._current_video_active:
+                    self._main_window.video_feed_label.setText(self._main_window.video_feed_label_live_text_min)
+                else:
+                    self._main_window.video_feed_label.setText(self._main_window.video_feed_label_down_text_min)
             else:
-                self._main_window.video_feed_display.setPixmap(self._splitter.frame_pixmap)
+                if self._current_video_active:
+                    self._main_window.video_feed_label.setText(self._main_window.video_feed_label_live_text)
+                else:
+                    self._main_window.video_feed_label.setText("")
 
             # Split image, name, and loop count
-            if self._splitter.splits.current_image_index is None:
+            if current_image_index is None:
                 self._main_window.split_image_display.setText(self._main_window.split_image_default_text)
-                self._main_window.split_name_label.setText("")
+                self._main_window.split_name_label.setText("No split images loaded")
                 self._main_window.split_image_loop_label.setText("")
             else:
-                current_image_index = self._splitter.splits.current_image_index
-                self._main_window.split_image_display.setPixmap(self._splitter.splits.list[current_image_index].pixmap)
+                if not settings.value("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
+                    self._main_window.split_image_display.setPixmap(self._splitter.splits.list[current_image_index].pixmap)
                 self._main_window.split_name_label.setText(self._splitter.splits.list[current_image_index].name)
 
                 current_total_loops = self._splitter.splits.list[current_image_index].loops
@@ -302,26 +354,18 @@ class UIController:
                 self._main_window.highest_match_percent.setText(self._formatted_match_percent_string(self._splitter.highest_match_percent, decimals))
 
             # Threshold match percent
-            threshold_match_percent = self._splitter.splits.list[self._splitter.splits.current_image_index].threshold
-            if threshold_match_percent is None:
+            if current_image_index is None:
                 self._main_window.threshold_match_percent.setText(self._null_match_percent_string())
             else:
-                self._main_window.threshold_match_percent.setText(self._formatted_match_percent_string(threshold_match_percent, decimals))
+                threshold_match_percent = self._splitter.splits.list[current_image_index].threshold
+                if threshold_match_percent is None:
+                    self._main_window.threshold_match_percent.setText(self._null_match_percent_string())
+                else:
+                    self._main_window.threshold_match_percent.setText(self._formatted_match_percent_string(threshold_match_percent, decimals))
 
         def update_buttons_and_hotkeys(self):
-            # Check if split image list empty
-            if self._current_split_list_empty and len(self._splitter.splits.list) > 0 or not self._current_split_list_empty and len(self._splitter.splits.list) == 0:
-                self._current_split_list_empty = not self._current_split_list_empty
+            current_image_index = self._splitter.splits.current_image_index
 
-            # Check if video active
-            if self._current_video_active and not self._splitter.capture_thread.is_alive() or not self._current_video_active and self._splitter.capture_thread.is_alive():
-                self._current_video_active = not self._current_video_active
-
-            # Check if splitter is delaying
-            if self._current_splitter_delaying and not self._splitter.delaying or not self._current_splitter_delaying and self._splitter.delaying:
-                self._current_splitter_delaying = not self._current_splitter_delaying
-
-            # Update buttons and hotkeys
             if self._current_split_list_empty:
                 # Disable split, undo, skip, previous, next split, reset, pause / unpause
                 self._main_window.split_shortcut.setEnabled(False)
@@ -360,7 +404,7 @@ class UIController:
                     self._main_window.pause_comparison_button.setEnabled(False)
 
                 # Enable undo and previous if this isn't the first split
-                if self._splitter.splits.current_image_index == 0 and self._splitter.splits.current_loop == 0:
+                if (current_image_index == 0 or current_image_index is None) and self._splitter.splits.current_loop == 0:
                     self._main_window.undo_split_button.setEnabled(False)
                     self._main_window.undo_split_shortcut.setEnabled(False)
                     self._main_window.previous_split_button.setEnabled(False)
@@ -370,7 +414,7 @@ class UIController:
                     self._main_window.previous_split_button.setEnabled(True)
 
                 # Enable skip and next if this isn't the last split
-                if self._splitter.splits.current_image_index == len(self._splitter.splits.list) - 1 and self._splitter.splits.current_loop == self._splitter.splits.list[self._splitter.splits.current_image_index].loops:
+                if current_image_index is None or current_image_index == len(self._splitter.splits.list) - 1 and self._splitter.splits.current_loop == self._splitter.splits.list[current_image_index].loops:
                     self._main_window.skip_split_button.setEnabled(False)
                     self._main_window.skip_split_shortcut.setEnabled(False)
                     self._main_window.next_split_button.setEnabled(False)
@@ -378,8 +422,6 @@ class UIController:
                     self._main_window.skip_split_button.setEnabled(True)
                     self._main_window.skip_split_shortcut.setEnabled(True)
                     self._main_window.next_split_button.setEnabled(True)
-
-            print(time.perf_counter() - self.start)
 
         def _null_match_percent_string(self):
             match_percent_string = "--"
