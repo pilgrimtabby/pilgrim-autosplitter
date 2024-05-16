@@ -1,6 +1,7 @@
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import QTimer
 
+from splitter.split_dir import SplitDir
 from ui.ui_main_window import GUIMainWindow
 from ui.ui_settings_window import GUISettingsWindow
 from ui.ui_style import GUIStyle
@@ -25,7 +26,7 @@ class UIController:
 
         # Image directory button clicked
         self.main_window.image_directory_button.clicked.connect(self.splitter.splits.set_image_directory_path)
-        self.main_window.image_directory_button.clicked.connect(self.main_window.set_split_directory_line_edit_text)
+        self.main_window.image_directory_button.clicked.connect(lambda self=self.splitter: setattr(self, "splits", SplitDir()))
 
         # Minimal view / full view button clicked
         self.main_window.minimal_view_button.clicked.connect(lambda: settings.setValue("SHOW_MIN_VIEW", not settings.value("SHOW_MIN_VIEW")))

@@ -1,10 +1,10 @@
 import time
 import webbrowser
 
-from PyQt5.QtCore import QRect, Qt, QTimer
+from PyQt5.QtCore import QRect, Qt, QTimer, pyqtSlot
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QMessageBox, QPushButton, QShortcut, QWidget)
+                             QMessageBox, QPushButton, QShortcut, QWidget, QFileDialog)
 
 from utils import settings
 
@@ -162,6 +162,13 @@ class GUIMainWindow(QMainWindow):
     # Setter Methods #
     #                #
     ##################
+
+    @pyqtSlot()  # Called from ui_controller
+    def set_image_directory_path(self):
+        path = QFileDialog.getExistingDirectory(self, "Select splits folder", settings.value("LAST_IMAGE_DIR"))
+        if path != "" and path != settings.value("LAST_IMAGE_DIR"):
+            settings.setValue("LAST_IMAGE_DIR", path)
+            self.set_split_directory_line_edit_text()
 
     def set_split_directory_line_edit_text(self):
         path = settings.value("LAST_IMAGE_DIR")
