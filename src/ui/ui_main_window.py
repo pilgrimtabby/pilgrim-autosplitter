@@ -1,6 +1,6 @@
 import webbrowser
 
-from PyQt5.QtCore import QRect, Qt, pyqtSlot
+from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
                              QPushButton, QShortcut, QWidget)
 

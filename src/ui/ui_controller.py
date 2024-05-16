@@ -204,6 +204,7 @@ class UIController:
                 settings.setValue("FRAME_WIDTH", 432)
                 settings.setValue("FRAME_HEIGHT", 243)
             self.main_window.set_layout(splitter_paused=self.splitter.suspended)
+            self.splitter.splits.resize_images()
 
         start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
         if start_with_video_value == 0:

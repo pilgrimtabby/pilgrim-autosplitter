@@ -145,24 +145,25 @@ class SplitDir:
 
         def get_delay_from_name(self):
             delay = re.search(r"_\#(.+?)\#", self.name)
-            if not delay:
+            if delay is None:
                 return settings.value("DEFAULT_DELAY"), True
             return float(delay[1]), False
 
         def get_pause_from_name(self):
             pause = re.search(r"_\[(.+?)\]", self.name)
-            if not pause:
+            print(self.name)
+            if pause is None:
                 return settings.value("DEFAULT_PAUSE"), True
             return float(pause[1]), False
 
         def get_threshold_from_name(self):
             threshold = re.search(r"_\((.+?)\)", self.name)
-            if not threshold:
+            if threshold is None:
                 return settings.value("DEFAULT_THRESHOLD"), True
             return float(threshold[1]), False
 
         def get_loops_from_name(self):
             loops = re.search(r"_\@(.+?)\@", self.name)
-            if not loops:
+            if loops is None:
                 return settings.value("DEFAULT_LOOP_COUNT"), True
             return int(loops[1]), False
