@@ -119,7 +119,7 @@ class UIController:
             if video_active:
                 self.splitter.start()
 
-            self.current_split_image_index = -1
+            self._current_split_image_index = -1
         self.update_ui_timer.start()
 
     # Called when settings window save button pressed
@@ -181,7 +181,7 @@ class UIController:
                 settings.setValue("FRAME_WIDTH", 432)
                 settings.setValue("FRAME_HEIGHT", 243)
             self.main_window.set_layout(splitter_paused=self.splitter.suspended)
-            self.splitter.splits
+            # self._poller.current_split_image_index = -1 # Force ui to display new image
 
         start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
         if start_with_video_value == 0:
@@ -257,19 +257,26 @@ class UIController:
             self._main_window = main_window
             self._settings_windowsettings_window = settings_window
             
-            # Set nonsensical values to force an update on first update_ui call
-            self.current_split_image_index = -1  # This value is set to -1 if a new split_dir instance is created by ui_controller.set_image_directory_path, or if the aspect ratio is changed
-            self._current_split_loop = -1
-            self._current_total_loops = -1
-            self._current_current_match_percent = -1
-            self._current_highest_match_percent = -1
-            self._current_threshold_match_percent = -1
-
+            self._current_split_image_index = 0  # This value is set to -1 if a new split_dir instance is created by ui_controller.set_image_directory_path, or if the aspect ratio is changed
+            self._current_split_loop = 0
+            self._current_total_loops = 0
+            self._current_current_match_percent = 0
+            self._current_highest_match_percent = 0
+            self._current_threshold_match_percent = 0
             self._current_split_list_empty = False
             self._current_video_active = False
             self._current_splitter_delaying = False
 
-            self._changes_made = True  # Force _update_buttons_and_hotkeys to run first time through. Updated in _update_buttons_and_hotkeys and _update_split_labels
+            # Set these True so their respective methods are called on first update_ui call
+            self._current_split_image_index_changed = True
+            self._current_split_loop_changed = True
+            self._current_total_loops_changed = True
+            self._current_current_match_percent_changed = True
+            self._current_highest_match_percent_changed = True
+            self._current_threshold_match_percent = True
+            self._current_split_list_empty_changed = True
+            self._current_video_active_changed = True
+            self._current_splitter_delaying_changed = True
 
         def update_ui(self) -> None:
             self._update_video_display()
@@ -278,6 +285,8 @@ class UIController:
             self._update_buttons_and_hotkeys()
 
         def _update_video_display(self):
+            # 
+            
             if self._splitter.frame_pixmap is None:
                 if self._main_window.video_feed_display.text() == "":  # There is currently an image being displayed
                     self._main_window.video_feed_display.setText(self._main_window.video_feed_default_text)
@@ -286,17 +295,17 @@ class UIController:
 
         def _update_split_labels(self):
             # Split image, split name
-            if self.current_split_image_index != self._splitter.splits.current_image_index:
-                self.current_split_image_index = self._splitter.splits.current_image_index
-                self._changes_made = True
+            if self._current_split_image_index != self._splitter.splits.current_image_index:
+                self._current_split_image_index = self._splitter.splits.current_image_index
+                self._current_split_image_index_changed = True
 
-                if self.current_split_image_index is None:
+                if self._current_split_image_index is None:
                     self._main_window.split_image_display.setText(self._main_window.split_image_default_text)
                     self._main_window.split_name_label.setText("")
                 else:
-                    self._main_window.split_image_display.setPixmap(self._splitter.splits.list[self.current_split_image_index].pixmap)
-                    print(self._splitter.splits.list[self.current_split_image_index].pixmap)
-                    self._main_window.split_name_label.setText(self._splitter.splits.list[self.current_split_image_index].name)
+                    self._main_window.split_image_display.setPixmap(self._splitter.splits.list[self._current_split_image_index].pixmap)
+                    print(self._splitter.splits.list[self._current_split_image_index].pixmap)
+                    self._main_window.split_name_label.setText(self._splitter.splits.list[self._current_split_image_index].name)
 
             # Split loop
             # Check if split image's total loops have changed
@@ -304,13 +313,13 @@ class UIController:
                 self._current_total_loops = self._splitter.splits.list[self._splitter.splits.current_image_index].loops
                 self._changes_made = True
 
-                if self.current_split_image_index is None:
+                if self._current_split_image_index is None:
                     self._main_window.split_image_loop_label.setText("")
                 else:
                     if self._current_split_loop != self._splitter.splits.current_loop:
                         self._current_split_loop = self._splitter.splits.current_loop
 
-                    # self._current_split_loop is never None if self.current_split_image_index is not None
+                    # self._current_split_loop is never None if self._current_split_image_index is not None
                     if self._current_split_loop == 0:
                         self._main_window.split_image_loop_label.setText("Split does not loop")
                     else:
@@ -329,7 +338,7 @@ class UIController:
                     self._main_window.split_image_loop_label.setText(f"Loop {self._current_split_loop} of {self._current_total_loops}")
         
         def _update_match_percents(self):
-            if self.current_split_image_index is None:
+            if self._current_split_image_index is None:
                 # Set current, highest, threshold blank if there is no split image
                 self._main_window.current_match_percent.setText(self._null_match_percent_string())
                 self._main_window.highest_match_percent.setText(self._null_match_percent_string())
