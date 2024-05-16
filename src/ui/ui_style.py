@@ -3,7 +3,7 @@ from string import Template
 from utils import settings
 
 
-class GUIStyle: 
+class UIStyle: 
     def __init__(self):
         self.style_dict_dark = {
             "default_background": "#333333",
@@ -153,8 +153,3 @@ class GUIStyle:
             window.setStyleSheet(self.style_sheet_dark)
         elif settings.value("THEME") == "light":
             window.setStyleSheet(self.style_sheet_light)
-
-    def set_global_style(self, windows: list):
-        for window in windows:
-            self.set_style(window)
-            window.update()

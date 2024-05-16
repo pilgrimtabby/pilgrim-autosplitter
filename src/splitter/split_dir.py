@@ -4,15 +4,13 @@ import re
 
 import cv2
 import numpy
-from PyQt5.QtWidgets import QFileDialog
-from PyQt5.QtCore import pyqtSlot
 
 from utils import frame_to_pixmap, settings
 
 
 class SplitDir:
-    def __init__(self, dir_path):
-        self.dir_path = dir_path
+    def __init__(self):
+        self.dir_path = settings.value("LAST_IMAGE_DIR")
         self.list = self.get_split_images()
         if len(self.list) > 0:
             self.current_image_index = 0
@@ -37,6 +35,9 @@ class SplitDir:
         return split_images
     
     def next_split_image(self):
+        if len(self.list) == 0:
+            raise Exception("Error: no split image list initialized")
+
         current_image = self.list[self.current_image_index]
 
         if self.current_loop == current_image.loops:
@@ -52,6 +53,9 @@ class SplitDir:
         return self.current_image_index
         
     def previous_split_image(self):
+        if len(self.list) == 0:
+            raise Exception("Error: no split image list initialized")
+
         if self.current_loop == 0:
             if self.current_image_index == 0:
                 self.current_image_index = len(self.list) - 1
@@ -67,6 +71,9 @@ class SplitDir:
         return self.current_image_index
         
     def reset_split_images(self):
+        if len(self.list) == 0:
+            raise Exception("Error: no split image list initialized")
+
         self.current_image_index = 0
         self.current_loop = 0
 
@@ -85,6 +92,11 @@ class SplitDir:
             if image.pause_is_default:
                 image.pause_duration = settings.value("DEFAULT_PAUSE")
 
+    def resize_images(self):
+        for image in self.list:
+            image.image = image.get_and_resize_image()
+            image.alpha = image.get_alpha()
+            image.pixmap = frame_to_pixmap(image.image, is_split=True)
 
     class _SplitImage:
         def __init__(self, image_path) -> None:
@@ -152,5 +164,5 @@ class SplitDir:
         def get_loops_from_name(self):
             loops = re.search(r"_\@(.+?)\@", self.name)
             if not loops:
-                return settings.value("DEFAULT_LOOPS"), True
+                return settings.value("DEFAULT_LOOP_COUNT"), True
             return int(loops[1]), False

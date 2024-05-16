@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QAction, QCheckBox, QComboBox, QDialog,
 from utils import settings
 
 
-class GUISettingsWindow(QDialog):
+class UISettingsWindow(QDialog):
     LEFT_EDGE_CORRECTION = 0
     TOP_EDGE_CORRECTION = 3
     LEFT_EDGE_CORRECTION_FRAME = 0
@@ -16,7 +16,7 @@ class GUISettingsWindow(QDialog):
     LEFT_SIDE_WIDGET_WIDTH = 70
     LEFT_SIDE_WIDGET_HEIGHT = 27
 
-    def __init__(self, style):
+    def __init__(self, style_sheet):
         #################
         #               #
         # Window Config #
@@ -35,6 +35,10 @@ class GUISettingsWindow(QDialog):
         self.close_window_action.triggered.connect(self.close)
         
         self.close_app_shortcut = QShortcut("ctrl+q", self)
+
+        # Style
+        self.style_sheet = style_sheet
+        self.style_sheet.set_style(self)
 
         ###########
         #         #
@@ -61,7 +65,7 @@ class GUISettingsWindow(QDialog):
         self.fps_label.setToolTip("Read this many frames per second from video source")
         
         self.fps_spinbox = QSpinBox(self)
-        self.fps_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 12 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT))
+        self.fps_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 12 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.fps_spinbox.setMinimum(1)
         self.fps_spinbox.setMaximum(120)
 
@@ -87,7 +91,7 @@ class GUISettingsWindow(QDialog):
         self.default_threshold_label.setToolTip("Images must match at least this much to trigger a split, pause, etc.")
         
         self.default_threshold_double_spinbox = QDoubleSpinBox(self)
-        self.default_threshold_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 72 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT))
+        self.default_threshold_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 72 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.default_threshold_double_spinbox.setDecimals(2)
         self.default_threshold_double_spinbox.setMinimum(0.1)
         self.default_threshold_double_spinbox.setMaximum(100)
@@ -101,7 +105,7 @@ class GUISettingsWindow(QDialog):
         self.match_percent_decimals_label.setToolTip("Images must match at least this much to trigger a split, pause, etc.")
 
         self.match_percent_decimals_spinbox = QSpinBox(self)
-        self.match_percent_decimals_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 102 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT))
+        self.match_percent_decimals_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 102 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.match_percent_decimals_spinbox.setMinimum(0)
         self.match_percent_decimals_spinbox.setMaximum(2)
 
@@ -112,7 +116,7 @@ class GUISettingsWindow(QDialog):
         self.default_delay_label.setToolTip("The default delay between the split threshold being reached and a split, pause, etc.")
 
         self.default_delay_double_spinbox = QDoubleSpinBox(self)
-        self.default_delay_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 132 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT))
+        self.default_delay_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 132 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.default_delay_double_spinbox.setDecimals(3)
         self.default_delay_double_spinbox.setMinimum(0)
         self.default_delay_double_spinbox.setMaximum(10000000)
@@ -125,7 +129,7 @@ class GUISettingsWindow(QDialog):
         self.default_pause_label.setToolTip("The default waiting period after a split and before starting to compare the next image. Set this setting higher to save CPU")
 
         self.default_pause_double_spinbox = QDoubleSpinBox(self)
-        self.default_pause_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 162 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT))
+        self.default_pause_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 162 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.default_pause_double_spinbox.setDecimals(0)
         self.default_pause_double_spinbox.setMinimum(0)
         self.default_pause_double_spinbox.setMaximum(10000000)
@@ -138,7 +142,7 @@ class GUISettingsWindow(QDialog):
         self.aspect_ratio_label.setToolTip("This affects how images are displayed on the GUI and matched with split images. However, you can use 16:9 when playing games at 4:3, or vice versa.")
 
         self.aspect_ratio_combo_box = QComboBox(self)
-        self.aspect_ratio_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 194 + self.TOP_EDGE_CORRECTION, 130, LEFT_SIDE_WIDGET_HEIGHT - 4))
+        self.aspect_ratio_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 194 + self.TOP_EDGE_CORRECTION, 130, self.LEFT_SIDE_WIDGET_HEIGHT - 4))
         self.aspect_ratio_combo_box.addItems(["4:3 (480x360)", "4:3 (320x240)", "16:9 (512x288)", "16:9 (432x243)"])
 
         # Start with video checkbox
@@ -163,7 +167,7 @@ class GUISettingsWindow(QDialog):
         self.theme_label.setToolTip("Does anyone actually use light mode?")
 
         self.theme_combo_box = QComboBox(self)
-        self.theme_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, LEFT_SIDE_WIDGET_WIDTH, LEFT_SIDE_WIDGET_HEIGHT - 4))
+        self.theme_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT - 4))
         self.theme_combo_box.addItems(["dark", "light"])
 
         # Hotkey header
@@ -306,35 +310,37 @@ class GUISettingsWindow(QDialog):
         # Set all widget values to stored values
         self.reset_settings()
 
+    # Called when self.close is called (red x is pressed to close window, keyboard shortcut closes window, cancel button pressed, etc.)
     def closeEvent(self, _):
         self.reset_settings()
 
+    # Called when save button is pressed
     def reset_settings(self):
         self.setFocus(True)  # Take focus off the last widget the user selected
         
         # Settings aren't reset automatically when the window is closed, so they are read from utils.settings and placed back manually here
         # Spinboxes
-        for spinbox, setting in {
+        for spinbox, value in {
             self.fps_spinbox: settings.value("FPS"),
             self.default_threshold_double_spinbox: str(float(settings.value("DEFAULT_THRESHOLD") * 100)),
             self.match_percent_decimals_spinbox: settings.value("MATCH_PERCENT_DECIMALS"),
             self.default_delay_double_spinbox: settings.value("DEFAULT_DELAY"),
             self.default_pause_double_spinbox: settings.value("DEFAULT_PAUSE"),
         }.items():
-            spinbox.setProperty("value", setting)
+            spinbox.setProperty("value", value)
 
         # Checkboxes
-        for checkbox, setting in {
+        for checkbox, value in {
             self.open_screenshots_checkbox: settings.value("OPEN_SCREENSHOT_ON_CAPTURE"),
             self.start_with_video_checkbox: settings.value("START_WITH_VIDEO"),
         }.items():
-            if setting:
+            if value:
                 checkbox.setCheckState(Qt.Checked)
             else:
                 checkbox.setCheckState(Qt.Unchecked)
 
         # Hotkeys
-        for hotkey_line_edit, settings in {
+        for hotkey_line_edit, values in {
             self.start_split_hotkey_line_edit: (settings.value("SPLIT_HOTKEY_TEXT"), settings.value("SPLIT_HOTKEY_KEY_SEQUENCE")),
             self.reset_hotkey_line_edit: (settings.value("RESET_HOTKEY_TEXT"), settings.value("RESET_HOTKEY_KEY_SEQUENCE")),
             self.pause_hotkey_line_edit: (settings.value("PAUSE_HOTKEY_TEXT"), settings.value("PAUSE_HOTKEY_KEY_SEQUENCE")),
@@ -344,8 +350,8 @@ class GUISettingsWindow(QDialog):
             self.next_split_hotkey_line_edit: (settings.value("NEXT_HOTKEY_TEXT"), settings.value("NEXT_HOTKEY_KEY_SEQUENCE")),
             self.screenshot_hotkey_line_edit: (settings.value("SCREENSHOT_HOTKEY_TEXT"), settings.value("SCREENSHOT_HOTKEY_KEY_SEQUENCE")),
         }.items():
-            hotkey_line_edit.setText(settings[0])
-            hotkey_line_edit.key_sequence = settings[1]
+            hotkey_line_edit.setText(values[0])
+            hotkey_line_edit.key_sequence = values[1]
 
         # Comboboxes
         if settings.value("ASPECT_RATIO") == "4:3 (480x360)":
@@ -362,8 +368,8 @@ class GUISettingsWindow(QDialog):
         elif settings.value("THEME") == "light":
             self.theme_combo_box.setCurrentIndex(1)
 
+    # Allow user to take focus off a widget by clicking empty space
     def event(self, event):
-        # Allow user to take focus off a widget by clicking empty space
         if (event.type() == QEvent.MouseButtonPress):
             self.setFocus(True)
             return True
