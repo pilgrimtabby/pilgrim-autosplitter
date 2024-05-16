@@ -1,3 +1,4 @@
+import time
 from PyQt5.QtCore import QTimer, pyqtSlot
 from PyQt5.QtWidgets import QFileDialog
 
@@ -16,7 +17,7 @@ class UIController:
         self.main_window = UIMainWindow(self.style)
         self.settings_window = UISettingsWindow(self.style)
 
-        self._poller = self._Poller(self.splitter, self.main_window, self.settings_window)
+        self._poller = self._Poller(self.splitter, self.main_window)
 
         #######################
         #                     #
@@ -101,8 +102,9 @@ class UIController:
         ##########################
 
         self.update_ui_timer = QTimer()
-        self.update_ui_timer.setInterval(1000 // settings.value("FPS"))
-        self.update_ui_timer.timeout.connect(self._poller.update_ui)
+        self.update_ui_timer.setInterval(1000 // settings.value("FPS")) # This takes about 1/10000 of a second on average
+        self.update_ui_timer.timeout.connect(self._poller.update_labels)
+        self.update_ui_timer.timeout.connect(self._poller.update_buttons_and_hotkeys)
         self.update_ui_timer.start()
 
     # Called when select splits directory button pressed
@@ -252,197 +254,132 @@ class UIController:
             self.main_window.set_ui_shortcut_keybindings()
 
     class _Poller:
-        def __init__(self, splitter: Splitter, main_window: UIMainWindow, settings_window: UISettingsWindow) -> None:
+        def __init__(self, splitter: Splitter, main_window: UIMainWindow) -> None:
             self._splitter = splitter
             self._main_window = main_window
-            self._settings_windowsettings_window = settings_window
             
-            self._current_split_image_index = 0  # This value is set to -1 if a new split_dir instance is created by ui_controller.set_image_directory_path, or if the aspect ratio is changed
-            self._current_split_loop = 0
-            self._current_total_loops = 0
-            self._current_current_match_percent = 0
-            self._current_highest_match_percent = 0
-            self._current_threshold_match_percent = 0
             self._current_split_list_empty = False
             self._current_video_active = False
             self._current_splitter_delaying = False
 
-            # Set these True so their respective methods are called on first update_ui call
-            self._current_split_image_index_changed = True
-            self._current_split_loop_changed = True
-            self._current_total_loops_changed = True
-            self._current_current_match_percent_changed = True
-            self._current_highest_match_percent_changed = True
-            self._current_threshold_match_percent = True
-            self._current_split_list_empty_changed = True
-            self._current_video_active_changed = True
-            self._current_splitter_delaying_changed = True
+        def update_labels(self) -> None:
+            self.start = time.perf_counter()
 
-        def update_ui(self) -> None:
-            self._update_video_display()
-            self._update_split_labels()
-            self._update_match_percents()
-            self._update_buttons_and_hotkeys()
-
-        def _update_video_display(self):
-            # 
-            
+            # Video feed
             if self._splitter.frame_pixmap is None:
-                if self._main_window.video_feed_display.text() == "":  # There is currently an image being displayed
-                    self._main_window.video_feed_display.setText(self._main_window.video_feed_default_text)
+                self._main_window.video_feed_display.setText(self._main_window.video_feed_default_text)
             else:
                 self._main_window.video_feed_display.setPixmap(self._splitter.frame_pixmap)
 
-        def _update_split_labels(self):
-            # Split image, split name
-            if self._current_split_image_index != self._splitter.splits.current_image_index:
-                self._current_split_image_index = self._splitter.splits.current_image_index
-                self._current_split_image_index_changed = True
+            # Split image, name, and loop count
+            if self._splitter.splits.current_image_index is None:
+                self._main_window.split_image_display.setText(self._main_window.split_image_default_text)
+                self._main_window.split_name_label.setText("")
+                self._main_window.split_image_loop_label.setText("")
+            else:
+                current_image_index = self._splitter.splits.current_image_index
+                self._main_window.split_image_display.setPixmap(self._splitter.splits.list[current_image_index].pixmap)
+                self._main_window.split_name_label.setText(self._splitter.splits.list[current_image_index].name)
 
-                if self._current_split_image_index is None:
-                    self._main_window.split_image_display.setText(self._main_window.split_image_default_text)
-                    self._main_window.split_name_label.setText("")
-                else:
-                    self._main_window.split_image_display.setPixmap(self._splitter.splits.list[self._current_split_image_index].pixmap)
-                    print(self._splitter.splits.list[self._current_split_image_index].pixmap)
-                    self._main_window.split_name_label.setText(self._splitter.splits.list[self._current_split_image_index].name)
-
-            # Split loop
-            # Check if split image's total loops have changed
-            if self._current_total_loops != self._splitter.splits.list[self._splitter.splits.current_image_index].loops:
-                self._current_total_loops = self._splitter.splits.list[self._splitter.splits.current_image_index].loops
-                self._changes_made = True
-
-                if self._current_split_image_index is None:
-                    self._main_window.split_image_loop_label.setText("")
-                else:
-                    if self._current_split_loop != self._splitter.splits.current_loop:
-                        self._current_split_loop = self._splitter.splits.current_loop
-
-                    # self._current_split_loop is never None if self._current_split_image_index is not None
-                    if self._current_split_loop == 0:
-                        self._main_window.split_image_loop_label.setText("Split does not loop")
-                    else:
-                        self._main_window.split_image_loop_label.setText(f"Loop {self._current_split_loop} of {self._current_total_loops}")
-
-            # Check if split image's current loop has changed
-            if self._current_split_loop != self._splitter.splits.current_loop:
-                self._current_split_loop = self._splitter.splits.current_loop
-                self._changes_made = True
-
-                if self._current_split_loop is None:
-                    self._main_window.split_image_loop_label.setText("")
-                if self._current_split_loop == 0:
+                current_total_loops = self._splitter.splits.list[current_image_index].loops
+                if current_total_loops == 0:
                     self._main_window.split_image_loop_label.setText("Split does not loop")
                 else:
-                    self._main_window.split_image_loop_label.setText(f"Loop {self._current_split_loop} of {self._current_total_loops}")
+                    self._main_window.split_image_loop_label.setText(f"Loop {self._splitter.splits.current_loop} of {current_total_loops}")
         
-        def _update_match_percents(self):
-            if self._current_split_image_index is None:
-                # Set current, highest, threshold blank if there is no split image
+            # Match percent labels
+            decimals = settings.value("MATCH_PERCENT_DECIMALS")
+            # Current match percent
+            if self._splitter.current_match_percent is None:
                 self._main_window.current_match_percent.setText(self._null_match_percent_string())
-                self._main_window.highest_match_percent.setText(self._null_match_percent_string())
-                self._main_window.threshold_match_percent.setText(self._null_match_percent_string())
-    
             else:
-                decimals = settings.value("MATCH_PERCENT_DECIMALS")
-                # Current match percent
-                if self._current_current_match_percent != self._splitter.current_match_percent:
-                    self._current_current_match_percent = self._splitter.current_match_percent
-                    if self._current_current_match_percent is None:
-                        self._main_window.current_match_percent.setText(self._null_match_percent_string())
-                    else:
-                        self._main_window.current_match_percent.setText(self._formatted_match_percent_string(self._current_current_match_percent, decimals))
+                self._main_window.current_match_percent.setText(self._formatted_match_percent_string(self._splitter.current_match_percent, decimals))
 
-                # Highest match percent
-                if self._current_highest_match_percent != self._splitter.highest_match_percent:
-                    self._current_highest_match_percent = self._splitter.highest_match_percent
-                    if self._current_highest_match_percent is None:
-                        self._main_window.highest_match_percent.setText(self._null_match_percent_string())
-                    else:
-                        self._main_window.highest_match_percent.setText(self._formatted_match_percent_string(self._current_highest_match_percent, decimals))
+            # Highest match percent
+            if self._splitter.highest_match_percent is None:
+                self._main_window.highest_match_percent.setText(self._null_match_percent_string())
+            else:
+                self._main_window.highest_match_percent.setText(self._formatted_match_percent_string(self._splitter.highest_match_percent, decimals))
 
-                # Threshold match percent
-                if self._current_threshold_match_percent != self._splitter.splits.list[self._splitter.splits.current_image_index].threshold:
-                    self._current_threshold_match_percent = self._splitter.splits.list[self._splitter.splits.current_image_index].threshold
-                    if self._current_threshold_match_percent is None:
-                        self._main_window.threshold_match_percent.setText(self._null_match_percent_string())
-                    else:
-                        self._main_window.threshold_match_percent.setText(self._formatted_match_percent_string(self._current_threshold_match_percent, decimals))
+            # Threshold match percent
+            threshold_match_percent = self._splitter.splits.list[self._splitter.splits.current_image_index].threshold
+            if threshold_match_percent is None:
+                self._main_window.threshold_match_percent.setText(self._null_match_percent_string())
+            else:
+                self._main_window.threshold_match_percent.setText(self._formatted_match_percent_string(threshold_match_percent, decimals))
 
-        def _update_buttons_and_hotkeys(self):
-            # Check if this method should be ran through or not
+        def update_buttons_and_hotkeys(self):
+            # Check if split image list empty
             if self._current_split_list_empty and len(self._splitter.splits.list) > 0 or not self._current_split_list_empty and len(self._splitter.splits.list) == 0:
                 self._current_split_list_empty = not self._current_split_list_empty
-                self._changes_made = True
 
+            # Check if video active
             if self._current_video_active and not self._splitter.capture_thread.is_alive() or not self._current_video_active and self._splitter.capture_thread.is_alive():
                 self._current_video_active = not self._current_video_active
-                self._changes_made = True
 
+            # Check if splitter is delaying
             if self._current_splitter_delaying and not self._splitter.delaying or not self._current_splitter_delaying and self._splitter.delaying:
                 self._current_splitter_delaying = not self._current_splitter_delaying
-                self._changes_made = True
 
-            if self._changes_made:
-                self._changes_made = False
+            # Update buttons and hotkeys
+            if self._current_split_list_empty:
+                # Disable split, undo, skip, previous, next split, reset, pause / unpause
+                self._main_window.split_shortcut.setEnabled(False)
+                self._main_window.undo_split_button.setEnabled(False)
+                self._main_window.undo_split_shortcut.setEnabled(False)
+                self._main_window.skip_split_button.setEnabled(False)
+                self._main_window.skip_split_shortcut.setEnabled(False)
+                self._main_window.previous_split_button.setEnabled(False)
+                self._main_window.next_split_button.setEnabled(False)
+                self._main_window.reset_splits_button.setEnabled(False)
+                self._main_window.reset_shortcut.setEnabled(False)
+                self._main_window.pause_comparison_button.setEnabled(False)
 
-                if self._current_split_list_empty:
-                    # Disable split, undo, skip, previous, next split, reset, pause / unpause
-                    self._main_window.split_shortcut.setEnabled(False)
-                    self._main_window.undo_split_button.setEnabled(False)
-                    self._main_window.undo_split_shortcut.setEnabled(False)
-                    self._main_window.skip_split_button.setEnabled(False)
-                    self._main_window.skip_split_shortcut.setEnabled(False)
-                    self._main_window.previous_split_button.setEnabled(False)
-                    self._main_window.next_split_button.setEnabled(False)
-                    self._main_window.reset_splits_button.setEnabled(False)
-                    self._main_window.reset_shortcut.setEnabled(False)
+                # Enable screenshots if video is on
+                if self._current_video_active:
+                    self._main_window.screenshot_button.setEnabled(True)
+                else:
+                    self._main_window.screenshot_button.setEnabled(False)
+
+            else:
+                # Enable split and reset
+                self._main_window.split_shortcut.setEnabled(True)
+                self._main_window.reset_splits_button.setEnabled(True)
+                self._main_window.reset_shortcut.setEnabled(True)
+
+                # Enable screenshots if video is on
+                if self._current_video_active:
+                    self._main_window.screenshot_button.setEnabled(True)
+                    # Enable pause / unpause if splitter isn't delaying
+                    if self._current_splitter_delaying:
+                        self._main_window.pause_comparison_button.setEnabled(False)
+                    else:
+                        self._main_window.pause_comparison_button.setEnabled(True)
+                else:
+                    self._main_window.screenshot_button.setEnabled(False)
                     self._main_window.pause_comparison_button.setEnabled(False)
 
-                    # Enable screenshots if video is on
-                    if self._current_video_active:
-                        self._main_window.screenshot_button.setEnabled(True)
-                    else:
-                        self._main_window.screenshot_button.setEnabled(False)
-
+                # Enable undo and previous if this isn't the first split
+                if self._splitter.splits.current_image_index == 0 and self._splitter.splits.current_loop == 0:
+                    self._main_window.undo_split_button.setEnabled(False)
+                    self._main_window.undo_split_shortcut.setEnabled(False)
+                    self._main_window.previous_split_button.setEnabled(False)
                 else:
-                    # Enable split and reset
-                    self._main_window.split_shortcut.setEnabled(True)
-                    self._main_window.reset_splits_button.setEnabled(True)
-                    self._main_window.reset_shortcut.setEnabled(True)
+                    self._main_window.undo_split_button.setEnabled(True)
+                    self._main_window.undo_split_shortcut.setEnabled(True)
+                    self._main_window.previous_split_button.setEnabled(True)
 
-                    # Enable screenshots if video is on
-                    if self._current_video_active:
-                        self._main_window.screenshot_button.setEnabled(True)
-                        # Enable pause / unpause if splitter isn't delaying
-                        if self._current_splitter_delaying:
-                            self._main_window.pause_comparison_button.setEnabled(False)
-                        else:
-                            self._main_window.pause_comparison_button.setEnabled(True)
-                    else:
-                        self._main_window.screenshot_button.setEnabled(False)
-                        self._main_window.pause_comparison_button.setEnabled(False)
+                # Enable skip and next if this isn't the last split
+                if self._splitter.splits.current_image_index == len(self._splitter.splits.list) - 1 and self._splitter.splits.current_loop == self._splitter.splits.list[self._splitter.splits.current_image_index].loops:
+                    self._main_window.skip_split_button.setEnabled(False)
+                    self._main_window.skip_split_shortcut.setEnabled(False)
+                    self._main_window.next_split_button.setEnabled(False)
+                else:
+                    self._main_window.skip_split_button.setEnabled(True)
+                    self._main_window.skip_split_shortcut.setEnabled(True)
+                    self._main_window.next_split_button.setEnabled(True)
 
-                    # Enable undo and previous if this isn't the first split
-                    if self._splitter.splits.current_image_index == 0 and self._splitter.splits.current_loop == 0:
-                        self._main_window.undo_split_button.setEnabled(False)
-                        self._main_window.undo_split_shortcut.setEnabled(False)
-                        self._main_window.previous_split_button.setEnabled(False)
-                    else:
-                        self._main_window.undo_split_button.setEnabled(True)
-                        self._main_window.undo_split_shortcut.setEnabled(True)
-                        self._main_window.previous_split_button.setEnabled(True)
-
-                    # Enable skip and next if this isn't the last split
-                    if self._splitter.splits.current_image_index == len(self._splitter.splits.list) - 1 and self._splitter.splits.current_loop == self._splitter.splits.list[self._splitter.splits.current_image_index].loops:
-                        self._main_window.skip_split_button.setEnabled(False)
-                        self._main_window.skip_split_shortcut.setEnabled(False)
-                        self._main_window.next_split_button.setEnabled(False)
-                    else:
-                        self._main_window.skip_split_button.setEnabled(True)
-                        self._main_window.skip_split_shortcut.setEnabled(True)
-                        self._main_window.next_split_button.setEnabled(True)
+            print(time.perf_counter() - self.start)
 
         def _null_match_percent_string(self):
             match_percent_string = "--"
