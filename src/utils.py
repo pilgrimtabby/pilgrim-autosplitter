@@ -1,25 +1,9 @@
 import os
-from enum import Enum, auto
 
 import cv2
 import numpy
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QImage, QPixmap
-
-
-class PercentType(Enum):
-    CURRENT = auto()
-    HIGHEST = auto()
-    THRESHOLD = auto()
-
-
-def frame_to_pixmap(frame: numpy.ndarray, is_split=False):
-    if is_split:
-        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGBA8888).rgbSwapped()  # Make sure alpha channel is included, swap red and blue values
-    else:
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # No alpha
-        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
-    return QPixmap.fromImage(frame_img)
 
 
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")

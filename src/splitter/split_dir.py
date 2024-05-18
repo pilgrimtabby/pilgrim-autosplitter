@@ -4,8 +4,9 @@ import re
 
 import cv2
 import numpy
+from PyQt5.QtGui import QImage, QPixmap
 
-from utils import frame_to_pixmap, settings
+from utils import settings
 
 
 class SplitDir:
@@ -96,7 +97,7 @@ class SplitDir:
         for image in self.list:
             image.image = image.get_and_resize_image()
             image.alpha = image.get_alpha()
-            image.pixmap = frame_to_pixmap(image.image, is_split=True)
+            image.pixmap = image.get_pixmap()
 
     class _SplitImage:
         def __init__(self, image_path) -> None:
@@ -104,7 +105,7 @@ class SplitDir:
             self.name = pathlib.Path(image_path).stem
             self.image = self.get_and_resize_image()
             self.alpha = self.get_alpha()
-            self.pixmap = frame_to_pixmap(self.image, is_split=True)  ### Maybe split this method back into 2 methods
+            self.pixmap = self.get_pixmap()
             self.below_flag, self.dummy_flag, self.pause_flag = self.get_flags_from_name()
             self.delay_duration, self.delay_is_default = self.get_delay_from_name()
             self.pause_duration, self.pause_is_default = self.get_pause_from_name()
@@ -123,6 +124,10 @@ class SplitDir:
             alpha = self.image[:, :, 3]
             return cv2.merge([alpha, alpha, alpha])
         
+        def get_pixmap(self):
+            frame_img = QImage(self.image, self.image.shape[1], self.image.shape[0], QImage.Format_RGBA8888).rgbSwapped()  # Make sure alpha channel is included, swap red and blue values
+            return QPixmap.fromImage(frame_img)
+
         def get_flags_from_name(self):
             flags = re.findall(r"_\{([bdp]+?)\}", self.name)
             if "d" in flags and "p" in flags:

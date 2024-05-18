@@ -1,14 +1,12 @@
-import os
-import platform
-import subprocess
 import threading
 import time
-from pathlib import Path
 
 import cv2
+import numpy
+from PyQt5.QtGui import QImage, QPixmap
 
 from splitter.split_dir import SplitDir
-from utils import frame_to_pixmap, settings
+from utils import settings
 
 
 class Splitter:
@@ -71,7 +69,7 @@ class Splitter:
                     self._capture_thread_finished = True
                 else:
                     self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-                    self.frame_pixmap = frame_to_pixmap(self.frame)
+                    self.frame_pixmap = self._frame_to_pixmap(self.frame)
 
         self._cap.release()
         self.frame = None
@@ -239,3 +237,8 @@ class Splitter:
         else:
             self.suspended = True
             self._safe_exit_compare_thread()
+
+    def _frame_to_pixmap(self, frame: numpy.ndarray):
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # No alpha
+        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
+        return QPixmap.fromImage(frame_img)
