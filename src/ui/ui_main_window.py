@@ -68,6 +68,11 @@ class UIMainWindow(QMainWindow):
         self.video_feed_display_default_text = "No video feed detected"        
 
         # Split image
+        self.minimal_view_no_splits_label = QLabel(self.container)
+        self.minimal_view_no_splits_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.minimal_view_no_splits_label.setAlignment(Qt.AlignCenter)
+        self.minimal_view_no_splits_label.setGeometry(QRect(92 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 251, 31))  # Always in the same spot
+
         self.split_name_label = QLabel(self.container)
         self.split_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.split_name_label.setAlignment(Qt.AlignCenter)
@@ -79,12 +84,11 @@ class UIMainWindow(QMainWindow):
         self.split_image_display = QLabel(self.container)
         self.split_image_display.setAlignment(Qt.AlignCenter)
         self.split_image_display.setObjectName("image_label_inactive")
-        self.split_image_default_text = "No split iamges loaded"
+        self.split_image_default_text = "No split images loaded"
 
         self.split_image_overlay = QLabel(self.container)
         self.split_image_overlay.setAlignment(Qt.AlignCenter)
         self.split_image_overlay.setObjectName("split_image_overlay")
-        self.split_image_overlay.setVisible(False)
 
         # Match percent (current)
         self.current_match_percent_label = QLabel(self.container)
@@ -510,3 +514,4 @@ class UIMainWindow(QMainWindow):
         self.reload_video_button.setVisible(visible)
         self.video_feed_display.setVisible(visible)
         self.split_image_display.setVisible(visible)
+        self.minimal_view_no_splits_label.setVisible(not visible)  # Only display when the other widgets are hidden

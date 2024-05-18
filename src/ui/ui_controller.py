@@ -54,6 +54,7 @@ class UIController:
         self.main_window.pause_comparison_button.clicked.connect(lambda: self.main_window.toggle_pause_comparison_button_text(self.splitter.suspended))
 
         # Split keyboard shortcut entered
+        self.main_window.split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
 
         # Undo split button clicked
@@ -144,14 +145,23 @@ class UIController:
             self.main_window.reset_splits_button.clicked.disconnect()
             self.main_window.reset_shortcut.activated.disconnect()
 
+            self.main_window.split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+            self.main_window.undo_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+            self.main_window.undo_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
+            self.main_window.skip_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
+            self.main_window.skip_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+            self.main_window.previous_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+            self.main_window.next_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
+            self.main_window.reset_splits_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
+            self.main_window.reset_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
 
         self.update_ui_timer.start()
@@ -364,12 +374,16 @@ class UIController:
             # Split image, name, and loop count
             if current_image_index is None:
                 self._main_window.split_image_display.setText(self._main_window.split_image_default_text)
-                self._main_window.split_name_label.setText("No split images loaded")
+                self._main_window.split_name_label.setText("")
                 self._main_window.split_image_loop_label.setText("")
+                self._main_window.minimal_view_no_splits_label.setText(self._main_window.split_image_default_text)
+                self._main_window.minimal_view_no_splits_label.raise_()  # Make sure it shows over other split image labels
             else:
                 if not settings.value("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
                     self._main_window.split_image_display.setPixmap(self._splitter.splits.list[current_image_index].pixmap)
                 self._main_window.split_name_label.setText(self._splitter.splits.list[current_image_index].name)
+                self._main_window.minimal_view_no_splits_label.setText("")
+                self._main_window.minimal_view_no_splits_label.lower()  # Make sure it is hidden under other split image labels
 
                 current_total_loops = self._splitter.splits.list[current_image_index].loops
                 if current_total_loops == 0:
@@ -429,7 +443,7 @@ class UIController:
                 self._main_window.pause_comparison_button.setEnabled(False)
 
                 # Enable screenshots if video is on
-                if self.self._splitter.capture_thread.is_alive():
+                if self._splitter.capture_thread.is_alive():
                     self._main_window.screenshot_button.setEnabled(True)
                 else:
                     self._main_window.screenshot_button.setEnabled(False)
