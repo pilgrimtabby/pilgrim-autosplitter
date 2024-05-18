@@ -377,6 +377,16 @@ class UIController:
                 else:
                     self._main_window.split_image_loop_label.setText(f"Loop {self._splitter.splits.current_loop} of {current_total_loops}")
         
+            # Split image overlay
+            if self._splitter.delaying and self._splitter.delay_remaining is not None:
+                self._main_window.split_image_overlay.setVisible(True)
+                self._main_window.split_image_overlay.setText("Splitting in {amount:.1f} s".format(amount=self._splitter.delay_remaining))
+            elif self._splitter.suspended and self._splitter.suspend_remaining is not None:
+                self._main_window.split_image_overlay.setVisible(True)
+                self._main_window.split_image_overlay.setText("Paused for next {amount:.1f} s".format(amount=self._splitter.suspend_remaining))
+            else:
+                self._main_window.split_image_overlay.setVisible(False)
+
             # Match percent labels
             decimals = settings.value("MATCH_PERCENT_DECIMALS")
             # Current match percent
@@ -431,7 +441,7 @@ class UIController:
                 self._main_window.reset_shortcut.setEnabled(True)
 
                 # Enable screenshots if video is on
-                if self.self._splitter.capture_thread.is_alive():
+                if self._splitter.capture_thread.is_alive():
                     self._main_window.screenshot_button.setEnabled(True)
                     # Enable pause / unpause if splitter isn't delaying
                     if self._splitter.delaying:

@@ -137,12 +137,14 @@ class Splitter:
         if delay_duration > 0:
 
             self.delaying = True
+            self.delay_remaining = delay_duration
             start_time = time.perf_counter()
             while time.perf_counter() - start_time < delay_duration and not self._compare_thread_finished:
-                self.current_match_percent = None  # In case _reset_compare_stats finishes here
-                self.highest_match_percent = None
+                self.current_match_percent, self.highest_match_percent = None, None  # In case _reset_compare_stats finishes here
+                self.delay_remaining = delay_duration - (time.perf_counter() - start_time)
                 time.sleep(self.interval)
             self.delaying = False
+            self.delay_remaining = None
 
             if self._compare_thread_finished:
                 return
@@ -155,16 +157,18 @@ class Splitter:
             pass
         self.splits.current_image_index = self.splits.next_split_image()
 
-        suspended_duration = self.splits.list[self.splits.current_image_index].pause_duration
-        if suspended_duration > 0:
+        suspend_duration = self.splits.list[self.splits.current_image_index].pause_duration
+        if suspend_duration > 0:
 
             self.suspended = True
+            self.suspend_remaining = suspend_duration
             start_time = time.perf_counter()
-            while time.perf_counter() - start_time < suspended_duration and not self._compare_thread_finished:
-                self.current_match_percent = None  # In case _reset_compare_stats finishes here
-                self.highest_match_percent = None
+            while time.perf_counter() - start_time < suspend_duration and not self._compare_thread_finished:
+                self.current_match_percent, self.highest_match_percent = None, None  # In case _reset_compare_stats finishes here
+                self.suspend_remaining = suspend_duration - (time.perf_counter() - start_time)
                 time.sleep(self.interval)
             self.suspended = False
+            self.suspend_remaining = None
 
             if self._compare_thread_finished:
                 return
