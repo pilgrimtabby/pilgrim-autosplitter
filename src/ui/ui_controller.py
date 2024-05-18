@@ -421,6 +421,7 @@ class UIController:
 
         def update_buttons_and_hotkeys(self):
             current_image_index = self._splitter.splits.current_image_index
+            self._main_window.toggle_pause_comparison_button_text(self._splitter.suspended)
 
             if self._current_split_list_empty:
                 # Disable split, undo, skip, previous, next split, reset, pause / unpause

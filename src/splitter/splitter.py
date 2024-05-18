@@ -171,7 +171,6 @@ class Splitter:
 
     def _reset_compare_stats(self, current_image_index: int):
         if self._compare_thread.is_alive():
-            print(threading.active_count())
             interval = 1 / settings.value("FPS")
             start = time.perf_counter()
             try:
