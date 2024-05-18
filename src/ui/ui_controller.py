@@ -334,30 +334,12 @@ class UIController:
             self._splitter = splitter
             self._main_window = main_window
             
-            self._current_split_list_empty = False
-            self._current_video_active = False
-            self._current_splitter_delaying = False
 
         def update_ui(self):
-            self.get_current_state()
-            self.update_labels()
-            self.update_buttons_and_hotkeys()
+            self._update_labels()
+            self._update_buttons_and_hotkeys()
 
-        # Check if split list empty, video active, splitter delaying
-        def get_current_state(self):
-            # Check if split image list empty
-            if self._current_split_list_empty and len(self._splitter.splits.list) > 0 or not self._current_split_list_empty and len(self._splitter.splits.list) == 0:
-                self._current_split_list_empty = not self._current_split_list_empty
-
-            # Check if video active
-            if self._current_video_active and not self._splitter.capture_thread.is_alive() or not self._current_video_active and self._splitter.capture_thread.is_alive():
-                self._current_video_active = not self._current_video_active
-
-            # Check if splitter is delaying
-            if self._current_splitter_delaying and not self._splitter.delaying or not self._current_splitter_delaying and self._splitter.delaying:
-                self._current_splitter_delaying = not self._current_splitter_delaying
-
-        def update_labels(self) -> None:
+        def _update_labels(self) -> None:
             current_image_index = self._splitter.splits.current_image_index
 
             # Video feed
@@ -369,12 +351,12 @@ class UIController:
 
             # Video label
             if settings.value("SHOW_MIN_VIEW"):
-                if self._current_video_active:
+                if self._splitter.capture_thread.is_alive():
                     self._main_window.video_feed_label.setText(self._main_window.video_feed_label_live_text_min)
                 else:
                     self._main_window.video_feed_label.setText(self._main_window.video_feed_label_down_text_min)
             else:
-                if self._current_video_active:
+                if self._splitter.capture_thread.is_alive():
                     self._main_window.video_feed_label.setText(self._main_window.video_feed_label_live_text)
                 else:
                     self._main_window.video_feed_label.setText("")
@@ -419,11 +401,11 @@ class UIController:
                 else:
                     self._main_window.threshold_match_percent.setText(self._formatted_match_percent_string(threshold_match_percent, decimals))
 
-        def update_buttons_and_hotkeys(self):
+        def _update_buttons_and_hotkeys(self):
             current_image_index = self._splitter.splits.current_image_index
             self._main_window.toggle_pause_comparison_button_text(self._splitter.suspended)
 
-            if self._current_split_list_empty:
+            if len(self._splitter.splits.list) == 0:
                 # Disable split, undo, skip, previous, next split, reset, pause / unpause
                 self._main_window.split_shortcut.setEnabled(False)
                 self._main_window.undo_split_button.setEnabled(False)
@@ -437,7 +419,7 @@ class UIController:
                 self._main_window.pause_comparison_button.setEnabled(False)
 
                 # Enable screenshots if video is on
-                if self._current_video_active:
+                if self.self._splitter.capture_thread.is_alive():
                     self._main_window.screenshot_button.setEnabled(True)
                 else:
                     self._main_window.screenshot_button.setEnabled(False)
@@ -449,10 +431,10 @@ class UIController:
                 self._main_window.reset_shortcut.setEnabled(True)
 
                 # Enable screenshots if video is on
-                if self._current_video_active:
+                if self.self._splitter.capture_thread.is_alive():
                     self._main_window.screenshot_button.setEnabled(True)
                     # Enable pause / unpause if splitter isn't delaying
-                    if self._current_splitter_delaying:
+                    if self._splitter.delaying:
                         self._main_window.pause_comparison_button.setEnabled(False)
                     else:
                         self._main_window.pause_comparison_button.setEnabled(True)
@@ -461,7 +443,7 @@ class UIController:
                     self._main_window.pause_comparison_button.setEnabled(False)
 
                 # Enable undo and previous if this isn't the first split
-                if (current_image_index == 0 or current_image_index is None) and self._splitter.splits.current_loop == 0:
+                if (current_image_index is None or current_image_index == 0) and self._splitter.splits.current_loop == 0:
                     self._main_window.undo_split_button.setEnabled(False)
                     self._main_window.undo_split_shortcut.setEnabled(False)
                     self._main_window.previous_split_button.setEnabled(False)
