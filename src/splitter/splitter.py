@@ -7,10 +7,11 @@ from PyQt5.QtGui import QImage, QPixmap
 
 from splitter.split_dir import SplitDir
 from settings import settings
-
+from hotkey import Hotkey
 
 class Splitter:
     def __init__(self) -> None:
+        self.hotkey = Hotkey()
         self.interval = 1 / settings.value("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
         self.delaying = False  # Referenced by ui_controller to set status of various ui elements
         self.suspended = False  # Referenced by ui_controller to set status of various ui elements
@@ -147,13 +148,12 @@ class Splitter:
             if self._compare_thread_finished:
                 return
 
-        if self.splits.list[self.splits.current_image_index].pause_flag:
-            # press pause key
-            pass
-        elif not self.splits.list[self.splits.current_image_index].dummy_flag:
-            # press split key
-            pass
-        self.splits.current_image_index = self.splits.next_split_image()
+        if self.splits.list[self.splits.current_image_index].pause_flag and settings.value("PAUSE_HOTKEY_KEY_SEQUENCE") is not None:
+            self.hotkey.press("a")
+        elif not self.splits.list[self.splits.current_image_index].dummy_flag and settings.value("SPLIT_HOTKEY_KEY_SEQUENCE") is not None:
+            self.hotkey.press("space")
+        else:
+            self.splits.current_image_index = self.splits.next_split_image()
 
         suspend_duration = self.splits.list[self.splits.current_image_index].pause_duration
         if suspend_duration > 0:
