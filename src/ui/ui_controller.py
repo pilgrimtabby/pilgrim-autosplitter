@@ -321,7 +321,7 @@ class UIController:
                 return file_number
 
     # Called by self._take_screenshot
-    def _open_file(path: str):
+    def _open_file(self, path: str):
         if platform.system() == "Windows":
             os.startfile(path)
         elif platform.system() == "Darwin":
