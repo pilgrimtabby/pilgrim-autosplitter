@@ -6,7 +6,7 @@ import cv2
 import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
-from utils import settings
+from settings import settings
 
 
 class SplitDir:

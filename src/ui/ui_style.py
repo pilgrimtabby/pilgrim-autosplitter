@@ -1,6 +1,6 @@
 from string import Template
 
-from utils import settings
+from settings import settings
 
 
 class UIStyle: 

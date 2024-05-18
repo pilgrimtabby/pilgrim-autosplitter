@@ -4,7 +4,7 @@ from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
                              QPushButton, QShortcut, QWidget, QMessageBox)
 from PyQt5.QtGui import QPixmap
-from utils import settings
+from settings import settings
 
 
 class UIMainWindow(QMainWindow):

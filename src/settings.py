@@ -1,9 +1,6 @@
 import os
 
-import cv2
-import numpy
 from PyQt5.QtCore import QSettings
-from PyQt5.QtGui import QImage, QPixmap
 
 
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")

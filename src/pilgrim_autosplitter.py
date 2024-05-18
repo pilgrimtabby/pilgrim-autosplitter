@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QApplication
 
 from splitter.splitter import Splitter
 from ui.ui_controller import UIController
-from utils import settings
+from settings import settings
 
 import faulthandler
 faulthandler.enable()

@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QAction, QCheckBox, QComboBox, QDialog,
                              QLabel, QLineEdit, QPushButton, QShortcut,
                              QSpinBox, QWidget)
 
-from utils import settings
+from settings import settings
 
 
 class UISettingsWindow(QDialog):

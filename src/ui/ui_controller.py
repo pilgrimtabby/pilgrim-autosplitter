@@ -12,7 +12,7 @@ from splitter.splitter import Splitter
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
 from ui.ui_style import UIStyle
-from utils import settings
+from settings import settings
 
 
 class UIController:
