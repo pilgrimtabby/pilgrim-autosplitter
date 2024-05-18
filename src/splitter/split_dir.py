@@ -151,7 +151,6 @@ class SplitDir:
 
         def get_pause_from_name(self):
             pause = re.search(r"_\[(.+?)\]", self.name)
-            print(self.name)
             if pause is None:
                 return settings.value("DEFAULT_PAUSE"), True
             return float(pause[1]), False

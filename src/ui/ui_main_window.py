@@ -2,8 +2,8 @@ import webbrowser
 
 from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QPushButton, QShortcut, QWidget)
-
+                             QPushButton, QShortcut, QWidget, QMessageBox)
+from PyQt5.QtGui import QPixmap
 from utils import settings
 
 
@@ -56,6 +56,7 @@ class UIMainWindow(QMainWindow):
         self.video_feed_label = QLabel(self.container)
         self.video_feed_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.video_feed_label.setAlignment(Qt.AlignCenter)
+
         self.video_feed_label_live_text = "Video feed"
         self.video_feed_label_down_text_min = "Video status:   down"
         self.video_feed_label_live_text_min = "Video status:   healthy"
@@ -63,7 +64,8 @@ class UIMainWindow(QMainWindow):
         self.video_feed_display = QLabel(self.container)
         self.video_feed_display.setAlignment(Qt.AlignCenter)
         self.video_feed_display.setObjectName("image_label_inactive")
-        self.video_feed_default_text = "No video feed detected"        
+
+        self.video_feed_display_default_text = "No video feed detected"        
 
         # Split image
         self.split_name_label = QLabel(self.container)
@@ -125,36 +127,56 @@ class UIMainWindow(QMainWindow):
 
         # Minimal view button
         self.minimal_view_button = QPushButton(self.container)
+        self.minimal_view_button.setFocusPolicy(Qt.NoFocus)
 
         # Next source button
         self.next_source_button = QPushButton("Next source", self.container)
+        self.next_source_button.setFocusPolicy(Qt.NoFocus)
 
         # Screenshot button
         self.screenshot_button = QPushButton(self.container)
         self.screenshot_button.setEnabled(False)
+        self.screenshot_button.setFocusPolicy(Qt.NoFocus)
+
+        # Screenshot success message box
+        self.screenshot_success_message_box = QMessageBox(self)
+        self.screenshot_success_message_box.setText("Screenshot taken")
+
+        # Screenshot error message box
+        self.screenshot_error_message_box = QMessageBox(self)
+        self.screenshot_error_message_box.setText("Could not take screenshot")
+        self.screenshot_error_message_box.setInformativeText("No video feed detected. Please make sure video feed is active and try again.")
+        self.screenshot_error_message_box.setIcon(QMessageBox.Warning)
 
         # Reload video button
         self.reload_video_button = QPushButton("Reconnect video", self.container)
+        self.reload_video_button.setFocusPolicy(Qt.NoFocus)
 
         # Previous split button
         self.previous_split_button = QPushButton("<", self.container)
         self.previous_split_button.setEnabled(False)
+        self.previous_split_button.setFocusPolicy(Qt.NoFocus)
 
         # Next split button
         self.next_split_button = QPushButton(">", self.container)
         self.next_split_button.setEnabled(False)
+        self.next_split_button.setFocusPolicy(Qt.NoFocus)
 
         # Skip split button
         self.skip_split_button = QPushButton(self.container)
         self.skip_split_button.setEnabled(False)
+        self.skip_split_button.setFocusPolicy(Qt.NoFocus)
 
         # Undo split button
         self.undo_split_button = QPushButton(self.container)
         self.undo_split_button.setEnabled(False)
+        self.undo_split_button.setFocusPolicy(Qt.NoFocus)
 
         # Pause comparison / unpause comparison button
         self.pause_comparison_button = QPushButton(self.container)
         self.pause_comparison_button.setEnabled(False)
+        self.pause_comparison_button.setFocusPolicy(Qt.NoFocus)
+
         self.pause_comparison_button_pause_text_default = "Pause comparison"
         self.pause_comparison_button_pause_text_truncated = "Pause comp"
         self.pause_comparison_button_unpause_text_default = "Unpause comparison"
@@ -163,6 +185,7 @@ class UIMainWindow(QMainWindow):
         # Reset splits button
         self.reset_splits_button = QPushButton(self.container)
         self.reset_splits_button.setEnabled(False)
+        self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
 
         ################################
         #                              #
@@ -213,11 +236,11 @@ class UIMainWindow(QMainWindow):
         # Set keybindings
         self.set_ui_shortcut_keybindings()
 
-    ##################
-    #                #
-    # Setter Methods #
-    #                #
-    ##################
+    #######################
+    #                     #
+    # Update view methods #
+    #                     #
+    #######################
 
     # Called from ui_controller.set_image_directory_path
     def set_split_directory_line_edit_text(self):
@@ -260,7 +283,7 @@ class UIMainWindow(QMainWindow):
         layout = self.get_layout()
         layout(splitter_paused)
 
-    # Called by self.set_layout
+    # Called by self.set_layout; by ui_controller when minimal view button is pressed or when aspect ratio is changed in settings
     def get_layout(self):
         if settings.value("SHOW_MIN_VIEW"):
             return self._show_minimal_view

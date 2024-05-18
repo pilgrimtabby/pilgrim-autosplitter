@@ -18,7 +18,7 @@ class Splitter:
         self.suspended = False  # Referenced by ui_controller to set status of various ui elements
 
         # _capture_thread variables
-        self._frame = None
+        self.frame = None
         self.frame_pixmap = None  # Passed to UI by ui_controller._poller
         self._cap = None
         self.capture_thread = threading.Thread(target=self._capture)  # Referenced by ui_controller to check if thread is alive
@@ -30,6 +30,10 @@ class Splitter:
         self.highest_match_percent = None  # Referenced by ui_controller to set match percent information, and set by ui_controller ever time it calls split_dir.next_split_image or split_dir.previous_split_image
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
+
+        # _reset_compare_stats_thread variables
+        self._reset_compare_stats_thread = threading.Thread(target=self._reset_compare_stats, args=(0,))
+        self._reset_compare_stats_thread_finished = False
 
     # Used by ui.controller in conjunction with safe_exit_all_threads
     def start(self):
@@ -50,6 +54,12 @@ class Splitter:
         self._compare_thread.daemon = True
         self._compare_thread.start()
 
+    def start_reset_compare_stats_thread(self, current_image_index: int):
+        self._reset_compare_stats_thread = threading.Thread(target=self._reset_compare_stats, args=(current_image_index,))
+        self._reset_compare_stats_thread_finished = False
+        self._reset_compare_stats_thread.daemon = True
+        self._reset_compare_stats_thread.start()
+
     def _capture(self):
         start_time = time.perf_counter()
         while not self._capture_thread_finished:
@@ -60,11 +70,11 @@ class Splitter:
                 if frame is None:   # Something happened to the video feed, kill the thread
                     self._capture_thread_finished = True
                 else:
-                    self._frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-                    self.frame_pixmap = frame_to_pixmap(self._frame)
+                    self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+                    self.frame_pixmap = frame_to_pixmap(self.frame)
 
         self._cap.release()
-        self._frame = None
+        self.frame = None
         self.frame_pixmap = None
         # Kill comparer if capture goes down
         self._safe_exit_compare_thread()
@@ -76,7 +86,7 @@ class Splitter:
             if still_going:
                 self._split()
 
-    def _look_for_match(self):   ##### Make safe from Nones
+    def _look_for_match(self):
         self.current_match_percent = 0
         self.highest_match_percent = 0
 
@@ -88,13 +98,14 @@ class Splitter:
             if current_time - start_time >= self.interval:
                 start_time = current_time
 
-                current_frame = self._frame  # Prevent a None slipping through from the capture thread
-                if current_frame is None:
+                # Use a snapshot of this value to make this thread-safe
+                frame = self.frame
+                if frame is None:
                     continue
 
                 try:
                     comparison_frame = cv2.matchTemplate(
-                        current_frame,
+                        frame,
                         self.splits.list[self.splits.current_image_index].image[:, :, :3],
                         cv2.TM_CCORR_NORMED,
                         mask=self.splits.list[self.splits.current_image_index].alpha
@@ -128,6 +139,8 @@ class Splitter:
             self.delaying = True
             start_time = time.perf_counter()
             while time.perf_counter() - start_time < delay_duration and not self._compare_thread_finished:
+                self.current_match_percent = None  # In case _reset_compare_stats finishes here
+                self.highest_match_percent = None
                 time.sleep(self.interval)
             self.delaying = False
 
@@ -148,11 +161,29 @@ class Splitter:
             self.suspended = True
             start_time = time.perf_counter()
             while time.perf_counter() - start_time < suspended_duration and not self._compare_thread_finished:
+                self.current_match_percent = None  # In case _reset_compare_stats finishes here
+                self.highest_match_percent = None
                 time.sleep(self.interval)
             self.suspended = False
 
             if self._compare_thread_finished:
                 return
+
+    def _reset_compare_stats(self, current_image_index: int):
+        if self._compare_thread.is_alive():
+            print(threading.active_count())
+            interval = 1 / settings.value("FPS")
+            start = time.perf_counter()
+            try:
+                # Exit once the split image has changed. If it hasn't changed, as a failsafe, exit the thread after 1.5 seconds.
+                while current_image_index == self.splits.current_image_index and not self._reset_compare_stats_thread_finished and time.perf_counter() - start < 1.5:
+                    time.sleep(interval)
+
+                time.sleep(interval)
+                self.current_match_percent = 0
+                self.highest_match_percent = 0
+            except TypeError:  # Split folder was changed to a folder with no splits
+                pass
 
     # Exiting the capture thread also exits the compare thread.
     # Used to safely kill all threads in this class before replacing some important element.
@@ -160,8 +191,11 @@ class Splitter:
     # Called by ui_controller before starting the splitter
     def safe_exit_all_threads(self):
         self._capture_thread_finished = True
+        self._reset_compare_stats_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
+        if self._reset_compare_stats_thread.is_alive():
+            self._reset_compare_stats_thread.join()
 
     # Called by this._capture when its thread dies, and by toggle_suspended (pause / unpause button pressed in ui)
     def _safe_exit_compare_thread(self):
@@ -202,41 +236,3 @@ class Splitter:
         else:
             self.suspended = True
             self._safe_exit_compare_thread()
-
-    # Called by ui_controller when screenshot button pressed/ shortcut entered
-    def take_screenshot(self) -> bool:
-        if self._frame is None:
-            return None
-
-        image_dir = settings.value("LAST_IMAGE_DIR")
-        if image_dir is None or not Path(image_dir).is_dir:
-            image_dir = os.path.expanduser("~")
-
-        screenshot_path = f"{image_dir}/{self._get_unique_filename_number(image_dir)}_screenshot.png"
-        cv2.imwrite(screenshot_path, self._frame)
-
-        if Path(screenshot_path).is_file():
-            if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
-                self._open_file(screenshot_path)
-            return screenshot_path
-        return None
-    
-    # Called by self.take_screenshot
-    def _get_unique_filename_number(self, dir: str):
-        file_int = 1
-        while True:
-            leading_zeros = "0" * (3 - len(str(file_int)))
-            file_number = f"{leading_zeros}{file_int}"
-            if Path(f"{dir}/{file_number}_screenshot.png").is_file():
-                file_int += 1
-            else:
-                return file_number
-
-    # Called by self.take_screenshot
-    def _open_file(path: str):
-        if platform.system() == "Windows":
-            os.startfile(path)
-        elif platform.system() == "Darwin":
-            subprocess.call(["open", path])
-        else:
-            subprocess.call(["xdg-open", path])

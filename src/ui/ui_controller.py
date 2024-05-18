@@ -1,5 +1,11 @@
+import os
+from pathlib import Path
+import platform
+import subprocess
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtGui import QPixmap
+import cv2
 
 from splitter.split_dir import SplitDir
 from splitter.splitter import Splitter
@@ -37,7 +43,7 @@ class UIController:
         self.main_window.next_source_button.clicked.connect(self.splitter.start)
 
         # Screenshot button clicked
-        self.main_window.screenshot_button.clicked.connect(self.splitter.take_screenshot)
+        self.main_window.screenshot_button.clicked.connect(self._take_screenshot)
 
         # Reload video button clicked
         self.main_window.reload_video_button.clicked.connect(self.splitter.safe_exit_all_threads)
@@ -49,39 +55,40 @@ class UIController:
 
         # Split keyboard shortcut entered
         self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
-        self.main_window.split_shortcut.activated.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Undo split button clicked
+        self.main_window.undo_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
-        self.main_window.undo_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
         ##### send undo button keystroke
 
         # Undo split keyboard shortcut entered
+        self.main_window.undo_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
-        self.main_window.undo_split_shortcut.activated.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Skip split button clicked
+        self.main_window.skip_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
-        self.main_window.skip_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
         ##### send skip button keystroke
 
         # Skip split keyboard shortcut entered
+        self.main_window.skip_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
-        self.main_window.skip_split_shortcut.activated.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Previous split button clicked
+        self.main_window.previous_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
-        self.main_window.previous_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Next split button clicked
+        self.main_window.next_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
-        self.main_window.next_split_button.clicked.connect(lambda: setattr(self.splitter, "highest_match_percent", 0))
 
         # Reset button clicked
+        self.main_window.reset_splits_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
         ##### Send reset keyboard shortcut
 
         # Reset splits keyboard shortcut entered
+        self.main_window.reset_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
         self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
 
         # Settings menu bar action triggered
@@ -274,6 +281,54 @@ class UIController:
         if hotkey_changed:
             self.main_window.set_ui_shortcut_keybindings()
 
+    # Called by ui_controller when screenshot button pressed/ shortcut entered
+    def _take_screenshot(self) -> None:
+        frame = self.splitter.frame
+        if frame is None:
+            self.main_window.screenshot_error_message_box.exec()
+            return
+
+        image_dir = settings.value("LAST_IMAGE_DIR")
+        if image_dir is None or not Path(image_dir).is_dir:
+            image_dir = os.path.expanduser("~")
+
+        screenshot_path = f"{image_dir}/{self._get_unique_filename_number(image_dir)}_screenshot.png"
+        cv2.imwrite(screenshot_path, frame)
+
+        if Path(screenshot_path).is_file():
+            if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
+                self._open_file(screenshot_path)
+            else:
+                self.main_window.screenshot_success_message_box.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
+                self.main_window.screenshot_success_message_box.setIconPixmap(QPixmap(screenshot_path).scaledToWidth(150))
+                self.main_window.screenshot_success_message_box.exec()        
+            return
+        
+        self.main_window.screenshot_error_message_box.exec()
+        
+    # Called by self._take_screenshot
+    def _get_unique_filename_number(self, dir: str):
+        file_int = 1
+        while True:
+            if file_int > 999:
+                raise Exception(f"Error: no suitable filename found in {dir}")
+            
+            leading_zeros = "0" * (3 - len(str(file_int)))
+            file_number = f"{leading_zeros}{file_int}"
+            if Path(f"{dir}/{file_number}_screenshot.png").is_file():
+                file_int += 1
+            else:
+                return file_number
+
+    # Called by self._take_screenshot
+    def _open_file(path: str):
+        if platform.system() == "Windows":
+            os.startfile(path)
+        elif platform.system() == "Darwin":
+            subprocess.call(["open", path])
+        else:
+            subprocess.call(["xdg-open", path])
+
     class _Poller:
         def __init__(self, splitter: Splitter, main_window: UIMainWindow) -> None:
             self._splitter = splitter
@@ -308,7 +363,7 @@ class UIController:
             # Video feed
             if not settings.value("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
                 if self._splitter.frame_pixmap is None:
-                    self._main_window.video_feed_display.setText(self._main_window.video_feed_default_text)
+                    self._main_window.video_feed_display.setText(self._main_window.video_feed_display_default_text)
                 else:
                     self._main_window.video_feed_display.setPixmap(self._splitter.frame_pixmap)
 
