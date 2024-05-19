@@ -25,7 +25,7 @@ class UIStyle:
         self.style_sheet_dark = Template(
             """
             * {
-                font-family: "Gill Sans";
+                font-family: "Gill Sans", "Calibri";
                 font-size: 16px;
                 color: $text_and_borders;
                 background-color: $default_background;

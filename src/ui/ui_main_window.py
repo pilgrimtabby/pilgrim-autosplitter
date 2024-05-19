@@ -1,3 +1,4 @@
+import platform
 import webbrowser
 
 from PyQt5.QtCore import QRect, Qt
@@ -35,14 +36,9 @@ class UIMainWindow(QMainWindow):
         self.help_action = QAction("Help", self)
         self.help_action.triggered.connect(lambda: webbrowser.open("https://github.com/pilgrimtabby/image-capture/", new=0, autoraise=True))
 
-        self.pizza_action = QAction("Pizza", self)
-        self.pizza_action.setShortcut("ctrl+1")
-        self.pizza_action.triggered.connect(lambda: print("Hello"))
-
         self.menu_bar_pilgrim_autosplitter = self.menu_bar.addMenu("&Autosplitter Settings")
         self.menu_bar_pilgrim_autosplitter.addAction(self.settings_action)
         self.menu_bar_pilgrim_autosplitter.addAction(self.help_action)
-        self.menu_bar.addAction(self.pizza_action)
 
         ###########
         #         #
@@ -238,6 +234,11 @@ class UIMainWindow(QMainWindow):
         # Style and layout
         self.style_sheet = style_sheet
         self.style_sheet.set_style(self)
+
+        if platform.system() == "Windows":
+            self.HEIGHT_CORRECTION = 22
+        else:
+            self.HEIGHT_CORRECTION = 0
         self.set_layout(splitter_paused=False)
 
         # Program shortcuts
@@ -348,7 +349,7 @@ class UIMainWindow(QMainWindow):
     def _show_minimal_view(self, splitter_paused: bool):
         self._set_nonessential_widgets_visible(False)
         self._set_button_and_label_text(truncate=True, splitter_paused=splitter_paused)
-        self.setFixedSize(345, 179)
+        self.setFixedSize(345, 179 + self.HEIGHT_CORRECTION)
 
         self.previous_split_button.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, 31, 31))
         self.split_name_label.setGeometry(QRect(92 + self.LEFT_EDGE_CORRECTION, 214 + self.TOP_EDGE_CORRECTION, 251, 31))
@@ -374,7 +375,7 @@ class UIMainWindow(QMainWindow):
     def _show_480x360_view(self, splitter_paused: bool):
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
-        self.setFixedSize(1002, 570)
+        self.setFixedSize(1002, 570 + self.HEIGHT_CORRECTION)
 
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 785, 30))
         self.video_feed_label.setGeometry(QRect(260 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
@@ -409,7 +410,7 @@ class UIMainWindow(QMainWindow):
     def _show_320x240_view(self, splitter_paused: bool):
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=True, splitter_paused=splitter_paused)
-        self.setFixedSize(682, 450)
+        self.setFixedSize(682, 450 + self.HEIGHT_CORRECTION)
 
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 464, 30))
         self.video_feed_label.setGeometry(QRect(180 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
@@ -444,7 +445,7 @@ class UIMainWindow(QMainWindow):
     def _show_512x288_view(self, splitter_paused: bool):
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
-        self.setFixedSize(1064, 497)
+        self.setFixedSize(1064, 497 + self.HEIGHT_CORRECTION)
 
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 848, 30))
         self.video_feed_label.setGeometry(QRect(276 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
@@ -479,7 +480,7 @@ class UIMainWindow(QMainWindow):
     def _show_432x243_view(self, splitter_paused):
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
-        self.setFixedSize(904, 452)
+        self.setFixedSize(904, 452 + self.HEIGHT_CORRECTION)
         split_image_geometry = QRect(502 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 432, 243)
 
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 688, 30))
