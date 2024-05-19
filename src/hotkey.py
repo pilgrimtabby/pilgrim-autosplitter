@@ -1,6 +1,4 @@
 import platform
-import subprocess
-import time
 from pynput import keyboard
 import pyautogui
 
@@ -11,19 +9,18 @@ class Hotkey:
     def __init__(self) -> None:
         pass
 
-    def press(self, key: str):
+    def type(self, key: str):
         if platform.system() == "Windows":
             pass
         elif platform.system() == "Darwin":
-            self._press_macos(key)
+            self._type_macos(key)
         else:
             pass  # No Linux support yet (sorry...)
 
-    def _press_macos(self, key: int):
-        start = time.perf_counter()
+    def _type_macos(self, key: int):
+        # start = time.perf_counter()
         self.controller.press(keyboard.Key.space)
         self.controller.release(keyboard.Key.space)
-        # self.controller.release(key)
-        print(time.perf_counter() - start)
+        # print(time.perf_counter() - start)
 
 # aaaaa

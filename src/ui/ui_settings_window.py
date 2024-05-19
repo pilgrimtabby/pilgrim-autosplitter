@@ -1,9 +1,11 @@
+import platform
+
 from PyQt5.QtCore import QEvent, QRect, Qt
 from PyQt5.QtGui import QColor, QKeySequence
-from PyQt5.QtWidgets import (QAction, QCheckBox, QComboBox, QDialog,
-                             QDoubleSpinBox, QFrame, QGraphicsDropShadowEffect,
-                             QLabel, QLineEdit, QPushButton, QShortcut,
-                             QSpinBox, QWidget)
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
+                             QFrame, QGraphicsDropShadowEffect, QLabel,
+                             QLineEdit, QPushButton, QShortcut, QSpinBox,
+                             QWidget)
 
 from settings import settings
 
@@ -30,11 +32,15 @@ class UISettingsWindow(QDialog):
         self.setWindowTitle("Settings")
 
         # Shortcuts
-        self.close_window_action = QAction("Close Window", self)
-        self.close_window_action.setShortcuts(["ctrl+.", "ctrl+w"])  # ctrl+. already closes the window since main_window has this shortcut, but this overrides it... is that needed? reset_settings was being called twice before but maybe now it's ok -- check
-        self.close_window_action.triggered.connect(self.close)
-        
-        self.close_app_shortcut = QShortcut("ctrl+q", self)
+        self.close_window_shortcut_option1 = QShortcut("ctrl+.", self)
+        self.close_window_shortcut_option2 = QShortcut("ctrl+w", self)
+
+        self.close_window_shortcut_option1.activated.connect(self.close)
+        self.close_window_shortcut_option2.activated.connect(self.close)
+
+        # Add Mac-style "quit" shortcut (connected in ui_controller)
+        if platform.system() == "Darwin":
+            self.close_app_shortcut = QShortcut("ctrl+q", self)
 
         # Style
         self.style_sheet = style_sheet

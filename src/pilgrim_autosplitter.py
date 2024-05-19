@@ -37,8 +37,8 @@ class PilgrimAutosplitter:
             self.splitter.start()
 
         self.ui_controller = UIController(self.splitter)
-
         self.ui_controller.main_window.show()
+        
         self.pilgrim_universal_autosplitter.exec()
         
 

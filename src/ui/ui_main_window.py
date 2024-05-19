@@ -29,15 +29,20 @@ class UIMainWindow(QMainWindow):
         self.menu_bar = QMenuBar(self.container)
         self.setMenuBar(self.menu_bar)
 
-        self.settings_action = QAction("Settings", self)
+        self.settings_action = QAction("Open settings menu", self)
         self.settings_action.setShortcut("Ctrl+.")
 
         self.help_action = QAction("Help", self)
         self.help_action.triggered.connect(lambda: webbrowser.open("https://github.com/pilgrimtabby/image-capture/", new=0, autoraise=True))
 
-        self.menu_bar_pilgrim_autosplitter = self.menu_bar.addMenu("&Pilgrim Autosplitter")
+        self.pizza_action = QAction("Pizza", self)
+        self.pizza_action.setShortcut("ctrl+1")
+        self.pizza_action.triggered.connect(lambda: print("Hello"))
+
+        self.menu_bar_pilgrim_autosplitter = self.menu_bar.addMenu("&Autosplitter Settings")
         self.menu_bar_pilgrim_autosplitter.addAction(self.settings_action)
         self.menu_bar_pilgrim_autosplitter.addAction(self.help_action)
+        self.menu_bar.addAction(self.pizza_action)
 
         ###########
         #         #
@@ -47,6 +52,7 @@ class UIMainWindow(QMainWindow):
 
         # Split directory button and display
         self.split_directory_button = QPushButton("Select split image folder:", self.container)
+        self.split_directory_button.setFocusPolicy(Qt.NoFocus)
 
         self.split_directory_line_edit = QLineEdit(self.container)
         self.split_directory_line_edit.setText(settings.value("LAST_IMAGE_DIR"))
@@ -190,6 +196,38 @@ class UIMainWindow(QMainWindow):
         self.reset_splits_button = QPushButton(self.container)
         self.reset_splits_button.setEnabled(False)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
+
+
+        # # Undo split button clicked
+        # self.main_window.undo_split_button.clicked.connect(self.request_previous_split)
+        # ##### send undo button keystroke
+
+        # # Undo split keyboard shortcut entered
+        # self.main_window.undo_split_shortcut.activated.connect(self.request_previous_split)
+
+        # # Skip split button clicked
+        # self.main_window.skip_split_button.clicked.connect(self.request_next_split)
+        # ##### send skip button keystroke
+
+        # # Skip split keyboard shortcut entered
+        # self.main_window.skip_split_shortcut.activated.connect(self.request_next_split)
+
+        # # Previous split button clicked
+        # self.main_window.previous_split_button.clicked.connect(self.request_previous_split)
+
+        # # Next split button clicked
+        # self.main_window.next_split_button.clicked.connect(self.request_next_split)
+
+        # # Reset button clicked
+        # self.main_window.reset_splits_button.clicked.connect(self.request_reset)
+        # ##### Send reset keyboard shortcut
+
+        # # Reset splits keyboard shortcut entered
+        # self.main_window.reset_shortcut.activated.connect(self.request_reset)
+
+        # # Settings menu bar action triggered
+        # self.main_window.settings_action.triggered.connect(self.settings_window.exec)
+
 
         ################################
         #                              #

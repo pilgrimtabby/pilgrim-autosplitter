@@ -54,43 +54,34 @@ class UIController:
         self.main_window.pause_comparison_button.clicked.connect(lambda: self.main_window.toggle_pause_comparison_button_text(self.splitter.suspended))
 
         # Split keyboard shortcut entered
-        self.main_window.split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+        self.main_window.split_shortcut.activated.connect(self.request_next_split)
 
         # Undo split button clicked
-        self.main_window.undo_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+        self.main_window.undo_split_button.clicked.connect(self.request_previous_split)
         ##### send undo button keystroke
 
         # Undo split keyboard shortcut entered
-        self.main_window.undo_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
+        self.main_window.undo_split_shortcut.activated.connect(self.request_previous_split)
 
         # Skip split button clicked
-        self.main_window.skip_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
+        self.main_window.skip_split_button.clicked.connect(self.request_next_split)
         ##### send skip button keystroke
 
         # Skip split keyboard shortcut entered
-        self.main_window.skip_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
+        self.main_window.skip_split_shortcut.activated.connect(self.request_next_split)
 
         # Previous split button clicked
-        self.main_window.previous_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
+        self.main_window.previous_split_button.clicked.connect(self.request_previous_split)
 
         # Next split button clicked
-        self.main_window.next_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
+        self.main_window.next_split_button.clicked.connect(self.request_next_split)
 
         # Reset button clicked
-        self.main_window.reset_splits_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
+        self.main_window.reset_splits_button.clicked.connect(self.request_reset)
         ##### Send reset keyboard shortcut
 
         # Reset splits keyboard shortcut entered
-        self.main_window.reset_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
-        self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
+        self.main_window.reset_shortcut.activated.connect(self.request_reset)
 
         # Settings menu bar action triggered
         self.main_window.settings_action.triggered.connect(self.settings_window.exec)
@@ -102,8 +93,9 @@ class UIController:
         ###########################
 
         # Quit app keyboard shortcut entered (ctrl+q)
-        self.settings_window.close_app_shortcut.activated.connect(self.settings_window.close)
-        self.settings_window.close_app_shortcut.activated.connect(self.main_window.close)
+        if platform.system() == "Darwin":
+            self.settings_window.close_app_shortcut.activated.connect(self.settings_window.close)
+            self.settings_window.close_app_shortcut.activated.connect(self.main_window.close)
         
         # Save button clicked
         self.settings_window.save_button.clicked.connect(self.save_settings)
@@ -119,6 +111,33 @@ class UIController:
         self.update_ui_timer.setInterval(1000 // settings.value("FPS")) # This takes about 1/10000 of a second on average
         self.update_ui_timer.timeout.connect(self._poller.update_ui)
         self.update_ui_timer.start()
+
+    # Called when undo or previous button / hotkey pressed
+    def request_previous_split(self):
+        if self.splitter.suspended:
+            self.splitter.splits.previous_split_image()
+        else:
+            self.splitter._safe_exit_compare_thread()
+            self.splitter.splits.previous_split_image()
+            self.splitter._start_compare_thread()
+
+    # Called when next or skip button / hotkey pressed, and when split hotkey pressed
+    def request_next_split(self):
+        if self.splitter.suspended:
+            self.splitter.splits.next_split_image()
+        else:
+            self.splitter._safe_exit_compare_thread()
+            self.splitter.splits.next_split_image()
+            self.splitter._start_compare_thread()
+
+    # Called when reset button / hotkey pressed 
+    def request_reset(self):
+        if self.splitter.suspended:
+            self.splitter.splits.reset_split_images()
+        else:
+            self.splitter._safe_exit_compare_thread()
+            self.splitter.splits.reset_split_images()
+            self.splitter._start_compare_thread()
 
     # Called when select splits directory button pressed
     def set_image_directory_path(self):
@@ -145,23 +164,14 @@ class UIController:
             self.main_window.reset_splits_button.clicked.disconnect()
             self.main_window.reset_shortcut.activated.disconnect()
 
-            self.main_window.split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
-            self.main_window.undo_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
-            self.main_window.undo_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
-            self.main_window.skip_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
-            self.main_window.skip_split_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
-            self.main_window.previous_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
-            self.main_window.next_split_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
-            self.main_window.reset_splits_button.clicked.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
-            self.main_window.reset_shortcut.activated.connect(lambda: self.splitter.start_reset_compare_stats_thread(self.splitter.splits.current_image_index))
             self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
 
         self.update_ui_timer.start()

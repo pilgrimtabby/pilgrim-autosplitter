@@ -1,21 +1,20 @@
 import os
+from pathlib import Path
 
 from PyQt5.QtCore import QSettings
 
 
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")
 if settings.value("SETTINGS_SET") is None:
-    home_dir = os.path.expanduser("~")
     settings.setValue("SETTINGS_SET", True)
     settings.setValue("DEFAULT_THRESHOLD", .90)
     settings.setValue("DEFAULT_DELAY", 0)
     settings.setValue("DEFAULT_LOOP_COUNT", 0)
     settings.setValue("DEFAULT_PAUSE", 1)
     settings.setValue("FPS", 60)
-    settings.setValue("LAST_IMAGE_DIR", home_dir)
     settings.setValue("OPEN_SCREENSHOT_ON_CAPTURE", False)
     settings.setValue("MATCH_PERCENT_DECIMALS", 0)
-    settings.setValue("VERSION_NUMBER", "0.1.0-alpha")
+    settings.setValue("VERSION_NUMBER", "0.0.1")
     settings.setValue("SPLIT_HOTKEY_TEXT", "")
     settings.setValue("RESET_HOTKEY_TEXT", "")
     settings.setValue("PAUSE_HOTKEY_TEXT", "")
@@ -37,6 +36,11 @@ if settings.value("SETTINGS_SET") is None:
     settings.setValue("LAST_CAPTURE_SOURCE_INDEX", 0)
     settings.setValue("START_WITH_VIDEO", False)
     settings.setValue("SHOW_MIN_VIEW", False)
+
+# Set last image dir to home dir if last image dir doesn't exist
+if settings.value("LAST_IMAGE_DIR") is None or not Path(settings.value("LAST_IMAGE_DIR")).is_dir():
+    home_dir = os.path.expanduser("~")
+    settings.setValue("LAST_IMAGE_DIR", home_dir)
 
 # Always start in full view if video doesn't come on automatically
 if not settings.value("START_WITH_VIDEO"):
