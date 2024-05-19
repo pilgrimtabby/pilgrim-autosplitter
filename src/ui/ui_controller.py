@@ -12,7 +12,7 @@ from splitter.splitter import Splitter
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
 from ui.ui_style import UIStyle
-from settings import settings
+import settings
 
 
 class UIController:
@@ -34,7 +34,7 @@ class UIController:
         self.main_window.split_directory_button.clicked.connect(self.set_image_directory_path)
 
         # Minimal view / full view button clicked
-        self.main_window.minimal_view_button.clicked.connect(lambda: settings.setValue("SHOW_MIN_VIEW", not settings.value("SHOW_MIN_VIEW")))
+        self.main_window.minimal_view_button.clicked.connect(lambda: settings.set_value("SHOW_MIN_VIEW", not settings.get_bool("SHOW_MIN_VIEW")))
         self.main_window.minimal_view_button.clicked.connect(lambda: self.main_window.set_layout(splitter_paused=self.splitter.suspended))
 
         # Next source button clicked
@@ -108,7 +108,7 @@ class UIController:
         ##########################
 
         self.update_ui_timer = QTimer()
-        self.update_ui_timer.setInterval(1000 // settings.value("FPS")) # This takes about 1/10000 of a second on average
+        self.update_ui_timer.setInterval(1000 // settings.get_int("FPS")) # This takes about 1/10000 of a second on average
         self.update_ui_timer.timeout.connect(self._poller.update_ui)
         self.update_ui_timer.start()
 
@@ -142,9 +142,9 @@ class UIController:
     # Called when select splits directory button pressed
     def set_image_directory_path(self):
         self.update_ui_timer.stop()
-        path = QFileDialog.getExistingDirectory(self.main_window, "Select splits folder", settings.value("LAST_IMAGE_DIR"))
-        if path != "" and path != settings.value("LAST_IMAGE_DIR"):
-            settings.setValue("LAST_IMAGE_DIR", path)
+        path = QFileDialog.getExistingDirectory(self.main_window, "Select splits folder", settings.get_str("LAST_IMAGE_DIR"))
+        if path != "" and path != settings.get_str("LAST_IMAGE_DIR"):
+            settings.set_value("LAST_IMAGE_DIR", path)
             self.main_window.set_split_directory_line_edit_text()
 
             video_active = self.splitter.capture_thread.is_alive()
@@ -153,27 +153,6 @@ class UIController:
             if video_active:
                 self.splitter.start()
 
-            # Reconnect signals to new SplitDir instance
-            self.main_window.split_shortcut.activated.disconnect()
-            self.main_window.undo_split_button.clicked.disconnect()
-            self.main_window.undo_split_shortcut.activated.disconnect()
-            self.main_window.skip_split_button.clicked.disconnect()
-            self.main_window.skip_split_shortcut.activated.disconnect()
-            self.main_window.previous_split_button.clicked.disconnect()
-            self.main_window.next_split_button.clicked.disconnect()
-            self.main_window.reset_splits_button.clicked.disconnect()
-            self.main_window.reset_shortcut.activated.disconnect()
-
-            self.main_window.split_shortcut.activated.connect(self.splitter.splits.next_split_image)
-            self.main_window.undo_split_button.clicked.connect(self.splitter.splits.previous_split_image)
-            self.main_window.undo_split_shortcut.activated.connect(self.splitter.splits.previous_split_image)
-            self.main_window.skip_split_button.clicked.connect(self.splitter.splits.next_split_image)
-            self.main_window.skip_split_shortcut.activated.connect(self.splitter.splits.next_split_image)
-            self.main_window.previous_split_button.clicked.connect(self.splitter.splits.previous_split_image)
-            self.main_window.next_split_button.clicked.connect(self.splitter.splits.next_split_image)
-            self.main_window.reset_splits_button.clicked.connect(self.splitter.splits.reset_split_images)
-            self.main_window.reset_shortcut.activated.connect(self.splitter.splits.reset_split_images)
-
         self.update_ui_timer.start()
 
     # Called when settings window save button pressed
@@ -181,8 +160,8 @@ class UIController:
         self.settings_window.setFocus(True)  # Take focus off widgets
 
         fps = self.settings_window.fps_spinbox.value()
-        if fps != settings.value("FPS"):
-            settings.setValue("FPS", fps)
+        if fps != settings.get_int("FPS"):
+            settings.set_value("FPS", fps)
             self.splitter.interval = 1 / fps  # Update the value for the current Splitter instance
 
         open_screenshots_value = self.settings_window.open_screenshots_checkbox.checkState()
@@ -190,46 +169,46 @@ class UIController:
             open_screenshots = False
         else:
             open_screenshots = True
-        if open_screenshots != settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
-            settings.setValue("OPEN_SCREENSHOT_ON_CAPTURE", open_screenshots)
+        if open_screenshots != settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
+            settings.set_value("OPEN_SCREENSHOT_ON_CAPTURE", open_screenshots)
 
         default_threshold = float(self.settings_window.default_threshold_double_spinbox.value()) / 100
-        if default_threshold != settings.value("DEFAULT_THRESHOLD"):
-            settings.setValue("DEFAULT_THRESHOLD", default_threshold)
+        if default_threshold != settings.get_float("DEFAULT_THRESHOLD"):
+            settings.set_value("DEFAULT_THRESHOLD", default_threshold)
             self.splitter.splits.set_default_threshold()
 
         match_percent_decimals = self.settings_window.match_percent_decimals_spinbox.value()
-        if match_percent_decimals != settings.value("MATCH_PERCENT_DECIMALS"):
-            settings.setValue("MATCH_PERCENT_DECIMALS", match_percent_decimals)
+        if match_percent_decimals != settings.get_int("MATCH_PERCENT_DECIMALS"):
+            settings.set_value("MATCH_PERCENT_DECIMALS", match_percent_decimals)
 
         default_delay = self.settings_window.default_delay_double_spinbox.value()
-        if default_delay != settings.value("DEFAULT_DELAY"):
-            settings.setValue("DEFAULT_DELAY", default_delay)
+        if default_delay != settings.get_float("DEFAULT_DELAY"):
+            settings.set_value("DEFAULT_DELAY", default_delay)
             self.splitter.splits.set_default_delay()
 
         default_pause = self.settings_window.default_pause_double_spinbox.value()
-        if default_pause != settings.value("DEFAULT_PAUSE"):
-            settings.setValue("DEFAULT_PAUSE", default_pause)
+        if default_pause != settings.get_float("DEFAULT_PAUSE"):
+            settings.set_value("DEFAULT_PAUSE", default_pause)
             self.splitter.splits.set_default_pause()
 
         aspect_ratio = self.settings_window.aspect_ratio_combo_box.currentText()
-        if aspect_ratio != settings.value("ASPECT_RATIO"):
+        if aspect_ratio != settings.get_str("ASPECT_RATIO"):
             if aspect_ratio == "4:3 (480x360)":
-                settings.setValue("ASPECT_RATIO", "4:3 (480x360)")
-                settings.setValue("FRAME_WIDTH", 480)
-                settings.setValue("FRAME_HEIGHT", 360)
+                settings.set_value("ASPECT_RATIO", "4:3 (480x360)")
+                settings.set_value("FRAME_WIDTH", 480)
+                settings.set_value("FRAME_HEIGHT", 360)
             if aspect_ratio == "4:3 (320x240)":
-                settings.setValue("ASPECT_RATIO", "4:3 (320x240)")
-                settings.setValue("FRAME_WIDTH", 320)
-                settings.setValue("FRAME_HEIGHT", 240)
+                settings.set_value("ASPECT_RATIO", "4:3 (320x240)")
+                settings.set_value("FRAME_WIDTH", 320)
+                settings.set_value("FRAME_HEIGHT", 240)
             if aspect_ratio == "16:9 (512x288)":
-                settings.setValue("ASPECT_RATIO", "16:9 (512x288)")
-                settings.setValue("FRAME_WIDTH", 512)
-                settings.setValue("FRAME_HEIGHT", 288)
+                settings.set_value("ASPECT_RATIO", "16:9 (512x288)")
+                settings.set_value("FRAME_WIDTH", 512)
+                settings.set_value("FRAME_HEIGHT", 288)
             if aspect_ratio == "16:9 (432x243)":
-                settings.setValue("ASPECT_RATIO", "16:9 (432x243)")
-                settings.setValue("FRAME_WIDTH", 432)
-                settings.setValue("FRAME_HEIGHT", 243)
+                settings.set_value("ASPECT_RATIO", "16:9 (432x243)")
+                settings.set_value("FRAME_WIDTH", 432)
+                settings.set_value("FRAME_HEIGHT", 243)
             self.main_window.set_layout(splitter_paused=self.splitter.suspended)
             self.splitter.splits.resize_images()
 
@@ -238,64 +217,64 @@ class UIController:
             start_with_video = False
         else:
             start_with_video = True
-        if start_with_video != settings.value("START_WITH_VIDEO"):
-            settings.setValue("START_WITH_VIDEO", start_with_video)
+        if start_with_video != settings.get_bool("START_WITH_VIDEO"):
+            settings.set_value("START_WITH_VIDEO", start_with_video)
 
         theme = self.settings_window.theme_combo_box.currentText()
-        if theme != settings.value("THEME"):
+        if theme != settings.get_str("THEME"):
             if theme == "dark":
-                settings.setValue("THEME", "dark")
+                settings.set_value("THEME", "dark")
             elif theme == "light":
-                settings.setValue("THEME", "light")
+                settings.set_value("THEME", "light")
             self.main_window.style_sheet.set_style(self.main_window)
 
         hotkey_changed = False
-        hotkey_text, hotkey_key_sequence = self.settings_window.start_split_hotkey_line_edit.text(), self.settings_window.start_split_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("SPLIT_HOTKEY_TEXT"):
-            settings.setValue("SPLIT_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("SPLIT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.start_split_hotkey_line_edit.text(), self.settings_window.start_split_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("SPLIT_HOTKEY_TEXT"):
+            settings.set_value("SPLIT_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("SPLIT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.reset_hotkey_line_edit.text(), self.settings_window.reset_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("RESET_HOTKEY_TEXT"):
-            settings.setValue("RESET_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("RESET_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.reset_hotkey_line_edit.text(), self.settings_window.reset_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("RESET_HOTKEY_TEXT"):
+            settings.set_value("RESET_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("RESET_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.pause_hotkey_line_edit.text(), self.settings_window.pause_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("PAUSE_HOTKEY_TEXT"):
-            settings.setValue("PAUSE_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("PAUSE_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.pause_hotkey_line_edit.text(), self.settings_window.pause_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("PAUSE_HOTKEY_TEXT"):
+            settings.set_value("PAUSE_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("PAUSE_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.undo_split_hotkey_line_edit.text(), self.settings_window.undo_split_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("UNDO_HOTKEY_TEXT"):
-            settings.setValue("UNDO_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("UNDO_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.undo_split_hotkey_line_edit.text(), self.settings_window.undo_split_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("UNDO_HOTKEY_TEXT"):
+            settings.set_value("UNDO_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("UNDO_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.skip_split_hotkey_line_edit.text(), self.settings_window.skip_split_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("SKIP_HOTKEY_TEXT"):
-            settings.setValue("SKIP_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("SKIP_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.skip_split_hotkey_line_edit.text(), self.settings_window.skip_split_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("SKIP_HOTKEY_TEXT"):
+            settings.set_value("SKIP_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("SKIP_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.previous_split_hotkey_line_edit.text(), self.settings_window.previous_split_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("PREVIOUS_HOTKEY_TEXT"):
-            settings.setValue("PREVIOUS_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("PREVIOUS_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.previous_split_hotkey_line_edit.text(), self.settings_window.previous_split_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("PREVIOUS_HOTKEY_TEXT"):
+            settings.set_value("PREVIOUS_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("PREVIOUS_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.next_split_hotkey_line_edit.text(), self.settings_window.next_split_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("NEXT_HOTKEY_TEXT"):
-            settings.setValue("NEXT_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("NEXT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.next_split_hotkey_line_edit.text(), self.settings_window.next_split_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("NEXT_HOTKEY_TEXT"):
+            settings.set_value("NEXT_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("NEXT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
-        hotkey_text, hotkey_key_sequence = self.settings_window.screenshot_hotkey_line_edit.text(), self.settings_window.screenshot_hotkey_line_edit.key_sequence
-        if hotkey_text != settings.value("SCREENSHOT_HOTKEY_TEXT"):
-            settings.setValue("SCREENSHOT_HOTKEY_TEXT", hotkey_text)
-            settings.setValue("SCREENSHOT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
+        hotkey_text, hotkey_key_sequence = self.settings_window.screenshot_hotkey_line_edit.text(), self.settings_window.screenshot_hotkey_line_edit.key_sequence.toString()
+        if hotkey_text != settings.get_str("SCREENSHOT_HOTKEY_TEXT"):
+            settings.set_value("SCREENSHOT_HOTKEY_TEXT", hotkey_text)
+            settings.set_value("SCREENSHOT_HOTKEY_KEY_SEQUENCE", hotkey_key_sequence)
             hotkey_changed = True
 
         if hotkey_changed:
@@ -308,7 +287,7 @@ class UIController:
             self.main_window.screenshot_error_message_box.exec()
             return
 
-        image_dir = settings.value("LAST_IMAGE_DIR")
+        image_dir = settings.get_str("LAST_IMAGE_DIR")
         if image_dir is None or not Path(image_dir).is_dir:
             image_dir = os.path.expanduser("~")
 
@@ -316,7 +295,7 @@ class UIController:
         cv2.imwrite(screenshot_path, frame)
 
         if Path(screenshot_path).is_file():
-            if settings.value("OPEN_SCREENSHOT_ON_CAPTURE"):
+            if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
                 self._open_file(screenshot_path)
             else:
                 self.main_window.screenshot_success_message_box.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
@@ -363,14 +342,14 @@ class UIController:
             current_image_index = self._splitter.splits.current_image_index
 
             # Video feed
-            if not settings.value("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
+            if not settings.get_bool("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
                 if self._splitter.frame_pixmap is None:
                     self._main_window.video_feed_display.setText(self._main_window.video_feed_display_default_text)
                 else:
                     self._main_window.video_feed_display.setPixmap(self._splitter.frame_pixmap)
 
             # Video label
-            if settings.value("SHOW_MIN_VIEW"):
+            if settings.get_bool("SHOW_MIN_VIEW"):
                 if self._splitter.capture_thread.is_alive():
                     self._main_window.video_feed_label.setText(self._main_window.video_feed_label_live_text_min)
                 else:
@@ -389,7 +368,7 @@ class UIController:
                 self._main_window.minimal_view_no_splits_label.setText(self._main_window.split_image_default_text)
                 self._main_window.minimal_view_no_splits_label.raise_()  # Make sure it shows over other split image labels
             else:
-                if not settings.value("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
+                if not settings.get_bool("SHOW_MIN_VIEW"):  # Save some cpu when minimal view on
                     self._main_window.split_image_display.setPixmap(self._splitter.splits.list[current_image_index].pixmap)
                 self._main_window.split_name_label.setText(self._splitter.splits.list[current_image_index].name)
                 self._main_window.minimal_view_no_splits_label.setText("")
@@ -412,7 +391,7 @@ class UIController:
                 self._main_window.split_image_overlay.setVisible(False)
 
             # Match percent labels
-            decimals = settings.value("MATCH_PERCENT_DECIMALS")
+            decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
             # Current match percent
             if self._splitter.current_match_percent is None:
                 self._main_window.current_match_percent.setText(self._null_match_percent_string())
@@ -498,7 +477,7 @@ class UIController:
 
         def _null_match_percent_string(self):
             match_percent_string = "--"
-            decimals = settings.value("MATCH_PERCENT_DECIMALS")
+            decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
             if decimals > 0:
                 match_percent_string += "."
                 while decimals > 0:

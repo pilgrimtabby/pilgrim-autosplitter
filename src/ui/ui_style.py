@@ -1,6 +1,6 @@
 from string import Template
 
-from settings import settings
+import settings
 
 
 class UIStyle: 
@@ -149,7 +149,7 @@ class UIStyle:
         ).substitute(self.style_dict_light)
 
     def set_style(self, window):
-        if settings.value("THEME") == "dark":
+        if settings.get_str("THEME") == "dark":
             window.setStyleSheet(self.style_sheet_dark)
-        elif settings.value("THEME") == "light":
+        elif settings.get_str("THEME") == "light":
             window.setStyleSheet(self.style_sheet_light)

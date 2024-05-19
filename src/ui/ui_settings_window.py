@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
                              QLineEdit, QPushButton, QShortcut, QSpinBox,
                              QWidget)
 
-from settings import settings
+import settings
 
 
 class UISettingsWindow(QDialog):
@@ -293,7 +293,7 @@ class UISettingsWindow(QDialog):
 
         self.screenshot_hotkey_line_edit = KeyLineEdit(self)
         self.screenshot_hotkey_line_edit.setGeometry(QRect(410 + self.LEFT_EDGE_CORRECTION, 252 + self.TOP_EDGE_CORRECTION, 121, 25))
-        self.screenshot_hotkey_line_edit.setText(f'{settings.value("SCREENSHOT_HOTKEY_TEXT")}')
+        self.screenshot_hotkey_line_edit.setText(f'{settings.get_str("SCREENSHOT_HOTKEY_TEXT")}')
         self.screenshot_hotkey_line_edit.setReadOnly(True)
 
         self.screenshot_hotkey_clear_button = QPushButton("clear", self)
@@ -327,18 +327,18 @@ class UISettingsWindow(QDialog):
         # Settings aren't reset automatically when the window is closed, so they are read from utils.settings and placed back manually here
         # Spinboxes
         for spinbox, value in {
-            self.fps_spinbox: settings.value("FPS"),
-            self.default_threshold_double_spinbox: str(float(settings.value("DEFAULT_THRESHOLD") * 100)),
-            self.match_percent_decimals_spinbox: settings.value("MATCH_PERCENT_DECIMALS"),
-            self.default_delay_double_spinbox: settings.value("DEFAULT_DELAY"),
-            self.default_pause_double_spinbox: settings.value("DEFAULT_PAUSE"),
+            self.fps_spinbox: settings.get_int("FPS"),
+            self.default_threshold_double_spinbox: str(float(settings.get_float("DEFAULT_THRESHOLD") * 100)),
+            self.match_percent_decimals_spinbox: settings.get_int("MATCH_PERCENT_DECIMALS"),
+            self.default_delay_double_spinbox: settings.get_float("DEFAULT_DELAY"),
+            self.default_pause_double_spinbox: settings.get_float("DEFAULT_PAUSE"),
         }.items():
             spinbox.setProperty("value", value)
 
         # Checkboxes
         for checkbox, value in {
-            self.open_screenshots_checkbox: settings.value("OPEN_SCREENSHOT_ON_CAPTURE"),
-            self.start_with_video_checkbox: settings.value("START_WITH_VIDEO"),
+            self.open_screenshots_checkbox: settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"),
+            self.start_with_video_checkbox: settings.get_bool("START_WITH_VIDEO"),
         }.items():
             if value:
                 checkbox.setCheckState(Qt.Checked)
@@ -347,31 +347,31 @@ class UISettingsWindow(QDialog):
 
         # Hotkeys
         for hotkey_line_edit, values in {
-            self.start_split_hotkey_line_edit: (settings.value("SPLIT_HOTKEY_TEXT"), settings.value("SPLIT_HOTKEY_KEY_SEQUENCE")),
-            self.reset_hotkey_line_edit: (settings.value("RESET_HOTKEY_TEXT"), settings.value("RESET_HOTKEY_KEY_SEQUENCE")),
-            self.pause_hotkey_line_edit: (settings.value("PAUSE_HOTKEY_TEXT"), settings.value("PAUSE_HOTKEY_KEY_SEQUENCE")),
-            self.undo_split_hotkey_line_edit: (settings.value("UNDO_HOTKEY_TEXT"), settings.value("UNDO_HOTKEY_KEY_SEQUENCE")),
-            self.skip_split_hotkey_line_edit: (settings.value("SKIP_HOTKEY_TEXT"), settings.value("SKIP_HOTKEY_KEY_SEQUENCE")),
-            self.previous_split_hotkey_line_edit: (settings.value("PREVIOUS_HOTKEY_TEXT"), settings.value("PREVIOUS_HOTKEY_KEY_SEQUENCE")),
-            self.next_split_hotkey_line_edit: (settings.value("NEXT_HOTKEY_TEXT"), settings.value("NEXT_HOTKEY_KEY_SEQUENCE")),
-            self.screenshot_hotkey_line_edit: (settings.value("SCREENSHOT_HOTKEY_TEXT"), settings.value("SCREENSHOT_HOTKEY_KEY_SEQUENCE")),
+            self.start_split_hotkey_line_edit: (settings.get_str("SPLIT_HOTKEY_TEXT"), settings.get_qkeysequence("SPLIT_HOTKEY_KEY_SEQUENCE")),
+            self.reset_hotkey_line_edit: (settings.get_str("RESET_HOTKEY_TEXT"), settings.get_qkeysequence("RESET_HOTKEY_KEY_SEQUENCE")),
+            self.pause_hotkey_line_edit: (settings.get_str("PAUSE_HOTKEY_TEXT"), settings.get_qkeysequence("PAUSE_HOTKEY_KEY_SEQUENCE")),
+            self.undo_split_hotkey_line_edit: (settings.get_str("UNDO_HOTKEY_TEXT"), settings.get_qkeysequence("UNDO_HOTKEY_KEY_SEQUENCE")),
+            self.skip_split_hotkey_line_edit: (settings.get_str("SKIP_HOTKEY_TEXT"), settings.get_qkeysequence("SKIP_HOTKEY_KEY_SEQUENCE")),
+            self.previous_split_hotkey_line_edit: (settings.get_str("PREVIOUS_HOTKEY_TEXT"), settings.get_qkeysequence("PREVIOUS_HOTKEY_KEY_SEQUENCE")),
+            self.next_split_hotkey_line_edit: (settings.get_str("NEXT_HOTKEY_TEXT"), settings.get_qkeysequence("NEXT_HOTKEY_KEY_SEQUENCE")),
+            self.screenshot_hotkey_line_edit: (settings.get_str("SCREENSHOT_HOTKEY_TEXT"), settings.get_qkeysequence("SCREENSHOT_HOTKEY_KEY_SEQUENCE")),
         }.items():
             hotkey_line_edit.setText(values[0])
             hotkey_line_edit.key_sequence = values[1]
 
         # Comboboxes
-        if settings.value("ASPECT_RATIO") == "4:3 (480x360)":
+        if settings.get_str("ASPECT_RATIO") == "4:3 (480x360)":
             self.aspect_ratio_combo_box.setCurrentIndex(0)
-        elif settings.value("ASPECT_RATIO") == "4:3 (320x240)":
+        elif settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
             self.aspect_ratio_combo_box.setCurrentIndex(1)
-        elif settings.value("ASPECT_RATIO") == "16:9 (512x288)":
+        elif settings.get_str("ASPECT_RATIO") == "16:9 (512x288)":
             self.aspect_ratio_combo_box.setCurrentIndex(2)
-        elif settings.value("ASPECT_RATIO") == "16:9 (432x243)":
+        elif settings.get_str("ASPECT_RATIO") == "16:9 (432x243)":
             self.aspect_ratio_combo_box.setCurrentIndex(3)
 
-        if settings.value("THEME") == "dark":
+        if settings.get_str("THEME") == "dark":
             self.theme_combo_box.setCurrentIndex(0)
-        elif settings.value("THEME") == "light":
+        elif settings.get_str("THEME") == "light":
             self.theme_combo_box.setCurrentIndex(1)
 
     # Allow user to take focus off a widget by clicking empty space

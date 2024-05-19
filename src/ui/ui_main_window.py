@@ -4,7 +4,7 @@ from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
                              QPushButton, QShortcut, QWidget, QMessageBox)
 from PyQt5.QtGui import QPixmap
-from settings import settings
+import settings
 
 
 class UIMainWindow(QMainWindow):
@@ -23,7 +23,7 @@ class UIMainWindow(QMainWindow):
         # Main widget and title
         self.container = QWidget(self)
         self.setCentralWidget(self.container)
-        self.setWindowTitle(f"Pilgrim Autosplitter v{settings.value('VERSION_NUMBER')}")
+        self.setWindowTitle(f"Pilgrim Autosplitter v{settings.get_str('VERSION_NUMBER')}")
 
         # Menu bar
         self.menu_bar = QMenuBar(self.container)
@@ -55,7 +55,7 @@ class UIMainWindow(QMainWindow):
         self.split_directory_button.setFocusPolicy(Qt.NoFocus)
 
         self.split_directory_line_edit = QLineEdit(self.container)
-        self.split_directory_line_edit.setText(settings.value("LAST_IMAGE_DIR"))
+        self.split_directory_line_edit.setText(settings.get_str("LAST_IMAGE_DIR"))
         self.split_directory_line_edit.setEnabled(False)
 
         # Video feed
@@ -286,13 +286,13 @@ class UIMainWindow(QMainWindow):
 
     # Called from ui_controller.set_image_directory_path
     def set_split_directory_line_edit_text(self):
-        path = settings.value("LAST_IMAGE_DIR")
+        path = settings.get_str("LAST_IMAGE_DIR")
         elided_path = self.split_directory_line_edit.fontMetrics().elidedText(path, Qt.ElideMiddle, self.split_directory_line_edit.width())
         self.split_directory_line_edit.setText(elided_path)
 
     # called from ui_controller (pause / unpause button pressed)
     def toggle_pause_comparison_button_text(self, splitter_suspended: bool) -> None:
-        if settings.value("SHOW_MIN_VIEW") or settings.value("ASPECT_RATIO") == "4:3 (320x240)":
+        if settings.get_bool("SHOW_MIN_VIEW") or settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
             if splitter_suspended:
                 self.pause_comparison_button.setText(self.pause_comparison_button_unpause_text_truncated)
             else:
@@ -307,13 +307,13 @@ class UIMainWindow(QMainWindow):
     # Called in self.__init__ and when save button is pressed in settings window
     def set_ui_shortcut_keybindings(self):
         for shortcut, key_sequence in {
-            self.split_shortcut: settings.value("SPLIT_HOTKEY_KEY_SEQUENCE"),
-            self.reset_shortcut: settings.value("RESET_HOTKEY_KEY_SEQUENCE"),
-            self.undo_split_shortcut: settings.value("UNDO_HOTKEY_KEY_SEQUENCE"),
-            self.skip_split_shortcut: settings.value("SKIP_HOTKEY_KEY_SEQUENCE"),
-            self.previous_split_shortcut: settings.value("PREVIOUS_HOTKEY_KEY_SEQUENCE"),
-            self.next_split_shortcut: settings.value("NEXT_HOTKEY_KEY_SEQUENCE"),
-            self.screenshot_shortcut: settings.value("SCREENSHOT_HOTKEY_KEY_SEQUENCE"),
+            self.split_shortcut: settings.get_qkeysequence("SPLIT_HOTKEY_KEY_SEQUENCE"),
+            self.reset_shortcut: settings.get_qkeysequence("RESET_HOTKEY_KEY_SEQUENCE"),
+            self.undo_split_shortcut: settings.get_qkeysequence("UNDO_HOTKEY_KEY_SEQUENCE"),
+            self.skip_split_shortcut: settings.get_qkeysequence("SKIP_HOTKEY_KEY_SEQUENCE"),
+            self.previous_split_shortcut: settings.get_qkeysequence("PREVIOUS_HOTKEY_KEY_SEQUENCE"),
+            self.next_split_shortcut: settings.get_qkeysequence("NEXT_HOTKEY_KEY_SEQUENCE"),
+            self.screenshot_shortcut: settings.get_qkeysequence("SCREENSHOT_HOTKEY_KEY_SEQUENCE"),
         }.items():
             if key_sequence is None:
                 shortcut = QShortcut(self)
@@ -327,11 +327,11 @@ class UIMainWindow(QMainWindow):
 
     # Called by self.set_layout; by ui_controller when minimal view button is pressed or when aspect ratio is changed in settings
     def get_layout(self):
-        if settings.value("SHOW_MIN_VIEW"):
+        if settings.get_bool("SHOW_MIN_VIEW"):
             return self._show_minimal_view
 
         else:
-            aspect_ratio = settings.value("ASPECT_RATIO")
+            aspect_ratio = settings.get_str("ASPECT_RATIO")
             if aspect_ratio == "4:3 (480x360)":
                 return self._show_480x360_view
 
@@ -512,7 +512,7 @@ class UIMainWindow(QMainWindow):
 
     # Called by the self.show_x_view function suite
     def _set_button_and_label_text(self, truncate: bool, splitter_paused: bool):
-        if settings.value("SHOW_MIN_VIEW"):
+        if settings.get_bool("SHOW_MIN_VIEW"):
             self.minimal_view_button.setText("Full view")
         else:
             self.minimal_view_button.setText("Minimal view")

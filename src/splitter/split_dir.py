@@ -6,12 +6,12 @@ import cv2
 import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
-from settings import settings
+import settings
 
 
 class SplitDir:
     def __init__(self):
-        self.dir_path = settings.value("LAST_IMAGE_DIR")
+        self.dir_path = settings.get_str("LAST_IMAGE_DIR")
         self.list = self.get_split_images()
         if len(self.list) > 0:
             self.current_image_index = 0
@@ -81,17 +81,17 @@ class SplitDir:
     def set_default_threshold(self):
         for image in self.list:
             if image.threshold_is_default:
-                image.threshold = settings.value("DEFAULT_THRESHOLD")
+                image.threshold = settings.get_float("DEFAULT_THRESHOLD")
 
     def set_default_delay(self):
         for image in self.list:
             if image.delay_is_default:
-                image.delay_duration = settings.value("DEFAULT_DELAY")
+                image.delay_duration = settings.get_float("DEFAULT_DELAY")
 
     def set_default_pause(self):
         for image in self.list:
             if image.pause_is_default:
-                image.pause_duration = settings.value("DEFAULT_PAUSE")
+                image.pause_duration = settings.get_float("DEFAULT_PAUSE")
 
     def resize_images(self):
         for image in self.list:
@@ -114,7 +114,7 @@ class SplitDir:
 
         def get_and_resize_image(self) -> numpy.ndarray:
             image = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
-            image = cv2.resize(image, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+            image = cv2.resize(image, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
             # Add alpha to images if not already present (ie if image has only 3 channels, not 4)
             if image.shape[2] == 3:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
@@ -151,23 +151,23 @@ class SplitDir:
         def get_delay_from_name(self):
             delay = re.search(r"_\#(.+?)\#", self.name)
             if delay is None:
-                return settings.value("DEFAULT_DELAY"), True
+                return settings.get_float("DEFAULT_DELAY"), True
             return float(delay[1]), False
 
         def get_pause_from_name(self):
             pause = re.search(r"_\[(.+?)\]", self.name)
             if pause is None:
-                return settings.value("DEFAULT_PAUSE"), True
+                return settings.get_float("DEFAULT_PAUSE"), True
             return float(pause[1]), False
 
         def get_threshold_from_name(self):
             threshold = re.search(r"_\((.+?)\)", self.name)
             if threshold is None:
-                return settings.value("DEFAULT_THRESHOLD"), True
+                return settings.get_float("DEFAULT_THRESHOLD"), True
             return float(threshold[1]), False
 
         def get_loops_from_name(self):
             loops = re.search(r"_\@(.+?)\@", self.name)
             if loops is None:
-                return settings.value("DEFAULT_LOOP_COUNT"), True
+                return settings.get_int("DEFAULT_LOOP_COUNT"), True
             return int(loops[1]), False

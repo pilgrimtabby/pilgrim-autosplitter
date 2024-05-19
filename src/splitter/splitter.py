@@ -6,13 +6,13 @@ import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
 from splitter.split_dir import SplitDir
-from settings import settings
+import settings
 from hotkey import Hotkey
 
 class Splitter:
     def __init__(self) -> None:
         self.hotkey = Hotkey()
-        self.interval = 1 / settings.value("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
+        self.interval = 1 / settings.get_int("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
         self.delaying = False  # Referenced by ui_controller to set status of various ui elements
         self.delay_remaining = None
         self.suspended = True  # Referenced by ui_controller to set status of various ui elements
@@ -62,7 +62,7 @@ class Splitter:
                 if frame is None:   # Something happened to the video feed, kill the thread
                     self._capture_thread_finished = True
                 else:
-                    self.frame = cv2.resize(frame, (settings.value("FRAME_WIDTH"), settings.value("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
+                    self.frame = cv2.resize(frame, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
                     self.frame_pixmap = self._frame_to_pixmap(self.frame)
 
         self._cap.release()
@@ -140,10 +140,12 @@ class Splitter:
             if self._compare_thread_finished:
                 return
 
-        if self.splits.list[self.splits.current_image_index].pause_flag and settings.value("PAUSE_HOTKEY_KEY_SEQUENCE") is not None:
-            self.hotkey.type("a")
-        elif not self.splits.list[self.splits.current_image_index].dummy_flag and settings.value("SPLIT_HOTKEY_KEY_SEQUENCE") is not None:
-            self.hotkey.type("space")
+        if self.splits.list[self.splits.current_image_index].pause_flag and settings.get_str("PAUSE_HOTKEY_TEXT") != "":
+            self.hotkey.type(settings.get_qkeysequence("PAUSE_HOTKEY_KEY_SEQUENCE"))
+
+        elif not self.splits.list[self.splits.current_image_index].dummy_flag and settings.get_str("SPLIT_HOTKEY_TEXT") != "":
+            self.hotkey.type(settings.get_qkeysequence("SPLIT_HOTKEY_KEY_SEQUENCE"))
+
         else:
             self.splits.current_image_index = self.splits.next_split_image()
 
@@ -180,13 +182,13 @@ class Splitter:
 
     # Called by self.start_capture_thread
     def _get_new_capture_source(self):
-        cap = cv2.VideoCapture(settings.value("LAST_CAPTURE_SOURCE_INDEX"))
+        cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         return cap
 
     # Called by ui controller when next source button pressed
     def next_capture_source(self):
-        source = settings.value("LAST_CAPTURE_SOURCE_INDEX") + 1
+        source = settings.get_int("LAST_CAPTURE_SOURCE_INDEX") + 1
         found_valid_source = False
         tries = 0
         while tries < 3:
@@ -199,7 +201,7 @@ class Splitter:
                 tries += 1
         if not found_valid_source:
             source = 0  # Give up, go back to first possible index
-        settings.setValue("LAST_CAPTURE_SOURCE_INDEX", source)
+        settings.set_value("LAST_CAPTURE_SOURCE_INDEX", source)
 
     # Called by ui_controller when pause / unpause button clicked
     def toggle_suspended(self):

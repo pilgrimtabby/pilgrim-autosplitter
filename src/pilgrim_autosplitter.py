@@ -16,7 +16,7 @@ import faulthandler
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import QApplication
 
-from settings import settings
+import settings
 from splitter.splitter import Splitter
 from ui.ui_controller import UIController
 
@@ -29,11 +29,15 @@ class PilgrimAutosplitter:
         self.pilgrim_universal_autosplitter = QApplication([])
         self.pilgrim_universal_autosplitter.setStyle("fusion")
 
-        if platform.system == "Darwin":
+        if platform.system() == "Windows":
+            self.pilgrim_universal_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
+        else:
             self.pilgrim_universal_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
 
+        settings.load_defaults()
+
         self.splitter = Splitter()
-        if settings.value("START_WITH_VIDEO"):
+        if settings.get_bool("START_WITH_VIDEO"):
             self.splitter.start()
 
         self.ui_controller = UIController(self.splitter)
