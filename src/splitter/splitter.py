@@ -7,11 +7,126 @@ from PyQt5.QtGui import QImage, QPixmap
 
 from splitter.split_dir import SplitDir
 import settings
-from hotkey import Hotkey
+from pynput import keyboard
 
 class Splitter:
+    text_to_key_dict = {
+        "space": keyboard.Key.space,
+        "!": "!",
+        "\"": "\"",
+        "#": "#",
+        "$": "$", 
+        "%": "%",
+        "&": "&",
+        "'": "'",
+        "(": "(",
+        ")": ")",
+        "*": "*",
+        "+": "+",
+        ",": ",",
+        "-": "-",
+        ".": ".",
+        "/": "/",
+        "0": "0",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "4": "4",
+        "5": "5",
+        "6": "6",
+        "7": "7",
+        "8": "8",
+        "9": "9",
+        ":": ":",
+        ";": ";",
+        "<": "<",
+        "=": "=",
+        ">": ">",
+        "?": "?",
+        "@": "@",
+        "a": "a",
+        "b": "b",
+        "c": "c",
+        "d": "d",
+        "e": "e",
+        "f": "f",
+        "g": "g",
+        "h": "h",
+        "i": "i",
+        "j": "j",
+        "k": "k",
+        "l": "l",
+        "m": "m",
+        "n": "n",
+        "o": "o",
+        "p": "p",
+        "q": "q",
+        "r": "r",
+        "s": "s",
+        "t": "t",
+        "u": "u",
+        "v": "v",
+        "w": "w",
+        "x": "x",
+        "y": "y",
+        "Z": "z",
+        "z": "z",
+        "[": "[",
+        "\\": "\\",
+        "]": "]",
+        "^": "^",
+        "_": "_",
+        "`": "`",
+        "{": "{",
+        "|": "|",
+        "}": "}",
+        "~": "~",
+        "delete": keyboard.Key.delete,
+        "return": keyboard.Key.enter,
+        "esc": keyboard.Key.esc,
+        "tab": keyboard.Key.tab,
+        "backspace": keyboard.Key.backspace,
+        "return": keyboard.Key.enter,
+        "enter": keyboard.Key.enter,
+        "delete": keyboard.Key.delete,
+        "home": keyboard.Key.home,
+        "end": keyboard.Key.end,
+        "left": keyboard.Key.left,
+        "up": keyboard.Key.up,
+        "right": keyboard.Key.right,
+        "down": keyboard.Key.down,
+        "page up": keyboard.Key.page_up,
+        "page down": keyboard.Key.page_down,
+        "shift": keyboard.Key.shift,
+        "ctrl": keyboard.Key.ctrl,
+        "caps lock": keyboard.Key.caps_lock,
+        "option": keyboard.Key.alt,
+        "alt": keyboard.Key.alt,
+        "cmd": keyboard.Key.cmd,
+        "f1": keyboard.Key.f1,
+        "f2": keyboard.Key.f2,
+        "f3": keyboard.Key.f3,
+        "f4": keyboard.Key.f4,
+        "f5": keyboard.Key.f5,
+        "f6": keyboard.Key.f6,
+        "f7": keyboard.Key.f7,
+        "f8": keyboard.Key.f8,
+        "f9": keyboard.Key.f9,
+        "f10": keyboard.Key.f10,
+        "f11": keyboard.Key.f11,
+        "f12": keyboard.Key.f12,
+        "f13": keyboard.Key.f13,
+        "f14": keyboard.Key.f14,
+        "f15": keyboard.Key.f15,
+        "f16": keyboard.Key.f16,
+        "f17": keyboard.Key.f17,
+        "f18": keyboard.Key.f18,
+        "f19": keyboard.Key.f19,
+        "f20": keyboard.Key.f20,
+    }
+
     def __init__(self) -> None:
-        self.hotkey = Hotkey()
+        self.hotkey = keyboard.Controller()
         self.interval = 1 / settings.get_int("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
         self.delaying = False  # Referenced by ui_controller to set status of various ui elements
         self.delay_remaining = None
@@ -31,6 +146,10 @@ class Splitter:
         self.highest_match_percent = None  # Referenced by ui_controller to set match percent information, and set by ui_controller ever time it calls split_dir.next_split_image or split_dir.previous_split_image
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
+
+        # _split_thread variables
+        self._split_thread = threading.Thread(target=self._press_split_hotkey)
+        self._split_thread_finished = False
 
     # Used by ui.controller in conjunction with safe_exit_all_threads
     def start(self):
@@ -52,6 +171,26 @@ class Splitter:
         self._compare_thread.start()
         self.suspended = False
 
+    def _start_split_hotkey_thread(self, current_index: int, current_loop: int, split_loops: int):
+        self._split_thread = threading.Thread(target=self._press_split_hotkey, args=(current_index, current_loop, split_loops,))
+        self._split_thread_finished = False
+        self._split_thread.daemon = True
+        self._split_thread.start()
+
+    def _press_split_hotkey(self, current_index: int, current_loop: int, split_loops: int):
+        start_time = time.perf_counter()
+        hotkey = settings.get_str("SPLIT_HOTKEY_TEXT")
+        self._press_hotkey(hotkey)
+
+        if current_loop == split_loops:  # wait for index to be 2 forward or for loop == 1
+            while time.perf_counter() - start_time < 1:
+                if self.splits.current_image_index == current_index + 2 or (self.splits.current_loop == 1 and self.splits.current_image_index == current_index + 1):
+                    self.splits.previous_split_image()
+        else:  # wait for loop to be 2 forward or for index to be different
+            while time.perf_counter() - start_time < 1:
+                if self.splits.current_loop == current_loop + 2 or self.splits.current_image_index != current_index:
+                    self.splits.previous_split_image()
+        
     def _capture(self):
         start_time = time.perf_counter()
         while not self._capture_thread_finished:
@@ -141,13 +280,11 @@ class Splitter:
                 return
 
         if self.splits.list[self.splits.current_image_index].pause_flag and settings.get_str("PAUSE_HOTKEY_TEXT") != "":
-            self.hotkey.type(settings.get_qkeysequence("PAUSE_HOTKEY_KEY_SEQUENCE"))
-
+            hotkey = settings.get_str("PAUSE_HOTKEY_TEXT")
+            self._press_hotkey(hotkey)
         elif not self.splits.list[self.splits.current_image_index].dummy_flag and settings.get_str("SPLIT_HOTKEY_TEXT") != "":
-            self.hotkey.type(settings.get_qkeysequence("SPLIT_HOTKEY_KEY_SEQUENCE"))
-
-        else:
-            self.splits.current_image_index = self.splits.next_split_image()
+            self._start_split_hotkey_thread(self.splits.current_image_index, self.splits.current_loop, self.splits.list[self.splits.current_image_index].loops)
+        self.splits.current_image_index = self.splits.next_split_image()
 
         suspend_duration = self.splits.list[self.splits.current_image_index].pause_duration
         if suspend_duration > 0:
@@ -172,13 +309,20 @@ class Splitter:
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
+        if self._split_thread.is_alive():
+            self._split_thread_finished = True
+            self._split_thread.join()
 
     # Called by this._capture when its thread dies, and by toggle_suspended (pause / unpause button pressed in ui)
+    # Also exits _split_thread, since they only operate together
     def _safe_exit_compare_thread(self):
         if self._compare_thread.is_alive():
             self._compare_thread_finished = True
             self._compare_thread.join()
             self.suspended = True
+        if self._split_thread.is_alive():
+            self._split_thread_finished = True
+            self._split_thread.join()
 
     # Called by self.start_capture_thread
     def _get_new_capture_source(self):
@@ -216,3 +360,8 @@ class Splitter:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # No alpha
         frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
         return QPixmap.fromImage(frame_img)
+
+    def _press_hotkey(self, key_text: str):        
+        key = self.text_to_key_dict[key_text]
+        self.hotkey.press(key)
+        self.hotkey.release(key)

@@ -137,7 +137,7 @@ class UISettingsWindow(QDialog):
         self.default_pause_double_spinbox = QDoubleSpinBox(self)
         self.default_pause_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 162 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.default_pause_double_spinbox.setDecimals(0)
-        self.default_pause_double_spinbox.setMinimum(0)
+        self.default_pause_double_spinbox.setMinimum(1)
         self.default_pause_double_spinbox.setMaximum(10000000)
         self.default_pause_double_spinbox.setSingleStep(1.0)
 
@@ -194,7 +194,7 @@ class UISettingsWindow(QDialog):
         self.start_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 45 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.start_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.start_split_hotkey_clear_button.clicked.connect(lambda: self.start_split_hotkey_line_edit.setText(""))
-        self.start_split_hotkey_clear_button.clicked.connect(lambda: self.start_split_hotkey_line_edit.set_key_sequence(None))
+        self.start_split_hotkey_clear_button.clicked.connect(lambda: self.start_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Reset splits hotkey
         self.reset_hotkey_label = QLabel("Reset splits", self)
@@ -209,7 +209,7 @@ class UISettingsWindow(QDialog):
         self.reset_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 75 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.reset_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.reset_hotkey_clear_button.clicked.connect(lambda: self.reset_hotkey_line_edit.setText(""))
-        self.reset_hotkey_clear_button.clicked.connect(lambda: self.reset_hotkey_line_edit.set_key_sequence(None))
+        self.reset_hotkey_clear_button.clicked.connect(lambda: self.reset_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Pause hotkey
         self.pause_hotkey_label = QLabel("Pause timer", self)
@@ -224,7 +224,7 @@ class UISettingsWindow(QDialog):
         self.pause_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 105 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.pause_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.pause_hotkey_clear_button.clicked.connect(lambda: self.pause_hotkey_line_edit.setText(""))
-        self.pause_hotkey_clear_button.clicked.connect(lambda: self.pause_hotkey_line_edit.set_key_sequence(None))
+        self.pause_hotkey_clear_button.clicked.connect(lambda: self.pause_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Undo split hotkey
         self.undo_split_hotkey_label = QLabel("Undo split", self)
@@ -239,7 +239,7 @@ class UISettingsWindow(QDialog):
         self.undo_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 135 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.undo_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.undo_split_hotkey_clear_button.clicked.connect(lambda: self.undo_split_hotkey_line_edit.setText(""))
-        self.undo_split_hotkey_clear_button.clicked.connect(lambda: self.undo_split_hotkey_line_edit.set_key_sequence(None))
+        self.undo_split_hotkey_clear_button.clicked.connect(lambda: self.undo_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Skip split hotkey
         self.skip_split_hotkey_label = QLabel("Skip split", self)
@@ -254,7 +254,7 @@ class UISettingsWindow(QDialog):
         self.skip_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 165 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.skip_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.skip_split_hotkey_clear_button.clicked.connect(lambda: self.skip_split_hotkey_line_edit.setText(""))
-        self.skip_split_hotkey_clear_button.clicked.connect(lambda: self.skip_split_hotkey_line_edit.set_key_sequence(None))
+        self.skip_split_hotkey_clear_button.clicked.connect(lambda: self.skip_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Previous split hotkey
         self.previous_split_hotkey_label = QLabel("Previous split", self)
@@ -269,7 +269,7 @@ class UISettingsWindow(QDialog):
         self.previous_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 195 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.previous_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.previous_split_hotkey_clear_button.clicked.connect(lambda: self.previous_split_hotkey_line_edit.setText(""))
-        self.previous_split_hotkey_clear_button.clicked.connect(lambda: self.previous_split_hotkey_line_edit.set_key_sequence(None))
+        self.previous_split_hotkey_clear_button.clicked.connect(lambda: self.previous_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Next split hotkey
         self.next_split_hotkey_label = QLabel("Next split", self)
@@ -284,7 +284,7 @@ class UISettingsWindow(QDialog):
         self.next_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.next_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.next_split_hotkey_clear_button.clicked.connect(lambda: self.next_split_hotkey_line_edit.setText(""))
-        self.next_split_hotkey_clear_button.clicked.connect(lambda: self.next_split_hotkey_line_edit.set_key_sequence(None))
+        self.next_split_hotkey_clear_button.clicked.connect(lambda: self.next_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Screenshot hotkey
         self.screenshot_hotkey_label = QLabel("Screenshot", self)
@@ -300,7 +300,7 @@ class UISettingsWindow(QDialog):
         self.screenshot_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.screenshot_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.setText(""))
-        self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.set_key_sequence(None))
+        self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Cancel button
         self.cancel_button = QPushButton("Cancel", self)
@@ -383,7 +383,7 @@ class UISettingsWindow(QDialog):
 
 
 class KeyLineEdit(QLineEdit):
-    keys_macos = {
+    keys = {
         32: "space",
         33: "!",
         34: "\"",
@@ -433,7 +433,6 @@ class KeyLineEdit(QLineEdit):
         78: "n",
         79: "o",
         80: "p",
-        81: "Q",
         81: "q",
         82: "r",
         83: "s",
@@ -472,9 +471,7 @@ class KeyLineEdit(QLineEdit):
         16777238: "page up",
         16777239: "page down",
         16777248: "shift",
-        16777249: "cmd",
         16777250: "ctrl",
-        16777251: "option",
         16777252: "caps lock",
         16777264: "f1",
         16777265: "f2",
@@ -498,6 +495,16 @@ class KeyLineEdit(QLineEdit):
         16777283: "f20",
     }
 
+    keys_windows = keys | {
+        16777249: "ctrl",
+        16777251: "alt",
+    }
+
+    keys_macos = keys | {
+        16777249: "cmd",
+        16777251: "option",
+    }
+
     def __init__(self, parent=None):
         QLineEdit.__init__(self, parent)
         self.key_sequence = QKeySequence()
@@ -506,7 +513,7 @@ class KeyLineEdit(QLineEdit):
         if (event.type() == QEvent.KeyPress):
             decoded_key = self.decode_key(event.key())
             if decoded_key == "":
-                self.key_sequence = None
+                self.key_sequence = QKeySequence()
                 self.setText("")
             else:
                 self.key_sequence = QKeySequence(event.key())
@@ -519,13 +526,9 @@ class KeyLineEdit(QLineEdit):
 
     def decode_key(self, key):
         try:
-            return self.keys_macos[key]
+            if platform.system() == "Windows":
+                return self.keys_windows[key]
+            else:
+                return self.keys_macos[key]
         except KeyError:
             return ""
-
-
-def event(self, event):
-    if (event.type() == QEvent.KeyPress):
-        print(f'{event.key()}: "{event.text()}",')
-        return False
-    return QWidget.event(self, event)
