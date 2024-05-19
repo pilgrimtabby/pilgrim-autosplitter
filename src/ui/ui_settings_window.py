@@ -495,6 +495,7 @@ class KeyLineEdit(QLineEdit):
         16777280: "f17",
         16777281: "f18",
         16777282: "f19",
+        16777283: "f20",
     }
 
     def __init__(self, parent=None):
@@ -521,3 +522,10 @@ class KeyLineEdit(QLineEdit):
             return self.keys_macos[key]
         except KeyError:
             return ""
+
+
+def event(self, event):
+    if (event.type() == QEvent.KeyPress):
+        print(f'{event.key()}: "{event.text()}",')
+        return False
+    return QWidget.event(self, event)
