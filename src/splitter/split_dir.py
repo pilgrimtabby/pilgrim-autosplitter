@@ -1,6 +1,7 @@
 import glob
 import pathlib
 import re
+import time
 
 import cv2
 import numpy
@@ -74,6 +75,10 @@ class SplitDir:
     def reset_split_images(self):
         if len(self.list) == 0:
             raise Exception("Error: no split image list initialized")
+        
+        new_list = self.get_split_images()
+        if len(new_list) != 0:  # Keep the old list if the directory is missing now
+            self.list = new_list
 
         self.current_image_index = 0
         self.current_loop = 0
