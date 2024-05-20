@@ -20,7 +20,6 @@ class UIController:
         self.splitter = splitter
         self.main_window = UIMainWindow()
         self.settings_window = UISettingsWindow()
-
         self._poller = self._Poller(self.splitter, self.main_window)
 
         #######################
@@ -122,6 +121,10 @@ class UIController:
 
     # Called when next or skip button / hotkey pressed, and when split hotkey pressed
     def request_next_split(self):
+        if self.splitter.pressing_hotkey:
+            self.splitter.pressing_hotkey = False
+            return
+
         if self.splitter.suspended:
             self.splitter.splits.next_split_image()
         else:

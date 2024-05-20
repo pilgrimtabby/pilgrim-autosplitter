@@ -1,4 +1,5 @@
 import platform
+import sys
 
 if platform.system() == "Darwin":
     import os
@@ -26,13 +27,10 @@ print("Setting everything up...")
 
 class PilgrimAutosplitter:
     def __init__(self) -> None:
-        self.pilgrim_universal_autosplitter = QApplication([])
+        self.pilgrim_universal_autosplitter = QApplication(sys.argv)
         self.pilgrim_universal_autosplitter.setStyle("fusion")
-
-        if platform.system() == "Windows":
-            self.pilgrim_universal_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
-        else:
-            self.pilgrim_universal_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
+        self.pilgrim_universal_autosplitter.setApplicationName("Pilgrim Autosplitter")
+        self.pilgrim_universal_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
 
         settings.load_defaults()
 
