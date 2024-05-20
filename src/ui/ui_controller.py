@@ -11,16 +11,15 @@ from splitter.split_dir import SplitDir
 from splitter.splitter import Splitter
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
-from ui.ui_style import UIStyle
+import ui.ui_style_sheet as style_sheet
 import settings
 
 
 class UIController:
     def __init__(self, splitter) -> None:
         self.splitter = splitter
-        self.style = UIStyle()
-        self.main_window = UIMainWindow(self.style)
-        self.settings_window = UISettingsWindow(self.style)
+        self.main_window = UIMainWindow()
+        self.settings_window = UISettingsWindow()
 
         self._poller = self._Poller(self.splitter, self.main_window)
 
@@ -226,7 +225,8 @@ class UIController:
                 settings.set_value("THEME", "dark")
             elif theme == "light":
                 settings.set_value("THEME", "light")
-            self.main_window.style_sheet.set_style(self.main_window)
+            style_sheet.set_style(self.main_window)
+            style_sheet.set_style(self.settings_window)
 
         hotkey_changed = False
         hotkey_text, hotkey_key_sequence = self.settings_window.start_split_hotkey_line_edit.text(), self.settings_window.start_split_hotkey_line_edit.key_sequence.toString()

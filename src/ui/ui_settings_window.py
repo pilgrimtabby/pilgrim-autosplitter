@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
                              QWidget)
 
 import settings
+import ui.ui_style_sheet as style_sheet
 
 
 class UISettingsWindow(QDialog):
@@ -18,7 +19,7 @@ class UISettingsWindow(QDialog):
     LEFT_SIDE_WIDGET_WIDTH = 70
     LEFT_SIDE_WIDGET_HEIGHT = 27
 
-    def __init__(self, style_sheet):
+    def __init__(self):
         #################
         #               #
         # Window Config #
@@ -43,8 +44,7 @@ class UISettingsWindow(QDialog):
             self.close_app_shortcut = QShortcut("ctrl+q", self)
 
         # Style
-        self.style_sheet = style_sheet
-        self.style_sheet.set_style(self)
+        style_sheet.set_style(self)
 
         ###########
         #         #

@@ -3,16 +3,17 @@ import webbrowser
 
 from PyQt5.QtCore import QRect, Qt
 from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QPushButton, QShortcut, QWidget, QMessageBox)
-from PyQt5.QtGui import QPixmap
+                             QMessageBox, QPushButton, QShortcut, QWidget)
+
 import settings
+import ui.ui_style_sheet as style_sheet
 
 
 class UIMainWindow(QMainWindow):
     LEFT_EDGE_CORRECTION = -44
     TOP_EDGE_CORRECTION = -215
 
-    def __init__(self, style_sheet):
+    def __init__(self):
         #################
         #               #
         # Window Config #
@@ -232,8 +233,7 @@ class UIMainWindow(QMainWindow):
         ################################
 
         # Style and layout
-        self.style_sheet = style_sheet
-        self.style_sheet.set_style(self)
+        style_sheet.set_style(self)
 
         if platform.system() == "Windows":
             self.HEIGHT_CORRECTION = 22
