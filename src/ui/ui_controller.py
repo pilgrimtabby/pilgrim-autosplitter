@@ -336,7 +336,6 @@ class UIController:
             self._splitter = splitter
             self._main_window = main_window
             
-
         def update_ui(self):
             self._update_labels()
             self._update_buttons_and_hotkeys()
@@ -449,11 +448,14 @@ class UIController:
                 # Enable screenshots if video is on
                 if self._splitter.capture_thread.is_alive():
                     self._main_window.screenshot_button.setEnabled(True)
+
+                    # I had this uncommented to disable unpausing while delaying, but I don't see any harm in enabling pausing while delaying, since it just cancels the split.
+                    # Leaving it here for now just in case it breaks something
                     # Enable pause / unpause if splitter isn't delaying
-                    if self._splitter.delaying:
-                        self._main_window.pause_comparison_button.setEnabled(False)
-                    else:
-                        self._main_window.pause_comparison_button.setEnabled(True)
+                    # if self._splitter.delaying:
+                    # self._main_window.pause_comparison_button.setEnabled(False)
+                    # else:
+                    self._main_window.pause_comparison_button.setEnabled(True)
                 else:
                     self._main_window.screenshot_button.setEnabled(False)
                     self._main_window.pause_comparison_button.setEnabled(False)

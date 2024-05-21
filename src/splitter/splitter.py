@@ -147,8 +147,9 @@ class Splitter:
 
     def _split(self):
         delay_duration = self.splits.list[self.splits.current_image_index].delay_duration
-        if delay_duration > 0:
+        suspend_duration = self.splits.list[self.splits.current_image_index].pause_duration
 
+        if delay_duration > 0:
             self.delaying = True
             self.delay_remaining = delay_duration
             start_time = time.perf_counter()
@@ -164,15 +165,11 @@ class Splitter:
         if self.splits.list[self.splits.current_image_index].pause_flag and settings.get_str("PAUSE_HOTKEY_TEXT") != "":
             key = settings.get_str("PAUSE_HOTKEY_TEXT")
             hotkey.press_hotkey(key)
-
         elif not self.splits.list[self.splits.current_image_index].dummy_flag and settings.get_str("SPLIT_HOTKEY_TEXT") != "":
             self._start_split_hotkey_thread()
-
         self.splits.current_image_index = self.splits.next_split_image()
 
-        suspend_duration = self.splits.list[self.splits.current_image_index].pause_duration
         if suspend_duration > 0:
-
             self.suspended = True
             self.suspend_remaining = suspend_duration
             start_time = time.perf_counter()

@@ -11,6 +11,9 @@ import settings
 
 
 class SplitDir:
+    MAX_LOOPS_AND_PAUSE = 99999
+    MAX_THRESHOLD = 1
+
     def __init__(self):
         self.dir_path = settings.get_str("LAST_IMAGE_DIR")
         self.list = self.get_split_images()
@@ -155,24 +158,24 @@ class SplitDir:
 
         def get_delay_from_name(self):
             delay = re.search(r"_\#(.+?)\#", self.name)
-            if delay is None:
+            if delay is None or not str(delay[1]).replace(".", "", 1).isdigit():  # Only recognizes non-negative ints and floats, which is what we want
                 return settings.get_float("DEFAULT_DELAY"), True
-            return float(delay[1]), False
+            return min(float(delay[1]), SplitDir.MAX_LOOPS_AND_PAUSE), False
 
         def get_pause_from_name(self):
             pause = re.search(r"_\[(.+?)\]", self.name)
-            if pause is None:
+            if pause is None or not str(pause[1]).replace(".", "", 1).isdigit():
                 return settings.get_float("DEFAULT_PAUSE"), True
-            return float(pause[1]), False
+            return min(float(pause[1]), SplitDir.MAX_LOOPS_AND_PAUSE), False
 
         def get_threshold_from_name(self):
             threshold = re.search(r"_\((.+?)\)", self.name)
-            if threshold is None:
+            if threshold is None or not str(threshold[1]).replace(".", "", 1).isdigit():
                 return settings.get_float("DEFAULT_THRESHOLD"), True
-            return float(threshold[1]), False
+            return min(float(threshold[1]) / 100, SplitDir.MAX_THRESHOLD), False
 
         def get_loops_from_name(self):
             loops = re.search(r"_\@(.+?)\@", self.name)
-            if loops is None:
+            if loops is None or not loops[1].isdigit():  # Only recognizes non-negative integers, which is what we want
                 return settings.get_int("DEFAULT_LOOP_COUNT"), True
-            return int(loops[1]), False
+            return min(int(loops[1]), SplitDir.MAX_LOOPS_AND_PAUSE), False
