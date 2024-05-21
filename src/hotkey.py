@@ -1,10 +1,15 @@
 from pynput import keyboard
 
 
-def press_hotkey(key_text: str):        
-    key = text_to_key_dict[key_text]
-    keyboard_controller.press(key)
-    keyboard_controller.release(key)
+# Return false if key not in dict
+def press_hotkey(key_text: str):
+    try:       
+        key = text_to_key_dict[key_text]
+        keyboard_controller.press(key)
+        keyboard_controller.release(key)
+        return True
+    except KeyError:
+        return False
 
 keyboard_controller = keyboard.Controller()
 text_to_key_dict = {
@@ -24,16 +29,26 @@ text_to_key_dict = {
     "-": "-",
     ".": ".",
     "/": "/",
-    "0": "0",
-    "1": "1",
-    "2": "2",
-    "3": "3",
-    "4": "4",
-    "5": "5",
-    "6": "6",
-    "7": "7",
-    "8": "8",
-    "9": "9",
+    "numpad0": keyboard.KeyCode(82),
+    "numpad1": keyboard.KeyCode(83),
+    "numpad2": keyboard.KeyCode(84),
+    "numpad3": keyboard.KeyCode(85),
+    "numpad4": keyboard.KeyCode(86),
+    "numpad5": keyboard.KeyCode(87),
+    "numpad6": keyboard.KeyCode(88),
+    "numpad7": keyboard.KeyCode(89),
+    "numpad8": keyboard.KeyCode(91),
+    "numpad9": keyboard.KeyCode(92),
+    "0": keyboard.KeyCode(29),
+    "1": keyboard.KeyCode(18),
+    "2": keyboard.KeyCode(19),
+    "3": keyboard.KeyCode(20),
+    "4": keyboard.KeyCode(21),
+    "5": keyboard.KeyCode(23),
+    "6": keyboard.KeyCode(22),
+    "7": keyboard.KeyCode(26),
+    "8": keyboard.KeyCode(28),
+    "9": keyboard.KeyCode(25),
     ":": ":",
     ";": ";",
     "<": "<",

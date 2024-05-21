@@ -195,38 +195,6 @@ class UIMainWindow(QMainWindow):
         self.reset_splits_button.setEnabled(False)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
 
-
-        # # Undo split button clicked
-        # self.main_window.undo_split_button.clicked.connect(self.request_previous_split)
-        # ##### send undo button keystroke
-
-        # # Undo split keyboard shortcut entered
-        # self.main_window.undo_split_shortcut.activated.connect(self.request_previous_split)
-
-        # # Skip split button clicked
-        # self.main_window.skip_split_button.clicked.connect(self.request_next_split)
-        # ##### send skip button keystroke
-
-        # # Skip split keyboard shortcut entered
-        # self.main_window.skip_split_shortcut.activated.connect(self.request_next_split)
-
-        # # Previous split button clicked
-        # self.main_window.previous_split_button.clicked.connect(self.request_previous_split)
-
-        # # Next split button clicked
-        # self.main_window.next_split_button.clicked.connect(self.request_next_split)
-
-        # # Reset button clicked
-        # self.main_window.reset_splits_button.clicked.connect(self.request_reset)
-        # ##### Send reset keyboard shortcut
-
-        # # Reset splits keyboard shortcut entered
-        # self.main_window.reset_shortcut.activated.connect(self.request_reset)
-
-        # # Settings menu bar action triggered
-        # self.main_window.settings_action.triggered.connect(self.settings_window.exec)
-
-
         ################################
         #                              #
         # Style, Layout, and Shortcuts #

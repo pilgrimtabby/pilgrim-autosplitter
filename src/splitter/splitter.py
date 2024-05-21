@@ -6,7 +6,7 @@ import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
 import settings
-from splitter import hotkey
+import hotkey
 from splitter.split_dir import SplitDir
 
 

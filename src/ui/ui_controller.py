@@ -13,6 +13,7 @@ from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
 import ui.ui_style_sheet as style_sheet
 import settings
+import hotkey
 
 
 class UIController:
@@ -55,15 +56,13 @@ class UIController:
         self.main_window.split_shortcut.activated.connect(self.request_next_split)
 
         # Undo split button clicked
-        self.main_window.undo_split_button.clicked.connect(self.request_previous_split)
-        ##### send undo button keystroke
+        self.main_window.undo_split_button.clicked.connect(self.attempt_undo_hotkey)
 
         # Undo split keyboard shortcut entered
         self.main_window.undo_split_shortcut.activated.connect(self.request_previous_split)
 
         # Skip split button clicked
-        self.main_window.skip_split_button.clicked.connect(self.request_next_split)
-        ##### send skip button keystroke
+        self.main_window.skip_split_button.clicked.connect(self.attempt_skip_hotkey)
 
         # Skip split keyboard shortcut entered
         self.main_window.skip_split_shortcut.activated.connect(self.request_next_split)
@@ -75,9 +74,7 @@ class UIController:
         self.main_window.next_split_button.clicked.connect(self.request_next_split)
 
         # Reset button clicked
-        self.main_window.reset_splits_button.clicked.connect(self.request_reset)
-        self.main_window.reset_splits_button.clicked.connect(lambda: setattr(self._poller, "reset_split_image", True))
-        ##### Send reset keyboard shortcut
+        self.main_window.reset_splits_button.clicked.connect(self.attempt_reset_hotkey)
 
         # Reset splits keyboard shortcut entered
         self.main_window.reset_shortcut.activated.connect(self.request_reset)
@@ -111,6 +108,25 @@ class UIController:
         self.update_ui_timer.setInterval(1000 // settings.get_int("FPS")) # This takes about 1/10000 of a second on average
         self.update_ui_timer.timeout.connect(self._poller.update_ui)
         self.update_ui_timer.start()
+
+    # Called when undo button pressed
+    def attempt_undo_hotkey(self):
+        hotkey_set = hotkey.press_hotkey(settings.get_str("UNDO_HOTKEY_TEXT"))
+        if not hotkey_set:
+            self.request_previous_split()
+
+    # Called when skip button pressed
+    def attempt_skip_hotkey(self):
+        hotkey_set = hotkey.press_hotkey(settings.get_str("SKIP_HOTKEY_TEXT"))
+        if not hotkey_set:
+            self.request_next_split()
+
+    # Called when reset button pressed
+    def attempt_reset_hotkey(self):
+        hotkey_set = hotkey.press_hotkey(settings.get_str("RESET_HOTKEY_TEXT"))
+        if not hotkey_set:
+            self.request_reset()
+            self._poller.reset_split_image = True
 
     # Called when undo or previous button / hotkey pressed
     def request_previous_split(self):
