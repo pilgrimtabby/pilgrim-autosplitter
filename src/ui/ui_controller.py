@@ -213,6 +213,8 @@ class UIController:
                 settings.set_value("FRAME_HEIGHT", 243)
             self.main_window.set_layout(splitter_paused=self.splitter.suspended)
             self.splitter.splits.resize_images()
+            # Make sure the resized image shows up in the ui
+            self.main_window.split_image_display.setPixmap(self.splitter.splits.list[self.splitter.splits.current_image_index].pixmap)
 
         start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
         if start_with_video_value == 0:
