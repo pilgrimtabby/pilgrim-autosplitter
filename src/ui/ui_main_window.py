@@ -92,6 +92,7 @@ class UIMainWindow(QMainWindow):
         self.split_image_overlay = QLabel(self.container)
         self.split_image_overlay.setAlignment(Qt.AlignCenter)
         self.split_image_overlay.setObjectName("split_image_overlay")
+        self.split_image_overlay.setVisible(False)
 
         # Match percent (current)
         self.current_match_percent_label = QLabel(self.container)
