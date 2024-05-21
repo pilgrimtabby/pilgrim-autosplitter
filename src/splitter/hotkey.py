@@ -1,5 +1,3 @@
-from os import name
-import re
 from pynput import keyboard
 
 
@@ -123,8 +121,3 @@ text_to_key_dict = {
     "f19": keyboard.Key.f19,
     "f20": keyboard.Key.f20,
 }
-
-
-# name = "001_screenshot_[20]"
-# pause = re.search(r"_\[(.+?)\]", name)
-# print(pause[1])

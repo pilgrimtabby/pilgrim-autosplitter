@@ -6,8 +6,9 @@ import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
 import settings
-from splitter.split_dir import SplitDir
 from splitter import hotkey
+from splitter.split_dir import SplitDir
+
 
 class Splitter:
     def __init__(self) -> None:
@@ -209,6 +210,8 @@ class Splitter:
     def _get_new_capture_source(self):
         cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # This is the lowest supported resolution, apparently
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         return cap
 
     # Called by ui controller when next source button pressed

@@ -1,7 +1,6 @@
 import glob
 import pathlib
 import re
-import time
 
 import cv2
 import numpy
