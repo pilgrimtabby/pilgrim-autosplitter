@@ -52,6 +52,7 @@ class UIMainWindow(QMainWindow):
         self.split_directory_button.setFocusPolicy(Qt.NoFocus)
 
         self.split_directory_line_edit = QLineEdit(self.container)
+        self.split_directory_line_edit.setAlignment(Qt.AlignLeft)
         self.split_directory_line_edit.setText(settings.get_str("LAST_IMAGE_DIR"))
         self.split_directory_line_edit.setEnabled(False)
 
@@ -258,7 +259,7 @@ class UIMainWindow(QMainWindow):
     def set_split_directory_line_edit_text(self):
         path = settings.get_str("LAST_IMAGE_DIR")
         elided_path = self.split_directory_line_edit.fontMetrics().elidedText(path, Qt.ElideMiddle, self.split_directory_line_edit.width())
-        self.split_directory_line_edit.setText(elided_path)
+        self.split_directory_line_edit.setText(elided_path)        
 
     # called from ui_controller (pause / unpause button pressed)
     def toggle_pause_comparison_button_text(self, splitter_suspended: bool) -> None:
@@ -316,10 +317,6 @@ class UIMainWindow(QMainWindow):
 
     # Called by self.set_layout
     def _show_minimal_view(self, splitter_paused: bool):
-        self._set_nonessential_widgets_visible(False)
-        self._set_button_and_label_text(truncate=True, splitter_paused=splitter_paused)
-        self.setFixedSize(345, 179 + self.HEIGHT_CORRECTION)
-
         self.previous_split_button.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, 31, 31))
         self.split_name_label.setGeometry(QRect(92 + self.LEFT_EDGE_CORRECTION, 214 + self.TOP_EDGE_CORRECTION, 251, 31))
         self.split_image_loop_label.setGeometry(QRect(92 + self.LEFT_EDGE_CORRECTION, 239 + self.TOP_EDGE_CORRECTION, 251, 31))
@@ -340,12 +337,12 @@ class UIMainWindow(QMainWindow):
         self.highest_match_percent_sign.setGeometry(QRect(282 + self.LEFT_EDGE_CORRECTION, 331 + self.TOP_EDGE_CORRECTION, 21, 31))
         self.threshold_match_percent_sign.setGeometry(QRect(282 + self.LEFT_EDGE_CORRECTION, 358 + self.TOP_EDGE_CORRECTION, 21, 31))
 
+        self._set_nonessential_widgets_visible(False)
+        self._set_button_and_label_text(truncate=True, splitter_paused=splitter_paused)
+        self.setFixedSize(345, 179 + self.HEIGHT_CORRECTION)
+
     # Called by self.set_layout
     def _show_480x360_view(self, splitter_paused: bool):
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
-        self.setFixedSize(1002, 570 + self.HEIGHT_CORRECTION)
-
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 785, 30))
         self.video_feed_label.setGeometry(QRect(260 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
         self.split_name_label.setGeometry(QRect(584 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 415, 31))
@@ -371,16 +368,17 @@ class UIMainWindow(QMainWindow):
         self.undo_split_button.setGeometry(QRect(580 + self.LEFT_EDGE_CORRECTION, 730 + self.TOP_EDGE_CORRECTION, 91, 41))
         self.reset_splits_button.setGeometry(QRect(810 + self.LEFT_EDGE_CORRECTION, 680 + self.TOP_EDGE_CORRECTION, 191, 91))
         self.video_feed_display.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 480, 360))
+
         split_image_geometry = QRect(550 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 480, 360)
         self.split_image_display.setGeometry(split_image_geometry)
         self.split_image_overlay.setGeometry(split_image_geometry)
 
+        self._set_nonessential_widgets_visible(True)
+        self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
+        self.setFixedSize(1002, 570 + self.HEIGHT_CORRECTION)
+
     # Called by self.set_layout
     def _show_320x240_view(self, splitter_paused: bool):
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=True, splitter_paused=splitter_paused)
-        self.setFixedSize(682, 450 + self.HEIGHT_CORRECTION)
-
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 464, 30))
         self.video_feed_label.setGeometry(QRect(180 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
         self.split_name_label.setGeometry(QRect(424 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 254, 31))
@@ -406,16 +404,17 @@ class UIMainWindow(QMainWindow):
         self.undo_split_button.setGeometry(QRect(420 + self.LEFT_EDGE_CORRECTION, 610 + self.TOP_EDGE_CORRECTION, 56, 41))
         self.reset_splits_button.setGeometry(QRect(560 + self.LEFT_EDGE_CORRECTION, 560 + self.TOP_EDGE_CORRECTION, 121, 91))
         self.video_feed_display.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 320, 240))
+
         split_image_geometry = QRect(390 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 320, 240)
         self.split_image_display.setGeometry(split_image_geometry)
         self.split_image_overlay.setGeometry(split_image_geometry)
 
+        self._set_nonessential_widgets_visible(True)
+        self._set_button_and_label_text(truncate=True, splitter_paused=splitter_paused)
+        self.setFixedSize(682, 450 + self.HEIGHT_CORRECTION)
+
     # Called by self.set_layout
     def _show_512x288_view(self, splitter_paused: bool):
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
-        self.setFixedSize(1064, 497 + self.HEIGHT_CORRECTION)
-
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 848, 30))
         self.video_feed_label.setGeometry(QRect(276 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 80, 31))
         self.split_name_label.setGeometry(QRect(613 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 450, 31))
@@ -441,17 +440,17 @@ class UIMainWindow(QMainWindow):
         self.undo_split_button.setGeometry(QRect(612 + self.LEFT_EDGE_CORRECTION, 658 + self.TOP_EDGE_CORRECTION, 91, 41))
         self.reset_splits_button.setGeometry(QRect(874 + self.LEFT_EDGE_CORRECTION, 608 + self.TOP_EDGE_CORRECTION, 191, 91))
         self.video_feed_display.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 512, 288))
+
         split_image_geometry = QRect(582 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 512, 288)
         self.split_image_display.setGeometry(split_image_geometry)
         self.split_image_overlay.setGeometry(split_image_geometry)
 
-    # Called by self.set_layout
-    def _show_432x243_view(self, splitter_paused):
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
-        self.setFixedSize(904, 452 + self.HEIGHT_CORRECTION)
-        split_image_geometry = QRect(502 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 432, 243)
+        self.setFixedSize(1064, 497 + self.HEIGHT_CORRECTION)
 
+    # Called by self.set_layout
+    def _show_432x243_view(self, splitter_paused):
         self.split_directory_line_edit.setGeometry(QRect(247 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 688, 30))
         self.video_feed_label.setGeometry(QRect(161 + self.LEFT_EDGE_CORRECTION, 272 + self.TOP_EDGE_CORRECTION, 231, 31))
         self.split_name_label.setGeometry(QRect(534 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 371, 31))
@@ -477,11 +476,18 @@ class UIMainWindow(QMainWindow):
         self.undo_split_button.setGeometry(QRect(532 + self.LEFT_EDGE_CORRECTION, 613 + self.TOP_EDGE_CORRECTION, 86, 41))
         self.reset_splits_button.setGeometry(QRect(724 + self.LEFT_EDGE_CORRECTION, 563 + self.TOP_EDGE_CORRECTION, 181, 91))
         self.video_feed_display.setGeometry(QRect(60 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 432, 243))
+
+        split_image_geometry = QRect(502 + self.LEFT_EDGE_CORRECTION, 310 + self.TOP_EDGE_CORRECTION, 432, 243)
         self.split_image_display.setGeometry(split_image_geometry)
         self.split_image_overlay.setGeometry(split_image_geometry)
 
+        self._set_nonessential_widgets_visible(True)
+        self._set_button_and_label_text(truncate=False, splitter_paused=splitter_paused)
+        self.setFixedSize(904, 452 + self.HEIGHT_CORRECTION)
+
     # Called by the self.show_x_view function suite
     def _set_button_and_label_text(self, truncate: bool, splitter_paused: bool):
+        self.set_split_directory_line_edit_text()
         if settings.get_bool("SHOW_MIN_VIEW"):
             self.minimal_view_button.setText("Full view")
         else:

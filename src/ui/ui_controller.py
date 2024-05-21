@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import platform
 import subprocess
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtGui import QPixmap
 import cv2
@@ -35,6 +35,7 @@ class UIController:
         # Minimal view / full view button clicked
         self.main_window.minimal_view_button.clicked.connect(lambda: settings.set_value("SHOW_MIN_VIEW", not settings.get_bool("SHOW_MIN_VIEW")))
         self.main_window.minimal_view_button.clicked.connect(lambda: self.main_window.set_layout(splitter_paused=self.splitter.suspended))
+        self.main_window.minimal_view_button.clicked.connect(lambda: setattr(self._poller, "reset_split_image", True))  # So that split name gets elided if necessary
 
         # Next source button clicked
         self.main_window.next_source_button.clicked.connect(self.splitter.next_capture_source)
@@ -396,14 +397,14 @@ class UIController:
                 elif not self._splitter.capture_thread.is_alive() and self._main_window.video_feed_label.text() != self._main_window.video_feed_label_down_text_min:  # Video feed is down, but says it is live / is blank
                     self._main_window.video_feed_label.setText(self._main_window.video_feed_label_down_text_min)
             else:
-                if self._splitter.capture_thread.is_alive() and self._main_window.video_feed_label.text() == "":  # Video feed is live, but the label is blank
+                if self._splitter.capture_thread.is_alive() and self._main_window.video_feed_label.text() != self._main_window.video_feed_label_live_text:  # Video feed is live, but the label is wrong / blank
                     self._main_window.video_feed_label.setText(self._main_window.video_feed_label_live_text)
                 elif not self._splitter.capture_thread.is_alive() and self._main_window.video_feed_label.text() != "":  # Video feed is down, but label is filled
                     self._main_window.video_feed_label.setText("")
 
             # Split image, name, and loop count
             current_image_index = self._splitter.splits.current_image_index
-            if current_image_index is None and self._main_window.split_name_label.text() != "":  # No split image loaded, but split image still being displayed
+            if current_image_index is None and self._main_window.split_name_label.text() != self._main_window.split_image_default_text:  # No split image loaded, but split image still being displayed
                 self._most_recent_split_index = None
                 self._most_recent_loop = None
 
@@ -421,7 +422,10 @@ class UIController:
     
                 if not min_view_showing:  # Save some cpu when minimal view on
                     self._main_window.split_image_display.setPixmap(self._splitter.splits.list[self._most_recent_split_index].pixmap)
-                self._main_window.split_name_label.setText(self._splitter.splits.list[self._most_recent_split_index].name)
+
+                split_name = self._splitter.splits.list[self._most_recent_split_index].name
+                elided_name = self._main_window.split_name_label.fontMetrics().elidedText(split_name, Qt.ElideRight, self._main_window.split_name_label.width())
+                self._main_window.split_name_label.setText(elided_name)
                 self._main_window.minimal_view_no_splits_label.setText("")
                 self._main_window.minimal_view_no_splits_label.lower()  # Make sure it is hidden under other split image labels
 
