@@ -76,10 +76,12 @@ class UIController:
 
         # Reset button clicked
         self.main_window.reset_splits_button.clicked.connect(self.request_reset)
+        self.main_window.reset_splits_button.clicked.connect(lambda: setattr(self._poller, "reset_split_image", True))
         ##### Send reset keyboard shortcut
 
         # Reset splits keyboard shortcut entered
         self.main_window.reset_shortcut.activated.connect(self.request_reset)
+        self.main_window.reset_shortcut.activated.connect(lambda: setattr(self._poller, "reset_split_image", True))
 
         # Settings menu bar action triggered
         self.main_window.settings_action.triggered.connect(self.settings_window.exec)
@@ -214,7 +216,7 @@ class UIController:
             self.main_window.set_layout(splitter_paused=self.splitter.suspended)
             self.splitter.splits.resize_images()
             # Make sure the resized image shows up in the ui
-            self.main_window.split_image_display.setPixmap(self.splitter.splits.list[self.splitter.splits.current_image_index].pixmap)
+            self._poller.reset_split_image = True
 
         start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
         if start_with_video_value == 0:
@@ -344,6 +346,8 @@ class UIController:
             self._most_recent_match_percent_format_string = f"{{:.{self._most_recent_match_percent_decimals}f}}"
             self._most_recent_match_percent_null_string = self._null_match_percent_string()
 
+            self.reset_split_image = False  # This flag is only used to reset the split image in special circumstances
+
             self._splitter_suspended = None  # This flag is only used and updated by _set_pause_button_text
 
             # These flags are only modified in _update_flags and otherwise referenced only in _update_buttons_and_hotkeys
@@ -393,9 +397,11 @@ class UIController:
                 self._main_window.minimal_view_no_splits_label.setText(self._main_window.split_image_default_text)
                 self._main_window.minimal_view_no_splits_label.raise_()  # Make sure it shows over other split image labels
 
-            elif current_image_index is not None and (current_image_index != self._most_recent_split_index or self._splitter.splits.current_loop != self._most_recent_loop):  # Split image loaded that is either different from most recent one or on a different loop
+            elif current_image_index is not None and (current_image_index != self._most_recent_split_index or self._splitter.splits.current_loop != self._most_recent_loop) or self.reset_split_image:  # Split image loaded that is either different from most recent one or on a different loop
                 self._most_recent_split_index = current_image_index
                 self._most_recent_loop = self._splitter.splits.current_loop
+
+                self.reset_split_image = False
     
                 if not min_view_showing:  # Save some cpu when minimal view on
                     self._main_window.split_image_display.setPixmap(self._splitter.splits.list[self._most_recent_split_index].pixmap)
