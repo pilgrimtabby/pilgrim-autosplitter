@@ -42,7 +42,7 @@ class PilgrimAutosplitter:
         self.ui_controller.main_window.show()
         
         self.pilgrim_universal_autosplitter.exec()
-        
+         
 
 if __name__ == "__main__":
     print("Starting Pilgrim Autosplitter...")

@@ -76,15 +76,15 @@ def load_defaults():
         set_value("ASPECT_RATIO", "4:3 (480x360)")
         set_value("FRAME_WIDTH", 480)
         set_value("FRAME_HEIGHT", 360)
-    if aspect_ratio == "4:3 (320x240)":
+    elif aspect_ratio == "4:3 (320x240)":
         set_value("ASPECT_RATIO", "4:3 (320x240)")
         set_value("FRAME_WIDTH", 320)
         set_value("FRAME_HEIGHT", 240)
-    if aspect_ratio == "16:9 (512x288)":
+    elif aspect_ratio == "16:9 (512x288)":
         set_value("ASPECT_RATIO", "16:9 (512x288)")
         set_value("FRAME_WIDTH", 512)
         set_value("FRAME_HEIGHT", 288)
-    if aspect_ratio == "16:9 (432x243)":
+    elif aspect_ratio == "16:9 (432x243)":
         set_value("ASPECT_RATIO", "16:9 (432x243)")
         set_value("FRAME_WIDTH", 432)
         set_value("FRAME_HEIGHT", 243)
