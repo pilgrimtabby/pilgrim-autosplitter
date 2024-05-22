@@ -2,6 +2,8 @@ import os
 import platform
 import subprocess
 from pathlib import Path
+import threading
+import time
 
 import cv2
 from PyQt5.QtCore import QRect, Qt, QTimer
@@ -26,6 +28,9 @@ class UIController:
 
         self.set_main_window_layout()
         self.set_shortcut_keybindings()
+
+        self.match_percent_helper_thread = threading.Thread(target=self.reset_match_percents)
+        self.match_percent_helper_thread_finished = False
 
         #######################
         #                     #
@@ -132,25 +137,41 @@ class UIController:
 
     # Called when undo or previous button / hotkey pressed
     def request_previous_split(self):
-        if self.splitter.suspended:
+        # Failsafe in case the "previous button" doesn't get disabled in time, like when fast scrolling.
+        if self.splitter.splits.current_image_index > 0:
+            if not self.splitter.suspended:
+                self.start_match_percent_helper_thread()
             self.splitter.splits.previous_split_image()
-        else:
-            self.splitter._safe_exit_compare_thread()
-            self.splitter.splits.previous_split_image()
-            self.splitter._start_compare_thread()
 
     # Called when next or skip button / hotkey pressed, and when split hotkey pressed
     def request_next_split(self):
         if self.splitter.pressing_hotkey:
             self.splitter.pressing_hotkey = False
             return
+        # Failsafe in case the "next button" doesn't get disabled in time, like when fast scrolling.
+        # This prevents the last split from looping to the front if done manually, so it might not be the best solution,
+        # but it is ok for now.
+        if self.splitter.splits.current_image_index < len(self.splitter.splits.list) - 1:
+            if not self.splitter.suspended:
+                self.start_match_percent_helper_thread()
+            self.splitter.splits.next_split_image()
 
-        if self.splitter.suspended:
-            self.splitter.splits.next_split_image()
-        else:
-            self.splitter._safe_exit_compare_thread()
-            self.splitter.splits.next_split_image()
-            self.splitter._start_compare_thread()
+    # Called by the above two methods
+    def start_match_percent_helper_thread(self):
+        self.match_percent_helper_thread = threading.Thread(target=self.reset_match_percents, args=(self.splitter.splits.current_image_index, self.splitter.splits.current_loop,))
+        self.match_percent_helper_thread_finished = False
+        self.match_percent_helper_thread.daemon = True
+        self.match_percent_helper_thread.start()
+
+    # Called by the above method
+    def reset_match_percents(self, split_index: int, loop: int):
+        start_time = time.perf_counter()
+        while time.perf_counter() - start_time < 1 and not self.match_percent_helper_thread_finished:
+            if self.splitter.splits.current_image_index != split_index or self.splitter.splits.current_loop != loop:
+                break
+        time.sleep(1 / settings.get_int("FPS"))
+        self.splitter.current_match_percent = 0
+        self.splitter.highest_match_percent = 0
 
     # Called when reset button / hotkey pressed 
     def request_reset(self):
@@ -321,11 +342,11 @@ class UIController:
             hotkey_changed = True
 
         if hotkey_changed:
-            self.main_window.set_shortcut_keybindings()
+            self.set_shortcut_keybindings()
 
     # Called by ui_controller when screenshot button pressed/ shortcut entered
     def _take_screenshot(self) -> None:
-        frame = self.splitter.frame
+        frame = self.splitter.comparison_frame
         if frame is None:
             self.main_window.screenshot_error_message_box.exec()
             return

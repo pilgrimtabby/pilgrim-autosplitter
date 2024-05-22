@@ -11,6 +11,9 @@ from splitter.split_dir import SplitDir
 
 
 class Splitter:
+    COMPARISON_FRAME_WIDTH = settings.get_int("COMPARISON_FRAME_WIDTH")
+    COMPARISON_FRAME_HEIGHT = settings.get_int("COMPARISON_FRAME_HEIGHT")
+
     def __init__(self) -> None:
         self.interval = 1 / settings.get_int("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
         self.delaying = False  # Referenced by ui_controller to set status of various ui elements
@@ -20,7 +23,8 @@ class Splitter:
         self.pressing_hotkey = False
 
         # _capture_thread variables
-        self.frame = None
+        self.ui_frame = None
+        self.comparison_frame = None
         self.frame_pixmap = None  # Passed to UI by ui_controller._poller
         self._cap = None
         self.capture_thread = threading.Thread(target=self._capture)  # Referenced by ui_controller to check if thread is alive
@@ -70,7 +74,7 @@ class Splitter:
         hotkey.press_hotkey(key)
 
         start_time = time.perf_counter()
-        while time.perf_counter() - start_time < 1 and self.pressing_hotkey:
+        while time.perf_counter() - start_time < 1 and self.pressing_hotkey and not self._split_thread_finished:
             pass
         self.pressing_hotkey = False
         
@@ -80,17 +84,32 @@ class Splitter:
             current_time = time.perf_counter()
             if current_time - start_time < self.interval:
                 time.sleep(self.interval - (current_time - start_time))
-
             start_time = current_time
+
             frame = self._cap.read()[1]
             if frame is None:   # Something happened to the video feed, kill the thread
                 self._capture_thread_finished = True
+                break
+
+            if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
+                self.comparison_frame = cv2.resize(frame, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_LINEAR)
+                if settings.get_bool("SHOW_MIN_VIEW"):
+                    self.ui_frame = None
+                else:
+                    self.ui_frame = self.comparison_frame
+
             else:
-                self.frame = cv2.resize(frame, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_LINEAR)
-                self.frame_pixmap = self._frame_to_pixmap(self.frame)
+                self.comparison_frame = cv2.resize(frame, (self.COMPARISON_FRAME_WIDTH, self.COMPARISON_FRAME_HEIGHT), interpolation=cv2.INTER_LINEAR)
+                if settings.get_bool("SHOW_MIN_VIEW"):
+                    self.ui_frame = None
+                else:
+                    self.ui_frame = cv2.resize(frame, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_NEAREST)
+
+            self.frame_pixmap = self._frame_to_pixmap(self.ui_frame)
 
         self._cap.release()
-        self.frame = None
+        self.ui_frame = None
+        self.comparison_frame = None
         self.frame_pixmap = None
         # Kill comparer if capture goes down
         self._safe_exit_compare_thread()
@@ -116,7 +135,7 @@ class Splitter:
 
             start_time = current_time
             # Use a snapshot of this value to make this thread-safe
-            frame = self.frame
+            frame = self.comparison_frame
             if frame is None:
                 continue
 
@@ -244,6 +263,9 @@ class Splitter:
             self._safe_exit_compare_thread()
 
     def _frame_to_pixmap(self, frame: numpy.ndarray):
+        if frame is None:
+            return QPixmap()
+        
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # No alpha
         frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
         return QPixmap.fromImage(frame_img)
