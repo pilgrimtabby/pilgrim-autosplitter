@@ -46,4 +46,13 @@ class PilgrimAutosplitter:
 
 if __name__ == "__main__":
     print("Starting Pilgrim Autosplitter...")
+    # if platform.system() == "Darwin":
+    #     import traceback
+    #     with open("/tmp/pilgrimautosplitter.log", "a") as log:
+    #         try:
+    #             PilgrimAutosplitter()
+    #         except Exception:
+    #             traceback.print_exc(file=log)
+
+    # else:
     PilgrimAutosplitter()
