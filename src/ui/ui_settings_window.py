@@ -72,8 +72,8 @@ class UISettingsWindow(QDialog):
         
         self.fps_spinbox = QSpinBox(self)
         self.fps_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 12 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
-        self.fps_spinbox.setMinimum(1)
-        self.fps_spinbox.setMaximum(120)
+        self.fps_spinbox.setMinimum(20)
+        self.fps_spinbox.setMaximum(60)
 
         # Screenshots checkbox
         self.open_screenshots_label = QLabel("Open screenshots:", self)

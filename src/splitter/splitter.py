@@ -5,8 +5,8 @@ import cv2
 import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
-import settings
 import hotkey
+import settings
 from splitter.split_dir import SplitDir
 
 
@@ -78,14 +78,16 @@ class Splitter:
         start_time = time.perf_counter()
         while not self._capture_thread_finished:
             current_time = time.perf_counter()
-            if current_time - start_time >= self.interval:
-                start_time = current_time
-                frame = self._cap.read()[1]
-                if frame is None:   # Something happened to the video feed, kill the thread
-                    self._capture_thread_finished = True
-                else:
-                    self.frame = cv2.resize(frame, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_AREA)
-                    self.frame_pixmap = self._frame_to_pixmap(self.frame)
+            if current_time - start_time < self.interval:
+                time.sleep(self.interval - (current_time - start_time))
+
+            start_time = current_time
+            frame = self._cap.read()[1]
+            if frame is None:   # Something happened to the video feed, kill the thread
+                self._capture_thread_finished = True
+            else:
+                self.frame = cv2.resize(frame, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_LINEAR)
+                self.frame_pixmap = self._frame_to_pixmap(self.frame)
 
         self._cap.release()
         self.frame = None
@@ -109,38 +111,39 @@ class Splitter:
         start_time = time.perf_counter()
         while not self._compare_thread_finished:
             current_time = time.perf_counter()
-            if current_time - start_time >= self.interval:
-                start_time = current_time
+            if current_time - start_time < self.interval:
+                time.sleep(self.interval - (current_time - start_time))
 
-                # Use a snapshot of this value to make this thread-safe
-                frame = self.frame
-                if frame is None:
-                    continue
+            start_time = current_time
+            # Use a snapshot of this value to make this thread-safe
+            frame = self.frame
+            if frame is None:
+                continue
 
-                try:
-                    comparison_frame = cv2.matchTemplate(
-                        frame,
-                        self.splits.list[self.splits.current_image_index].image[:, :, :3],
-                        cv2.TM_CCORR_NORMED,
-                        mask=self.splits.list[self.splits.current_image_index].alpha
-                    )
-                    self.current_match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
-                except cv2.error as e:
-                    print(f"cv2 got an error: {e}")
+            try:
+                comparison_frame = cv2.matchTemplate(
+                    frame,
+                    self.splits.list[self.splits.current_image_index].image[:, :, :3],
+                    cv2.TM_CCORR_NORMED,
+                    mask=self.splits.list[self.splits.current_image_index].alpha
+                )
+                self.current_match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+            except cv2.error as e:
+                print(f"cv2 got an error: {e}")
 
-                if self.current_match_percent > self.highest_match_percent:
-                    self.highest_match_percent = self.current_match_percent
+            if self.current_match_percent > self.highest_match_percent:
+                self.highest_match_percent = self.current_match_percent
 
-                if self.current_match_percent >= self.splits.list[self.splits.current_image_index].threshold:
-                    if self.splits.list[self.splits.current_image_index].below_flag:
-                        went_above_threshold_flag = True
-                    else:
-                        match_found = True
-                        break
-
-                elif went_above_threshold_flag:
+            if self.current_match_percent >= self.splits.list[self.splits.current_image_index].threshold:
+                if self.splits.list[self.splits.current_image_index].below_flag:
+                    went_above_threshold_flag = True
+                else:
                     match_found = True
                     break
+
+            elif went_above_threshold_flag:
+                match_found = True
+                break
         
         self.current_match_percent = None
         self.highest_match_percent = None

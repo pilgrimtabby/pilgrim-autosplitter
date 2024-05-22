@@ -108,7 +108,7 @@ class UIController:
         ##########################
 
         self.update_ui_timer = QTimer()
-        self.update_ui_timer.setInterval(1000 // settings.get_int("FPS")) # This takes about 1/10000 of a second on average
+        self.update_ui_timer.setInterval(1000 // settings.get_int("FPS"))
         self.update_ui_timer.timeout.connect(self._poller.update_ui)
         self.update_ui_timer.start()
 
