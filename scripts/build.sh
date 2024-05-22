@@ -6,6 +6,7 @@ pyinstaller src/pilgrim_autosplitter.py --noconfirm --onefile --windowed --name 
 
 rm -r build
 rm -r dist
+rm "Pilgrim Autosplitter.spec"
 
 mkdir dist
 mv "scripts/Pilgrim Autosplitter.app" "dist/Pilgrim Autosplitter.app"

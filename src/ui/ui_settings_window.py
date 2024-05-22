@@ -1,11 +1,14 @@
+import platform
+
 from PyQt5.QtCore import QEvent, QRect, Qt
 from PyQt5.QtGui import QColor, QKeySequence
-from PyQt5.QtWidgets import (QAction, QCheckBox, QComboBox, QDialog,
-                             QDoubleSpinBox, QFrame, QGraphicsDropShadowEffect,
-                             QLabel, QLineEdit, QPushButton, QShortcut,
-                             QSpinBox, QWidget)
+from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
+                             QFrame, QGraphicsDropShadowEffect, QLabel,
+                             QLineEdit, QPushButton, QShortcut, QSpinBox,
+                             QWidget)
 
-from settings import settings
+import settings
+import ui.ui_style_sheet as style_sheet
 
 
 class UISettingsWindow(QDialog):
@@ -16,7 +19,7 @@ class UISettingsWindow(QDialog):
     LEFT_SIDE_WIDGET_WIDTH = 70
     LEFT_SIDE_WIDGET_HEIGHT = 27
 
-    def __init__(self, style_sheet):
+    def __init__(self):
         #################
         #               #
         # Window Config #
@@ -30,15 +33,18 @@ class UISettingsWindow(QDialog):
         self.setWindowTitle("Settings")
 
         # Shortcuts
-        self.close_window_action = QAction("Close Window", self)
-        self.close_window_action.setShortcuts(["ctrl+.", "ctrl+w"])  # ctrl+. already closes the window since main_window has this shortcut, but this overrides it... is that needed? reset_settings was being called twice before but maybe now it's ok -- check
-        self.close_window_action.triggered.connect(self.close)
-        
-        self.close_app_shortcut = QShortcut("ctrl+q", self)
+        self.close_window_shortcut_option1 = QShortcut("ctrl+.", self)
+        self.close_window_shortcut_option2 = QShortcut("ctrl+w", self)
+
+        self.close_window_shortcut_option1.activated.connect(self.close)
+        self.close_window_shortcut_option2.activated.connect(self.close)
+
+        # Add Mac-style "quit" shortcut (connected in ui_controller)
+        if platform.system() == "Darwin":
+            self.close_app_shortcut = QShortcut("ctrl+q", self)
 
         # Style
-        self.style_sheet = style_sheet
-        self.style_sheet.set_style(self)
+        style_sheet.set_style(self)
 
         ###########
         #         #
@@ -66,8 +72,8 @@ class UISettingsWindow(QDialog):
         
         self.fps_spinbox = QSpinBox(self)
         self.fps_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 12 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
-        self.fps_spinbox.setMinimum(1)
-        self.fps_spinbox.setMaximum(120)
+        self.fps_spinbox.setMinimum(20)
+        self.fps_spinbox.setMaximum(60)
 
         # Screenshots checkbox
         self.open_screenshots_label = QLabel("Open screenshots:", self)
@@ -131,7 +137,7 @@ class UISettingsWindow(QDialog):
         self.default_pause_double_spinbox = QDoubleSpinBox(self)
         self.default_pause_double_spinbox.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 162 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT))
         self.default_pause_double_spinbox.setDecimals(0)
-        self.default_pause_double_spinbox.setMinimum(0)
+        self.default_pause_double_spinbox.setMinimum(1)
         self.default_pause_double_spinbox.setMaximum(10000000)
         self.default_pause_double_spinbox.setSingleStep(1.0)
 
@@ -188,7 +194,7 @@ class UISettingsWindow(QDialog):
         self.start_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 45 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.start_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.start_split_hotkey_clear_button.clicked.connect(lambda: self.start_split_hotkey_line_edit.setText(""))
-        self.start_split_hotkey_clear_button.clicked.connect(lambda: self.start_split_hotkey_line_edit.set_key_sequence(None))
+        self.start_split_hotkey_clear_button.clicked.connect(lambda: self.start_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Reset splits hotkey
         self.reset_hotkey_label = QLabel("Reset splits", self)
@@ -203,7 +209,7 @@ class UISettingsWindow(QDialog):
         self.reset_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 75 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.reset_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.reset_hotkey_clear_button.clicked.connect(lambda: self.reset_hotkey_line_edit.setText(""))
-        self.reset_hotkey_clear_button.clicked.connect(lambda: self.reset_hotkey_line_edit.set_key_sequence(None))
+        self.reset_hotkey_clear_button.clicked.connect(lambda: self.reset_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Pause hotkey
         self.pause_hotkey_label = QLabel("Pause timer", self)
@@ -218,7 +224,7 @@ class UISettingsWindow(QDialog):
         self.pause_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 105 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.pause_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.pause_hotkey_clear_button.clicked.connect(lambda: self.pause_hotkey_line_edit.setText(""))
-        self.pause_hotkey_clear_button.clicked.connect(lambda: self.pause_hotkey_line_edit.set_key_sequence(None))
+        self.pause_hotkey_clear_button.clicked.connect(lambda: self.pause_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Undo split hotkey
         self.undo_split_hotkey_label = QLabel("Undo split", self)
@@ -233,7 +239,7 @@ class UISettingsWindow(QDialog):
         self.undo_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 135 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.undo_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.undo_split_hotkey_clear_button.clicked.connect(lambda: self.undo_split_hotkey_line_edit.setText(""))
-        self.undo_split_hotkey_clear_button.clicked.connect(lambda: self.undo_split_hotkey_line_edit.set_key_sequence(None))
+        self.undo_split_hotkey_clear_button.clicked.connect(lambda: self.undo_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Skip split hotkey
         self.skip_split_hotkey_label = QLabel("Skip split", self)
@@ -248,7 +254,7 @@ class UISettingsWindow(QDialog):
         self.skip_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 165 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.skip_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.skip_split_hotkey_clear_button.clicked.connect(lambda: self.skip_split_hotkey_line_edit.setText(""))
-        self.skip_split_hotkey_clear_button.clicked.connect(lambda: self.skip_split_hotkey_line_edit.set_key_sequence(None))
+        self.skip_split_hotkey_clear_button.clicked.connect(lambda: self.skip_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Previous split hotkey
         self.previous_split_hotkey_label = QLabel("Previous split", self)
@@ -263,7 +269,7 @@ class UISettingsWindow(QDialog):
         self.previous_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 195 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.previous_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.previous_split_hotkey_clear_button.clicked.connect(lambda: self.previous_split_hotkey_line_edit.setText(""))
-        self.previous_split_hotkey_clear_button.clicked.connect(lambda: self.previous_split_hotkey_line_edit.set_key_sequence(None))
+        self.previous_split_hotkey_clear_button.clicked.connect(lambda: self.previous_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Next split hotkey
         self.next_split_hotkey_label = QLabel("Next split", self)
@@ -278,7 +284,7 @@ class UISettingsWindow(QDialog):
         self.next_split_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.next_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.next_split_hotkey_clear_button.clicked.connect(lambda: self.next_split_hotkey_line_edit.setText(""))
-        self.next_split_hotkey_clear_button.clicked.connect(lambda: self.next_split_hotkey_line_edit.set_key_sequence(None))
+        self.next_split_hotkey_clear_button.clicked.connect(lambda: self.next_split_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Screenshot hotkey
         self.screenshot_hotkey_label = QLabel("Screenshot", self)
@@ -287,14 +293,14 @@ class UISettingsWindow(QDialog):
 
         self.screenshot_hotkey_line_edit = KeyLineEdit(self)
         self.screenshot_hotkey_line_edit.setGeometry(QRect(410 + self.LEFT_EDGE_CORRECTION, 252 + self.TOP_EDGE_CORRECTION, 121, 25))
-        self.screenshot_hotkey_line_edit.setText(f'{settings.value("SCREENSHOT_HOTKEY_TEXT")}')
+        self.screenshot_hotkey_line_edit.setText(f'{settings.get_str("SCREENSHOT_HOTKEY_TEXT")}')
         self.screenshot_hotkey_line_edit.setReadOnly(True)
 
         self.screenshot_hotkey_clear_button = QPushButton("clear", self)
         self.screenshot_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 255 + self.TOP_EDGE_CORRECTION, 39, 20))
         self.screenshot_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.setText(""))
-        self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.set_key_sequence(None))
+        self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.set_key_sequence(QKeySequence()))
 
         # Cancel button
         self.cancel_button = QPushButton("Cancel", self)
@@ -321,18 +327,18 @@ class UISettingsWindow(QDialog):
         # Settings aren't reset automatically when the window is closed, so they are read from utils.settings and placed back manually here
         # Spinboxes
         for spinbox, value in {
-            self.fps_spinbox: settings.value("FPS"),
-            self.default_threshold_double_spinbox: str(float(settings.value("DEFAULT_THRESHOLD") * 100)),
-            self.match_percent_decimals_spinbox: settings.value("MATCH_PERCENT_DECIMALS"),
-            self.default_delay_double_spinbox: settings.value("DEFAULT_DELAY"),
-            self.default_pause_double_spinbox: settings.value("DEFAULT_PAUSE"),
+            self.fps_spinbox: settings.get_int("FPS"),
+            self.default_threshold_double_spinbox: str(float(settings.get_float("DEFAULT_THRESHOLD") * 100)),
+            self.match_percent_decimals_spinbox: settings.get_int("MATCH_PERCENT_DECIMALS"),
+            self.default_delay_double_spinbox: settings.get_float("DEFAULT_DELAY"),
+            self.default_pause_double_spinbox: settings.get_float("DEFAULT_PAUSE"),
         }.items():
             spinbox.setProperty("value", value)
 
         # Checkboxes
         for checkbox, value in {
-            self.open_screenshots_checkbox: settings.value("OPEN_SCREENSHOT_ON_CAPTURE"),
-            self.start_with_video_checkbox: settings.value("START_WITH_VIDEO"),
+            self.open_screenshots_checkbox: settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"),
+            self.start_with_video_checkbox: settings.get_bool("START_WITH_VIDEO"),
         }.items():
             if value:
                 checkbox.setCheckState(Qt.Checked)
@@ -341,31 +347,31 @@ class UISettingsWindow(QDialog):
 
         # Hotkeys
         for hotkey_line_edit, values in {
-            self.start_split_hotkey_line_edit: (settings.value("SPLIT_HOTKEY_TEXT"), settings.value("SPLIT_HOTKEY_KEY_SEQUENCE")),
-            self.reset_hotkey_line_edit: (settings.value("RESET_HOTKEY_TEXT"), settings.value("RESET_HOTKEY_KEY_SEQUENCE")),
-            self.pause_hotkey_line_edit: (settings.value("PAUSE_HOTKEY_TEXT"), settings.value("PAUSE_HOTKEY_KEY_SEQUENCE")),
-            self.undo_split_hotkey_line_edit: (settings.value("UNDO_HOTKEY_TEXT"), settings.value("UNDO_HOTKEY_KEY_SEQUENCE")),
-            self.skip_split_hotkey_line_edit: (settings.value("SKIP_HOTKEY_TEXT"), settings.value("SKIP_HOTKEY_KEY_SEQUENCE")),
-            self.previous_split_hotkey_line_edit: (settings.value("PREVIOUS_HOTKEY_TEXT"), settings.value("PREVIOUS_HOTKEY_KEY_SEQUENCE")),
-            self.next_split_hotkey_line_edit: (settings.value("NEXT_HOTKEY_TEXT"), settings.value("NEXT_HOTKEY_KEY_SEQUENCE")),
-            self.screenshot_hotkey_line_edit: (settings.value("SCREENSHOT_HOTKEY_TEXT"), settings.value("SCREENSHOT_HOTKEY_KEY_SEQUENCE")),
+            self.start_split_hotkey_line_edit: (settings.get_str("SPLIT_HOTKEY_TEXT"), settings.get_qkeysequence("SPLIT_HOTKEY_KEY_SEQUENCE")),
+            self.reset_hotkey_line_edit: (settings.get_str("RESET_HOTKEY_TEXT"), settings.get_qkeysequence("RESET_HOTKEY_KEY_SEQUENCE")),
+            self.pause_hotkey_line_edit: (settings.get_str("PAUSE_HOTKEY_TEXT"), settings.get_qkeysequence("PAUSE_HOTKEY_KEY_SEQUENCE")),
+            self.undo_split_hotkey_line_edit: (settings.get_str("UNDO_HOTKEY_TEXT"), settings.get_qkeysequence("UNDO_HOTKEY_KEY_SEQUENCE")),
+            self.skip_split_hotkey_line_edit: (settings.get_str("SKIP_HOTKEY_TEXT"), settings.get_qkeysequence("SKIP_HOTKEY_KEY_SEQUENCE")),
+            self.previous_split_hotkey_line_edit: (settings.get_str("PREVIOUS_HOTKEY_TEXT"), settings.get_qkeysequence("PREVIOUS_HOTKEY_KEY_SEQUENCE")),
+            self.next_split_hotkey_line_edit: (settings.get_str("NEXT_HOTKEY_TEXT"), settings.get_qkeysequence("NEXT_HOTKEY_KEY_SEQUENCE")),
+            self.screenshot_hotkey_line_edit: (settings.get_str("SCREENSHOT_HOTKEY_TEXT"), settings.get_qkeysequence("SCREENSHOT_HOTKEY_KEY_SEQUENCE")),
         }.items():
             hotkey_line_edit.setText(values[0])
             hotkey_line_edit.key_sequence = values[1]
 
         # Comboboxes
-        if settings.value("ASPECT_RATIO") == "4:3 (480x360)":
+        if settings.get_str("ASPECT_RATIO") == "4:3 (480x360)":
             self.aspect_ratio_combo_box.setCurrentIndex(0)
-        elif settings.value("ASPECT_RATIO") == "4:3 (320x240)":
+        elif settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
             self.aspect_ratio_combo_box.setCurrentIndex(1)
-        elif settings.value("ASPECT_RATIO") == "16:9 (512x288)":
+        elif settings.get_str("ASPECT_RATIO") == "16:9 (512x288)":
             self.aspect_ratio_combo_box.setCurrentIndex(2)
-        elif settings.value("ASPECT_RATIO") == "16:9 (432x243)":
+        elif settings.get_str("ASPECT_RATIO") == "16:9 (432x243)":
             self.aspect_ratio_combo_box.setCurrentIndex(3)
 
-        if settings.value("THEME") == "dark":
+        if settings.get_str("THEME") == "dark":
             self.theme_combo_box.setCurrentIndex(0)
-        elif settings.value("THEME") == "light":
+        elif settings.get_str("THEME") == "light":
             self.theme_combo_box.setCurrentIndex(1)
 
     # Allow user to take focus off a widget by clicking empty space
@@ -377,7 +383,7 @@ class UISettingsWindow(QDialog):
 
 
 class KeyLineEdit(QLineEdit):
-    keys_macos = {
+    keys = {
         32: "space",
         33: "!",
         34: "\"",
@@ -427,7 +433,6 @@ class KeyLineEdit(QLineEdit):
         78: "n",
         79: "o",
         80: "p",
-        81: "Q",
         81: "q",
         82: "r",
         83: "s",
@@ -466,9 +471,7 @@ class KeyLineEdit(QLineEdit):
         16777238: "page up",
         16777239: "page down",
         16777248: "shift",
-        16777249: "cmd",
         16777250: "ctrl",
-        16777251: "option",
         16777252: "caps lock",
         16777264: "f1",
         16777265: "f2",
@@ -489,6 +492,17 @@ class KeyLineEdit(QLineEdit):
         16777280: "f17",
         16777281: "f18",
         16777282: "f19",
+        16777283: "f20",
+    }
+
+    keys_windows = keys | {
+        16777249: "ctrl",
+        16777251: "alt",
+    }
+
+    keys_macos = keys | {
+        16777249: "cmd",
+        16777251: "option",
     }
 
     def __init__(self, parent=None):
@@ -499,7 +513,7 @@ class KeyLineEdit(QLineEdit):
         if (event.type() == QEvent.KeyPress):
             decoded_key = self.decode_key(event.key())
             if decoded_key == "":
-                self.key_sequence = None
+                self.key_sequence = QKeySequence()
                 self.setText("")
             else:
                 self.key_sequence = QKeySequence(event.key())
@@ -512,6 +526,9 @@ class KeyLineEdit(QLineEdit):
 
     def decode_key(self, key):
         try:
-            return self.keys_macos[key]
+            if platform.system() == "Windows":
+                return self.keys_windows[key]
+            else:
+                return self.keys_macos[key]
         except KeyError:
             return ""

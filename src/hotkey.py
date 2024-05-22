@@ -1,28 +1,138 @@
-import platform
-import subprocess
-import time
+from pynput import keyboard
 
 
-class Hotkey:
-    def __init__(self) -> None:
-        pass
+# Return false if key not in dict
+def press_hotkey(key_text: str):
+    try:       
+        key = text_to_key_dict[key_text]
+        keyboard_controller.press(key)
+        keyboard_controller.release(key)
+        return True
+    except KeyError:
+        return False
 
-    @staticmethod
-    def press(key_code: int):
-        if platform.system() == "Windows":
-            pass
-        elif platform.system() == "Darwin":
-            Hotkey._press_macos(key_code)
-        else:
-            pass  # No Linux support yet (sorry...)
-
-    @staticmethod
-    def _press_macos(key_code: int):
-        start = time.perf_counter()
-        subprocess.call(["osascript", "-e", f"tell application \"System Events\" to key code {key_code}"])
-        print(time.perf_counter() - start)
-
-Hotkey.press(0)
-
-
-# aaaaaaaaaaaa
+keyboard_controller = keyboard.Controller()
+text_to_key_dict = {
+    "space": keyboard.Key.space,
+    "!": "!",
+    "\"": "\"",
+    "#": "#",
+    "$": "$", 
+    "%": "%",
+    "&": "&",
+    "'": "'",
+    "(": "(",
+    ")": ")",
+    "*": "*",
+    "+": "+",
+    ",": ",",
+    "-": "-",
+    ".": ".",
+    "/": "/",
+    "numpad0": keyboard.KeyCode(82),
+    "numpad1": keyboard.KeyCode(83),
+    "numpad2": keyboard.KeyCode(84),
+    "numpad3": keyboard.KeyCode(85),
+    "numpad4": keyboard.KeyCode(86),
+    "numpad5": keyboard.KeyCode(87),
+    "numpad6": keyboard.KeyCode(88),
+    "numpad7": keyboard.KeyCode(89),
+    "numpad8": keyboard.KeyCode(91),
+    "numpad9": keyboard.KeyCode(92),
+    "0": keyboard.KeyCode(29),
+    "1": keyboard.KeyCode(18),
+    "2": keyboard.KeyCode(19),
+    "3": keyboard.KeyCode(20),
+    "4": keyboard.KeyCode(21),
+    "5": keyboard.KeyCode(23),
+    "6": keyboard.KeyCode(22),
+    "7": keyboard.KeyCode(26),
+    "8": keyboard.KeyCode(28),
+    "9": keyboard.KeyCode(25),
+    ":": ":",
+    ";": ";",
+    "<": "<",
+    "=": "=",
+    ">": ">",
+    "?": "?",
+    "@": "@",
+    "a": "a",
+    "b": "b",
+    "c": "c",
+    "d": "d",
+    "e": "e",
+    "f": "f",
+    "g": "g",
+    "h": "h",
+    "i": "i",
+    "j": "j",
+    "k": "k",
+    "l": "l",
+    "m": "m",
+    "n": "n",
+    "o": "o",
+    "p": "p",
+    "q": "q",
+    "r": "r",
+    "s": "s",
+    "t": "t",
+    "u": "u",
+    "v": "v",
+    "w": "w",
+    "x": "x",
+    "y": "y",
+    "Z": "z",
+    "z": "z",
+    "[": "[",
+    "\\": "\\",
+    "]": "]",
+    "^": "^",
+    "_": "_",
+    "`": "`",
+    "{": "{",
+    "|": "|",
+    "}": "}",
+    "~": "~",
+    "delete": keyboard.Key.delete,
+    "return": keyboard.Key.enter,
+    "esc": keyboard.Key.esc,
+    "tab": keyboard.Key.tab,
+    "backspace": keyboard.Key.backspace,
+    "return": keyboard.Key.enter,
+    "enter": keyboard.Key.enter,
+    "delete": keyboard.Key.delete,
+    "home": keyboard.Key.home,
+    "end": keyboard.Key.end,
+    "left": keyboard.Key.left,
+    "up": keyboard.Key.up,
+    "right": keyboard.Key.right,
+    "down": keyboard.Key.down,
+    "page up": keyboard.Key.page_up,
+    "page down": keyboard.Key.page_down,
+    "shift": keyboard.Key.shift,
+    "ctrl": keyboard.Key.ctrl,
+    "caps lock": keyboard.Key.caps_lock,
+    "option": keyboard.Key.alt,
+    "alt": keyboard.Key.alt,
+    "cmd": keyboard.Key.cmd,
+    "f1": keyboard.Key.f1,
+    "f2": keyboard.Key.f2,
+    "f3": keyboard.Key.f3,
+    "f4": keyboard.Key.f4,
+    "f5": keyboard.Key.f5,
+    "f6": keyboard.Key.f6,
+    "f7": keyboard.Key.f7,
+    "f8": keyboard.Key.f8,
+    "f9": keyboard.Key.f9,
+    "f10": keyboard.Key.f10,
+    "f11": keyboard.Key.f11,
+    "f12": keyboard.Key.f12,
+    "f13": keyboard.Key.f13,
+    "f14": keyboard.Key.f14,
+    "f15": keyboard.Key.f15,
+    "f16": keyboard.Key.f16,
+    "f17": keyboard.Key.f17,
+    "f18": keyboard.Key.f18,
+    "f19": keyboard.Key.f19,
+    "f20": keyboard.Key.f20,
+}
