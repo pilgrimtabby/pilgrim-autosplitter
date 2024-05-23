@@ -34,12 +34,10 @@ class Splitter:
         self.splits = SplitDir()  # Referenced by ui_controller to set status of various ui elements
         self.current_match_percent = None  # Referenced by ui_controller to set match percent information
         self.highest_match_percent = None  # Referenced by ui_controller to set match percent information, and set by ui_controller ever time it calls split_dir.next_split_image or split_dir.previous_split_image
+        self.changing_splits = False  # Set by ui_controller when scrolling back and forth between splits. Akin to a soft reset of the thread
+        self.waiting = False
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
-
-        # _split_thread variables
-        self._split_thread = threading.Thread(target=self._press_split_hotkey)
-        self._split_thread_finished = False
 
     # Used by ui.controller in conjunction with safe_exit_all_threads
     def start(self):
@@ -60,23 +58,6 @@ class Splitter:
         self._compare_thread.daemon = True
         self._compare_thread.start()
         self.suspended = False
-
-    def _start_split_hotkey_thread(self):
-        self._split_thread = threading.Thread(target=self._press_split_hotkey)
-        self._split_thread_finished = False
-        self._split_thread.daemon = True
-        self._split_thread.start()
-
-    def _press_split_hotkey(self):
-        self.pressing_hotkey = True
-
-        key = settings.get_str("SPLIT_HOTKEY_TEXT")
-        hotkey.press_hotkey(key)
-
-        start_time = time.perf_counter()
-        while time.perf_counter() - start_time < 1 and self.pressing_hotkey and not self._split_thread_finished:
-            pass
-        self.pressing_hotkey = False
         
     def _capture(self):
         start_time = time.perf_counter()
@@ -133,6 +114,13 @@ class Splitter:
             if current_time - start_time < self.interval:
                 time.sleep(self.interval - (current_time - start_time))
 
+            if self.changing_splits:
+                self.waiting = True
+                while self.changing_splits:
+                    time.sleep(self.interval)
+                self.waiting = False
+                return self._look_for_match()
+
             start_time = current_time
             # Use a snapshot of this value to make this thread-safe
             frame = self.comparison_frame
@@ -185,12 +173,21 @@ class Splitter:
             if self._compare_thread_finished:
                 return
 
-        if self.splits.list[self.splits.current_image_index].pause_flag and settings.get_str("PAUSE_HOTKEY_TEXT") != "":
-            key = settings.get_str("PAUSE_HOTKEY_TEXT")
-            hotkey.press_hotkey(key)
-        elif not self.splits.list[self.splits.current_image_index].dummy_flag and settings.get_str("SPLIT_HOTKEY_TEXT") != "":
-            self._start_split_hotkey_thread()
-        self.splits.current_image_index = self.splits.next_split_image()
+        if self.splits.list[self.splits.current_image_index].pause_flag:
+            key_code = settings.get_str("PAUSE_HOTKEY_CODE")
+            if key_code != "":
+                hotkey.press_hotkey(key_code)
+            self.splits.next_split_image()
+
+        elif self.splits.list[self.splits.current_image_index].dummy_flag:
+            self.splits.next_split_image()
+
+        else:
+            key_code = settings.get_str("SPLIT_HOTKEY_CODE")
+            if key_code == "":
+                self.splits.next_split_image()
+            else:
+                hotkey.press_hotkey(key_code)
 
         if suspend_duration > 0:
             self.suspended = True
@@ -213,20 +210,13 @@ class Splitter:
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
-        if self._split_thread.is_alive():
-            self._split_thread_finished = True
-            self._split_thread.join()
 
     # Called by this._capture when its thread dies, and by toggle_suspended (pause / unpause button pressed in ui)
-    # Also exits _split_thread, since they only operate together
     def _safe_exit_compare_thread(self):
         if self._compare_thread.is_alive():
             self._compare_thread_finished = True
             self._compare_thread.join()
             self.suspended = True
-        if self._split_thread.is_alive():
-            self._split_thread_finished = True
-            self._split_thread.join()
 
     # Called by self.start_capture_thread
     def _get_new_capture_source(self):

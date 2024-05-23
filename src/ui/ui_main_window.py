@@ -35,11 +35,22 @@ class UIMainWindow(QMainWindow):
         self.settings_action.setShortcut("Ctrl+.")
 
         self.help_action = QAction("Help", self)
-        self.help_action.triggered.connect(lambda: webbrowser.open("https://github.com/pilgrimtabby/image-capture/", new=0, autoraise=True))
+        self.help_action.triggered.connect(lambda: webbrowser.open("https://github.com/pilgrimtabby/pilgrim-autosplitter/", new=0, autoraise=True))
 
         self.menu_bar_pilgrim_autosplitter = self.menu_bar.addMenu("&Autosplitter Settings")
         self.menu_bar_pilgrim_autosplitter.addAction(self.settings_action)
         self.menu_bar_pilgrim_autosplitter.addAction(self.help_action)
+
+        # Style and layout
+        style_sheet.set_style(self)
+        if platform.system() == "Windows":
+            self.HEIGHT_CORRECTION = 22
+        else:
+            self.HEIGHT_CORRECTION = 0
+
+        # Shortcut to close app
+        self.close_window_shortcut = QShortcut("ctrl+w", self)
+        self.close_window_shortcut.activated.connect(self.close)
 
         ###########
         #         #
@@ -195,54 +206,6 @@ class UIMainWindow(QMainWindow):
         self.reset_splits_button = QPushButton(self.container)
         self.reset_splits_button.setEnabled(False)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
-
-        ################################
-        #                              #
-        # Style, Layout, and Shortcuts #
-        #                              #
-        ################################
-
-        # Style and layout
-        style_sheet.set_style(self)
-        if platform.system() == "Windows":
-            self.HEIGHT_CORRECTION = 22
-        else:
-            self.HEIGHT_CORRECTION = 0
-
-        # Program shortcuts
-        self.close_window_shortcut = QShortcut("ctrl+w", self)
-        self.close_window_shortcut.activated.connect(self.close)
-
-        # Split shortcut
-        self.split_shortcut = QShortcut(self)
-        self.split_shortcut.setEnabled(False)
-
-        # Reset shortcut
-        self.reset_shortcut = QShortcut(self)
-        self.reset_shortcut.setEnabled(False)
-
-        # Undo split shortcut
-        self.undo_split_shortcut = QShortcut(self)
-        self.undo_split_shortcut.setEnabled(False)
-
-        # Skip split shortcut
-        self.skip_split_shortcut = QShortcut(self)
-        self.skip_split_shortcut.setEnabled(False)
-
-        # These shortcuts don't have an analagous LiveSplit hotkey, so it's safe to connect them directly to the buttons
-        # They also don't need to be set as enabled or disabled, since they won't do anything if their corresponding buttons are disabled
-
-        # Previous split shortcut
-        self.previous_split_shortcut = QShortcut(self)
-        self.previous_split_shortcut.activated.connect(self.previous_split_button.click)
-
-        # Next split shortcut
-        self.next_split_shortcut = QShortcut(self)
-        self.next_split_shortcut.activated.connect(self.next_split_button.click)
-
-        # Screenshot shortcut
-        self.screenshot_shortcut = QShortcut(self)
-        self.screenshot_shortcut.activated.connect(self.screenshot_button.click)
 
     # called from ui_controller (pause / unpause button pressed) and ui_controller._poller when splitter suspended status changes
     def toggle_pause_comparison_button_text(self, splitter_suspended: bool) -> None:

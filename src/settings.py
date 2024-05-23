@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 from PyQt5.QtCore import QSettings
-from PyQt5.QtGui import QKeySequence
 
 
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")
@@ -22,9 +21,6 @@ def get_int(key):
 def get_float(key):
     return float(settings.value(key))
 
-def get_qkeysequence(key):
-    return QKeySequence(str(settings.value(key)))
-
 def set_value(key: str, value: any):
     settings.setValue(key, str(value))
 
@@ -39,22 +35,22 @@ def load_defaults():
         set_value("OPEN_SCREENSHOT_ON_CAPTURE", False)
         set_value("MATCH_PERCENT_DECIMALS", 0)
         set_value("VERSION_NUMBER", "0.0.1")
-        set_value("SPLIT_HOTKEY_TEXT", "")
-        set_value("RESET_HOTKEY_TEXT", "")
-        set_value("PAUSE_HOTKEY_TEXT", "")
-        set_value("UNDO_HOTKEY_TEXT", "")
-        set_value("SKIP_HOTKEY_TEXT", "")
-        set_value("PREVIOUS_HOTKEY_TEXT", "")
-        set_value("NEXT_HOTKEY_TEXT", "")
-        set_value("SCREENSHOT_HOTKEY_TEXT", "")
-        set_value("SPLIT_HOTKEY_KEY_SEQUENCE", "")
-        set_value("RESET_HOTKEY_KEY_SEQUENCE", "")
-        set_value("PAUSE_HOTKEY_KEY_SEQUENCE", "")
-        set_value("UNDO_HOTKEY_KEY_SEQUENCE", "")
-        set_value("SKIP_HOTKEY_KEY_SEQUENCE", "")
-        set_value("PREVIOUS_HOTKEY_KEY_SEQUENCE", "")
-        set_value("NEXT_HOTKEY_KEY_SEQUENCE", "")
-        set_value("SCREENSHOT_HOTKEY_KEY_SEQUENCE", "")
+        set_value("SPLIT_HOTKEY_NAME", "")
+        set_value("RESET_HOTKEY_NAME", "")
+        set_value("PAUSE_HOTKEY_NAME", "")
+        set_value("UNDO_HOTKEY_NAME", "")
+        set_value("SKIP_HOTKEY_NAME", "")
+        set_value("PREVIOUS_HOTKEY_NAME", "")
+        set_value("NEXT_HOTKEY_NAME", "")
+        set_value("SCREENSHOT_HOTKEY_NAME", "")
+        set_value("SPLIT_HOTKEY_CODE", "")
+        set_value("RESET_HOTKEY_CODE", "")
+        set_value("PAUSE_HOTKEY_CODE", "")
+        set_value("UNDO_HOTKEY_CODE", "")
+        set_value("SKIP_HOTKEY_CODE", "")
+        set_value("PREVIOUS_HOTKEY_CODE", "")
+        set_value("NEXT_HOTKEY_CODE", "")
+        set_value("SCREENSHOT_HOTKEY_CODE", "")
         set_value("THEME", "dark")
         set_value("ASPECT_RATIO", "4:3 (480x360)")
         set_value("LAST_CAPTURE_SOURCE_INDEX", 0)

@@ -24,7 +24,7 @@ from ui.ui_controller import UIController
 faulthandler.enable()
 print("Setting everything up...")
 
-
+ 
 class PilgrimAutosplitter:
     def __init__(self) -> None:
         self.pilgrim_universal_autosplitter = QApplication(sys.argv)
