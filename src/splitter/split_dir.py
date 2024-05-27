@@ -1,4 +1,5 @@
 import glob
+import math
 import pathlib
 import re
 
@@ -7,6 +8,7 @@ import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
 import settings
+from settings import COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT
 
 
 class SplitDir:
@@ -102,19 +104,15 @@ class SplitDir:
 
     def resize_images(self):
         for image in self.list:
-            image.image = image.get_image()
-            image.alpha = image.get_alpha()
+            image.image, image.mask = image.get_image_and_mask()
             image.pixmap = image.get_pixmap()
 
-    class _SplitImage:
-        COMPARISON_FRAME_WIDTH = settings.get_int("COMPARISON_FRAME_WIDTH")
-        COMPARISON_FRAME_HEIGHT = settings.get_int("COMPARISON_FRAME_HEIGHT")
-
+    class _SplitImage:        
         def __init__(self, image_path) -> None:
             self.path = image_path
             self.name = pathlib.Path(image_path).stem
-            self.image = self.get_image()
-            self.alpha = self.get_alpha()
+            self.image, self.mask = self.get_image_and_mask()
+            self.max_dist = self.get_max_dist()
             self.pixmap = self.get_pixmap()
             self.below_flag, self.dummy_flag, self.pause_flag = self.get_flags_from_name()
             self.delay_duration, self.delay_is_default = self.get_delay_from_name()
@@ -122,26 +120,37 @@ class SplitDir:
             self.threshold, self.threshold_is_default = self.get_threshold_from_name()
             self.loops, self.loops_is_default = self.get_loops_from_name()
 
-        def get_image(self) -> numpy.ndarray:
+        def get_image_and_mask(self) -> numpy.ndarray:
             image = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
-            image = cv2.resize(image, (self.COMPARISON_FRAME_WIDTH, self.COMPARISON_FRAME_HEIGHT), interpolation=cv2.INTER_AREA)
-            # Add alpha to images if not already present (ie if image has only 3 channels, not 4)
-            if image.shape[2] == 3:
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-            return image
-        
-        def get_alpha(self):
-            alpha = self.image[:, :, 3]
-            return cv2.merge([alpha, alpha, alpha])
-        
+            image = cv2.resize(image, (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT), interpolation=cv2.INTER_AREA)
+            
+            if self.has_alpha_channel(image):
+                mask = image[:, :, 3]  # use the alpha channel to tell _compare what pixels to actually check
+                image = image[:, :, 0:3] # Remove alpha channel if present (only keep first 3 channels) we don't need it anymore and using it in _compare is slower anyway
+            else:
+                mask = None
+
+            return image, mask
+
+        def get_max_dist(self):
+            if self.mask is None:
+                return math.sqrt(COMPARISON_FRAME_WIDTH * COMPARISON_FRAME_HEIGHT * 3) * 255  # length * width * number of channels is the no. of pixels, we sqrt that, then * 255 becuase each pixel has 255 possible values
+            else:
+                return math.sqrt(cv2.countNonZero(self.mask) * 3) * 255  # number of pixels * 3, since we are comparing to an image with 3 channels, then * 255 because each pixel has 255 possible values
+
         def get_pixmap(self):
             image = cv2.imread(self.path, cv2.IMREAD_UNCHANGED)
             image = cv2.resize(image, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_NEAREST)
-            # Add alpha to images if not already present (ie if image has only 3 channels, not 4)
-            if image.shape[2] == 3:
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-            frame_qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format_RGBA8888).rgbSwapped()  # Make sure alpha channel is included, swap red and blue values
+            # If image has alpha channel, make sure the QImage does too
+            # Since images are from screenshots read from a color camera, they will never have fewer than 3 channels
+            if self.has_alpha_channel(image):
+                frame_qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format_RGBA8888).rgbSwapped()  # Cv2 images read from files are BGR, so they need to be swapped to RGB (there is no BGRA format in QImage)
+            else:
+                frame_qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format_BGR888)  # Cv2 images read from files are BGR, so use BGR888 here
             return QPixmap.fromImage(frame_qimage)
+
+        def has_alpha_channel(self, image):
+            return image.shape[2] == 4
 
         def get_flags_from_name(self):
             flags = re.findall(r"_\{([bdp]+?)\}", self.name)

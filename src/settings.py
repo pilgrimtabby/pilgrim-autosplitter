@@ -3,7 +3,9 @@ from pathlib import Path
 
 from PyQt5.QtCore import QSettings
 
-
+COMPARISON_FRAME_WIDTH = 320
+COMPARISON_FRAME_HEIGHT = 240
+VERSION_NUMBER = "0.0.1"
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")
 
 def get_str(key):
@@ -34,7 +36,6 @@ def load_defaults():
         set_value("FPS", 60)
         set_value("OPEN_SCREENSHOT_ON_CAPTURE", False)
         set_value("MATCH_PERCENT_DECIMALS", 0)
-        set_value("VERSION_NUMBER", "0.0.1")
         set_value("SPLIT_HOTKEY_NAME", "")
         set_value("RESET_HOTKEY_NAME", "")
         set_value("PAUSE_HOTKEY_NAME", "")
@@ -56,8 +57,6 @@ def load_defaults():
         set_value("LAST_CAPTURE_SOURCE_INDEX", 0)
         set_value("START_WITH_VIDEO", False)
         set_value("SHOW_MIN_VIEW", False)
-        set_value("COMPARISON_FRAME_WIDTH", 320)
-        set_value("COMPARISON_FRAME_HEIGHT", 240)
 
     # Set last image dir to home dir if last image dir doesn't exist
     if not Path(get_str("LAST_IMAGE_DIR")).is_dir():

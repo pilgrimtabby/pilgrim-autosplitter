@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
 
 import settings
 import ui.ui_style_sheet as style_sheet
+from settings import VERSION_NUMBER
 
 
 class UIMainWindow(QMainWindow):
@@ -25,7 +26,7 @@ class UIMainWindow(QMainWindow):
         # Main widget and title
         self.container = QWidget(self)
         self.setCentralWidget(self.container)
-        self.setWindowTitle(f"Pilgrim Autosplitter v{settings.get_str('VERSION_NUMBER')}")
+        self.setWindowTitle(f"Pilgrim Autosplitter v{VERSION_NUMBER}")
 
         # Menu bar
         self.menu_bar = QMenuBar(self.container)

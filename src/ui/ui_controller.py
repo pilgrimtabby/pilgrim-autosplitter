@@ -191,7 +191,7 @@ class UIController:
         fps = self.settings_window.fps_spinbox.value()
         if fps != settings.get_int("FPS"):
             settings.set_value("FPS", fps)
-            self.splitter.interval = 1 / fps  # Update the value for the current Splitter instance
+            self.splitter.target_fps = fps  # Update the value for the current Splitter instance
 
         open_screenshots_value = self.settings_window.open_screenshots_checkbox.checkState()
         if open_screenshots_value == 0:

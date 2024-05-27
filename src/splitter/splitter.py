@@ -7,15 +7,16 @@ from PyQt5.QtGui import QImage, QPixmap
 
 import hotkey
 import settings
+from settings import COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT
 from splitter.split_dir import SplitDir
 
 
 class Splitter:
-    COMPARISON_FRAME_WIDTH = settings.get_int("COMPARISON_FRAME_WIDTH")
-    COMPARISON_FRAME_HEIGHT = settings.get_int("COMPARISON_FRAME_HEIGHT")
-
     def __init__(self) -> None:
-        self.interval = 1 / settings.get_int("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
+        self.target_fps = settings.get_int("FPS")  # modified by ui_controller.save_settings when fps is changed in settings menu
+        self.capture_max_fps = 60
+        self.fps_adjust_factor = 1.22  # On my machine, fps tends to be about 5/6 as fast as necessary, but even if this is different on other machines, this factor will adjust itself, so it's fine
+        self.interval = self.get_interval()
         self.delaying = False  # Referenced by ui_controller to set status of various ui elements
         self.delay_remaining = None
         self.suspended = True  # Referenced by ui_controller to set status of various ui elements
@@ -38,6 +39,9 @@ class Splitter:
         self.waiting = False
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
+
+    def get_interval(self):
+        return 1 / (min(self.target_fps, self.capture_max_fps) * self.fps_adjust_factor)
 
     # Used by ui.controller in conjunction with safe_exit_all_threads
     def start(self):
@@ -62,10 +66,13 @@ class Splitter:
     def _capture(self):
         start_time = time.perf_counter()
         while not self._capture_thread_finished:
-            current_time = time.perf_counter()
-            if current_time - start_time < self.interval:
-                time.sleep(self.interval - (current_time - start_time))
-            start_time = current_time
+
+            # We don't need to wait if we are hitting the max capture fps, since cap.read() blocks until the next frame is available anyway. So we only do this if we are targeting a framerate that is lower than the max fps
+            if self.target_fps < self. capture_max_fps:
+                current_time = time.perf_counter()
+                if current_time - start_time < self.interval:
+                    time.sleep(self.interval - (current_time - start_time))
+                start_time = time.perf_counter()
 
             frame = self._cap.read()[1]
             if frame is None:   # Something happened to the video feed, kill the thread
@@ -80,7 +87,7 @@ class Splitter:
                     self.ui_frame = self.comparison_frame
 
             else:
-                self.comparison_frame = cv2.resize(frame, (self.COMPARISON_FRAME_WIDTH, self.COMPARISON_FRAME_HEIGHT), interpolation=cv2.INTER_LINEAR)
+                self.comparison_frame = cv2.resize(frame, (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT), interpolation=cv2.INTER_LINEAR)
                 if settings.get_bool("SHOW_MIN_VIEW"):
                     self.ui_frame = None
                 else:
@@ -105,14 +112,16 @@ class Splitter:
     def _look_for_match(self):
         self.current_match_percent = 0
         self.highest_match_percent = 0
-
         match_found = False
         went_above_threshold_flag = False
-        start_time = time.perf_counter()
+
+        frames_this_second = 0
+        start_time = frame_counter_start_time = time.perf_counter()
         while not self._compare_thread_finished:
             current_time = time.perf_counter()
             if current_time - start_time < self.interval:
                 time.sleep(self.interval - (current_time - start_time))
+            start_time = time.perf_counter()
 
             if self.changing_splits:
                 self.waiting = True
@@ -121,20 +130,31 @@ class Splitter:
                 self.waiting = False
                 return self._look_for_match()
 
-            start_time = current_time
+            # Adjust self.interval up or down to acheive target fps
+            if time.perf_counter() - frame_counter_start_time >= 1:
+                fps = min(self.target_fps, self.capture_max_fps)
+                if frames_this_second != fps:
+                    difference = fps - frames_this_second
+                    self.fps_adjust_factor += (difference * 0.002)
+                self.interval = self.get_interval()
+                frames_this_second = 0
+                frame_counter_start_time = time.perf_counter()
+            else:
+                frames_this_second += 1
+
             # Use a snapshot of this value to make this thread-safe
             frame = self.comparison_frame
             if frame is None:
                 continue
 
             try:
-                comparison_frame = cv2.matchTemplate(
-                    frame,
-                    self.splits.list[self.splits.current_image_index].image[:, :, :3],
-                    cv2.TM_CCORR_NORMED,
-                    mask=self.splits.list[self.splits.current_image_index].alpha
+                euclidean_dist = cv2.norm(
+                    src1=self.splits.list[self.splits.current_image_index].image,
+                    src2=frame,
+                    normType=cv2.NORM_L2,
+                    mask=self.splits.list[self.splits.current_image_index].mask
                 )
-                self.current_match_percent = max(cv2.minMaxLoc(comparison_frame)[1], 0)
+                self.current_match_percent = 1 - (euclidean_dist / self.splits.list[self.splits.current_image_index].max_dist)
             except cv2.error as e:
                 print(f"cv2 got an error: {e}")
 
@@ -224,6 +244,10 @@ class Splitter:
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # This is the lowest supported resolution, apparently
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        try:
+            self.capture_max_fps = cap.get(cv2.CAP_PROP_FPS)
+        except cv2.error:
+            self.capture_max_fps = 60
         return cap
 
     # Called by ui controller when next source button pressed
@@ -256,6 +280,5 @@ class Splitter:
         if frame is None:
             return QPixmap()
         
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) # No alpha
-        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_RGB888)
+        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_BGR888)  # cv2 always returns BGR images from capture sources
         return QPixmap.fromImage(frame_img)
