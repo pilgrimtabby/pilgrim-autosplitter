@@ -28,7 +28,7 @@ class UISettingsWindow(QDialog):
         self.is_showing = False
 
         # Set size, title
-        self.setFixedSize(610, 362)
+        self.setFixedSize(610, 392)
         self.setWindowTitle("Settings")
 
         # Shortcuts
@@ -52,7 +52,7 @@ class UISettingsWindow(QDialog):
 
         # Border
         self.border_helper_frame = QFrame(self)
-        self.border_helper_frame.setGeometry(QRect(10 + self.LEFT_EDGE_CORRECTION_FRAME, 10 + self.TOP_EDGE_CORRECTION_FRAME, 590, 342))
+        self.border_helper_frame.setGeometry(QRect(10 + self.LEFT_EDGE_CORRECTION_FRAME, 10 + self.TOP_EDGE_CORRECTION_FRAME, 590, 372))
         self.border_helper_frame.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.border_helper_frame.setObjectName("border")
 
@@ -143,6 +143,16 @@ class UISettingsWindow(QDialog):
         self.aspect_ratio_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 194 + self.TOP_EDGE_CORRECTION, 130, self.LEFT_SIDE_WIDGET_HEIGHT - 4))
         self.aspect_ratio_combo_box.addItems(["4:3 (480x360)", "4:3 (320x240)", "16:9 (512x288)", "16:9 (432x243)"])
 
+        # Theme combobox
+        self.theme_label = QLabel("Theme:", self)
+        self.theme_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 220 + self.TOP_EDGE_CORRECTION, 191, 31))
+        self.theme_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.theme_label.setToolTip("Does anyone actually use light mode?")
+
+        self.theme_combo_box = QComboBox(self)
+        self.theme_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT - 4))
+        self.theme_combo_box.addItems(["dark", "light"])
+
         # Start with video checkbox
         self.start_with_video_label = QLabel("Start with video:", self)
         self.start_with_video_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 250 + self.TOP_EDGE_CORRECTION, 191, 31))
@@ -158,15 +168,20 @@ class UISettingsWindow(QDialog):
         self.start_with_video_checkbox_helper_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.start_with_video_checkbox_helper_label.setGraphicsEffect(self.checkbox_shadow)
 
-        # Theme combobox
-        self.theme_label = QLabel("Theme:", self)
-        self.theme_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 220 + self.TOP_EDGE_CORRECTION, 191, 31))
-        self.theme_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.theme_label.setToolTip("Does anyone actually use light mode?")
+        # Enable global hotkeys checkbox
+        self.global_hotkeys_label = QLabel("Global hotkeys:", self)
+        self.global_hotkeys_label.setGeometry(QRect(20 + self.LEFT_EDGE_CORRECTION, 280 + self.TOP_EDGE_CORRECTION, 191, 31))
+        self.global_hotkeys_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.global_hotkeys_label.setToolTip("When disabled, hotkeys will only work when this program is in focus.")
 
-        self.theme_combo_box = QComboBox(self)
-        self.theme_combo_box.setGeometry(QRect(160 + self.LEFT_EDGE_CORRECTION, 224 + self.TOP_EDGE_CORRECTION, self.LEFT_SIDE_WIDGET_WIDTH, self.LEFT_SIDE_WIDGET_HEIGHT - 4))
-        self.theme_combo_box.addItems(["dark", "light"])
+        self.global_hotkeys_checkbox = QCheckBox(self)
+        self.global_hotkeys_checkbox.setGeometry(QRect(161 + self.LEFT_EDGE_CORRECTION, 289 + self.TOP_EDGE_CORRECTION, 13, 13))
+
+        self.global_hotkeys_checkbox_helper_label = QLabel(self)
+        self.global_hotkeys_checkbox_helper_label.setGeometry(QRect(161 + self.LEFT_EDGE_CORRECTION, 288 + self.TOP_EDGE_CORRECTION, 14, 15))
+        self.global_hotkeys_checkbox_helper_label.setObjectName("checkbox_helper")
+        self.global_hotkeys_checkbox_helper_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.global_hotkeys_checkbox_helper_label.setGraphicsEffect(self.checkbox_shadow)
 
         # Hotkey header
         self.hotkey_settings_label = QLabel("Hotkeys (click + type to change):", self)
@@ -294,34 +309,44 @@ class UISettingsWindow(QDialog):
         self.screenshot_hotkey_clear_button.clicked.connect(lambda: self.screenshot_hotkey_line_edit.setText(""))
         self.screenshot_hotkey_clear_button.clicked.connect(lambda: setattr(self.screenshot_hotkey_line_edit, "key_code", ""))
 
+        # Toggle global hotkeys hotkey
+        self.toggle_global_hotkeys_hotkey_label = QLabel("Toggle global", self)
+        self.toggle_global_hotkeys_hotkey_label.setGeometry(QRect(300 + self.LEFT_EDGE_CORRECTION, 280 + self.TOP_EDGE_CORRECTION, 100, 31))
+        self.toggle_global_hotkeys_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+        self.toggle_global_hotkeys_hotkey_line_edit = KeyLineEdit(self)
+        self.toggle_global_hotkeys_hotkey_line_edit.setGeometry(QRect(410 + self.LEFT_EDGE_CORRECTION, 282 + self.TOP_EDGE_CORRECTION, 121, 25))
+        self.toggle_global_hotkeys_hotkey_line_edit.setText(f'{settings.get_str("TOGGLE_HOTKEYS_HOTKEY_NAME")}')
+        self.toggle_global_hotkeys_hotkey_line_edit.setReadOnly(True)
+
+        self.toggle_global_hotkeys_hotkey_clear_button = QPushButton("clear", self)
+        self.toggle_global_hotkeys_hotkey_clear_button.setGeometry(QRect(545 + self.LEFT_EDGE_CORRECTION, 285 + self.TOP_EDGE_CORRECTION, 39, 20))
+        self.toggle_global_hotkeys_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self.toggle_global_hotkeys_hotkey_clear_button.clicked.connect(lambda: self.toggle_global_hotkeys_hotkey_line_edit.setText(""))
+        self.toggle_global_hotkeys_hotkey_clear_button.clicked.connect(lambda: setattr(self.toggle_global_hotkeys_hotkey_line_edit, "key_code", ""))
+
         # Cancel button
         self.cancel_button = QPushButton("Cancel", self)
-        self.cancel_button.setGeometry(QRect(319 + self.LEFT_EDGE_CORRECTION, 296 + self.TOP_EDGE_CORRECTION, 111, 31))
+        self.cancel_button.setGeometry(QRect(319 + self.LEFT_EDGE_CORRECTION, 326 + self.TOP_EDGE_CORRECTION, 111, 31))
         self.cancel_button.setFocusPolicy(Qt.NoFocus)
         self.cancel_button.clicked.connect(self.close)
 
         # Save button
         self.save_button = QPushButton("Save", self)
-        self.save_button.setGeometry(QRect(459 + self.LEFT_EDGE_CORRECTION, 296 + self.TOP_EDGE_CORRECTION, 111, 31))
+        self.save_button.setGeometry(QRect(459 + self.LEFT_EDGE_CORRECTION, 326 + self.TOP_EDGE_CORRECTION, 111, 31))
         self.save_button.setFocusPolicy(Qt.NoFocus)
 
-        # Set all widget values to stored values
-        self.reset_settings()
-
-    # Called when self.close is called (red x is pressed to close window, keyboard shortcut closes window, cancel button pressed, etc.)
-    def closeEvent(self, _):
-        self.is_showing = False
-        self.reset_settings()
-
-    def open(self):
-        super().open()
+    # Called when settings window is opened
+    def exec(self):
+        self.setFocus(True)  # Make sure no child widgets have focus
+        self.reset_settings()  # Set all widget values to stored values
         self.is_showing = True
+        super().exec()  # Since this call blocks until the window is closed, self.is_showing isn't set to false until after the user closes the window
+        self.is_showing = False
 
     # Called when save button is pressed
-    def reset_settings(self):
-        self.setFocus(True)  # Take focus off the last widget the user selected
-        
-        # Settings aren't reset automatically when the window is closed, so they are read from utils.settings and placed back manually here
+    # Settings aren't reset automatically when the window is opened, so they are read from settings.py and placed back manually here
+    def reset_settings(self):        
         # Spinboxes
         for spinbox, value in {
             self.fps_spinbox: settings.get_int("FPS"),
@@ -336,6 +361,7 @@ class UISettingsWindow(QDialog):
         for checkbox, value in {
             self.open_screenshots_checkbox: settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"),
             self.start_with_video_checkbox: settings.get_bool("START_WITH_VIDEO"),
+            self.global_hotkeys_checkbox: settings.get_bool("GLOBAL_HOTKEYS_ENABLED"),
         }.items():
             if value:
                 checkbox.setCheckState(Qt.Checked)
@@ -352,6 +378,7 @@ class UISettingsWindow(QDialog):
             self.previous_split_hotkey_line_edit: (settings.get_str("PREVIOUS_HOTKEY_NAME"), settings.get_str("PREVIOUS_HOTKEY_CODE")),
             self.next_split_hotkey_line_edit: (settings.get_str("NEXT_HOTKEY_NAME"), settings.get_str("NEXT_HOTKEY_CODE")),
             self.screenshot_hotkey_line_edit: (settings.get_str("SCREENSHOT_HOTKEY_NAME"), settings.get_str("SCREENSHOT_HOTKEY_CODE")),
+            self.toggle_global_hotkeys_hotkey_line_edit: (settings.get_str("TOGGLE_HOTKEYS_HOTKEY_NAME"), settings.get_str("TOGGLE_HOTKEYS_HOTKEY_CODE")),
         }.items():
             hotkey_line_edit.setText(values[0])
             hotkey_line_edit.key_name = values[0]

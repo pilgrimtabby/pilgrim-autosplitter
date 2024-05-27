@@ -44,6 +44,7 @@ def load_defaults():
         set_value("PREVIOUS_HOTKEY_NAME", "")
         set_value("NEXT_HOTKEY_NAME", "")
         set_value("SCREENSHOT_HOTKEY_NAME", "")
+        set_value("TOGGLE_HOTKEYS_HOTKEY_NAME", "")
         set_value("SPLIT_HOTKEY_CODE", "")
         set_value("RESET_HOTKEY_CODE", "")
         set_value("PAUSE_HOTKEY_CODE", "")
@@ -52,11 +53,13 @@ def load_defaults():
         set_value("PREVIOUS_HOTKEY_CODE", "")
         set_value("NEXT_HOTKEY_CODE", "")
         set_value("SCREENSHOT_HOTKEY_CODE", "")
+        set_value("TOGGLE_HOTKEYS_HOTKEY_CODE", "")
         set_value("THEME", "dark")
         set_value("ASPECT_RATIO", "4:3 (480x360)")
         set_value("LAST_CAPTURE_SOURCE_INDEX", 0)
         set_value("START_WITH_VIDEO", False)
         set_value("SHOW_MIN_VIEW", False)
+        set_value("GLOBAL_HOTKEYS_ENABLED", True)
 
     # Set last image dir to home dir if last image dir doesn't exist
     if not Path(get_str("LAST_IMAGE_DIR")).is_dir():

@@ -9,6 +9,7 @@ from pynput import keyboard
 from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QApplication
 
 import hotkey
 import settings
@@ -19,11 +20,12 @@ from ui.ui_settings_window import UISettingsWindow
 
 
 class UIController:
-    def __init__(self, splitter) -> None:
+    def __init__(self, application, splitter) -> None:
+        self.application = application
         self.splitter = splitter
         self.settings_window = UISettingsWindow()
         self.main_window = UIMainWindow()
-        self._poller = UIPoller(self)
+        self._poller = UIPoller(self, self.application)
 
         self.set_main_window_layout()
 
@@ -76,7 +78,7 @@ class UIController:
         self.main_window.next_split_button.clicked.connect(self.request_next_split)
 
         # Settings menu bar action triggered
-        self.main_window.settings_action.triggered.connect(self.settings_window.open)
+        self.main_window.settings_action.triggered.connect(self.settings_window.exec)
 
         ###########################
         #                         #
@@ -102,26 +104,26 @@ class UIController:
     # Called when undo button pressed
     def attempt_undo_hotkey(self):
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
-        if key_code == "":
-            self.request_previous_split()
-        else:
+        if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
             hotkey.press_hotkey(key_code)
+        else:
+            self.request_previous_split()
 
     # Called when skip button pressed
     def attempt_skip_hotkey(self):
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
-        if key_code == "":
-            self.request_next_split()
-        else:
+        if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
             hotkey.press_hotkey(key_code)
+        else:
+            self.request_next_split()
 
     # Called when reset button pressed
     def attempt_reset_hotkey(self):
         key_code = settings.get_str("RESET_HOTKEY_CODE")
-        if key_code == "":
-            self.reset()
-        else:
+        if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
             hotkey.press_hotkey(key_code)
+        else:
+            self.reset()
 
     # Called when undo or previous button / hotkey pressed
     def request_previous_split(self):
@@ -186,40 +188,60 @@ class UIController:
 
     # Called when settings window save button pressed
     def save_settings(self):
-        self.settings_window.setFocus(True)  # Take focus off widgets
+        # Spinboxes
+        for spinbox, setting_string in {
+            self.settings_window.fps_spinbox: "FPS",
+            self.settings_window.default_threshold_double_spinbox: "DEFAULT_THRESHOLD",
+            self.settings_window.match_percent_decimals_spinbox: "MATCH_PERCENT_DECIMALS",
+            self.settings_window.default_delay_double_spinbox: "DEFAULT_DELAY",
+            self.settings_window.default_pause_double_spinbox: "DEFAULT_PAUSE",
+        }.items():
+            if spinbox == self.settings_window.default_threshold_double_spinbox:
+                value = float(spinbox.value()) / 100
+            else:
+                value = spinbox.value()
 
-        fps = self.settings_window.fps_spinbox.value()
-        if fps != settings.get_int("FPS"):
-            settings.set_value("FPS", fps)
-            self.splitter.target_fps = fps  # Update the value for the current Splitter instance
+            # Send new FPS to controller and splitter
+            if spinbox == self.settings_window.fps_spinbox:
+                self.update_ui_timer.setInterval(1000 // value)
+                self.splitter.target_fps = value
 
-        open_screenshots_value = self.settings_window.open_screenshots_checkbox.checkState()
-        if open_screenshots_value == 0:
-            open_screenshots = False
-        else:
-            open_screenshots = True
-        if open_screenshots != settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
-            settings.set_value("OPEN_SCREENSHOT_ON_CAPTURE", open_screenshots)
+            settings.set_value(setting_string, value)
 
-        default_threshold = float(self.settings_window.default_threshold_double_spinbox.value()) / 100
-        if default_threshold != settings.get_float("DEFAULT_THRESHOLD"):
-            settings.set_value("DEFAULT_THRESHOLD", default_threshold)
-            self.splitter.splits.set_default_threshold()
+        self.splitter.splits.set_default_threshold()
+        self.splitter.splits.set_default_delay()
+        self.splitter.splits.set_default_pause()
 
-        match_percent_decimals = self.settings_window.match_percent_decimals_spinbox.value()
-        if match_percent_decimals != settings.get_int("MATCH_PERCENT_DECIMALS"):
-            settings.set_value("MATCH_PERCENT_DECIMALS", match_percent_decimals)
+        # Checkboxes
+        for checkbox, setting_string in {
+            self.settings_window.open_screenshots_checkbox: "OPEN_SCREENSHOT_ON_CAPTURE",
+            self.settings_window.start_with_video_checkbox: "START_WITH_VIDEO",
+            self.settings_window.global_hotkeys_checkbox: "GLOBAL_HOTKEYS_ENABLED",
+        }.items():
+            if checkbox.checkState() == 0:
+                value = False
+            else:
+                value = True
+            settings.set_value(setting_string, value)
 
-        default_delay = self.settings_window.default_delay_double_spinbox.value()
-        if default_delay != settings.get_float("DEFAULT_DELAY"):
-            settings.set_value("DEFAULT_DELAY", default_delay)
-            self.splitter.splits.set_default_delay()
+        # Hotkeys
+        for hotkey, setting_strings in {
+            self.settings_window.start_split_hotkey_line_edit: ("SPLIT_HOTKEY_NAME", "SPLIT_HOTKEY_CODE"),
+            self.settings_window.reset_hotkey_line_edit: ("RESET_HOTKEY_NAME", "RESET_HOTKEY_CODE"),
+            self.settings_window.pause_hotkey_line_edit: ("PAUSE_HOTKEY_NAME", "PAUSE_HOTKEY_CODE"),
+            self.settings_window.undo_split_hotkey_line_edit: ("UNDO_HOTKEY_NAME", "UNDO_HOTKEY_CODE"),
+            self.settings_window.skip_split_hotkey_line_edit: ("SKIP_HOTKEY_NAME", "SKIP_HOTKEY_CODE"),
+            self.settings_window.previous_split_hotkey_line_edit: ("PREVIOUS_HOTKEY_NAME", "PREVIOUS_HOTKEY_CODE"),
+            self.settings_window.next_split_hotkey_line_edit: ("NEXT_HOTKEY_NAME", "NEXT_HOTKEY_CODE"),
+            self.settings_window.screenshot_hotkey_line_edit: ("SCREENSHOT_HOTKEY_NAME", "SCREENSHOT_HOTKEY_CODE"),
+            self.settings_window.toggle_global_hotkeys_hotkey_line_edit: ("TOGGLE_HOTKEYS_HOTKEY_NAME", "TOGGLE_HOTKEYS_HOTKEY_CODE"),
+        }.items():
+            name, code = hotkey.text(), hotkey.key_code
+            settings.set_value(setting_strings[0], name)
+            settings.set_value(setting_strings[1], code)
 
-        default_pause = self.settings_window.default_pause_double_spinbox.value()
-        if default_pause != settings.get_float("DEFAULT_PAUSE"):
-            settings.set_value("DEFAULT_PAUSE", default_pause)
-            self.splitter.splits.set_default_pause()
-
+        # Comboboxes
+        # Only update these settings if the value changed, since calling resize_images, set_main_window_layout, and set_style is expensive
         aspect_ratio = self.settings_window.aspect_ratio_combo_box.currentText()
         if aspect_ratio != settings.get_str("ASPECT_RATIO"):
             if aspect_ratio == "4:3 (480x360)":
@@ -241,14 +263,6 @@ class UIController:
             self.splitter.splits.resize_images()
             self.set_main_window_layout()
 
-        start_with_video_value = self.settings_window.start_with_video_checkbox.checkState()
-        if start_with_video_value == 0:
-            start_with_video = False
-        else:
-            start_with_video = True
-        if start_with_video != settings.get_bool("START_WITH_VIDEO"):
-            settings.set_value("START_WITH_VIDEO", start_with_video)
-
         theme = self.settings_window.theme_combo_box.currentText()
         if theme != settings.get_str("THEME"):
             if theme == "dark":
@@ -257,46 +271,6 @@ class UIController:
                 settings.set_value("THEME", "light")
             style_sheet.set_style(self.main_window)
             style_sheet.set_style(self.settings_window)
-
-        key_name, key_code = self.settings_window.start_split_hotkey_line_edit.text(), self.settings_window.start_split_hotkey_line_edit.key_code
-        if key_name != settings.get_str("SPLIT_HOTKEY_NAME"):
-            settings.set_value("SPLIT_HOTKEY_NAME", key_name)
-            settings.set_value("SPLIT_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.reset_hotkey_line_edit.text(), self.settings_window.reset_hotkey_line_edit.key_code
-        if key_name != settings.get_str("RESET_HOTKEY_NAME"):
-            settings.set_value("RESET_HOTKEY_NAME", key_name)
-            settings.set_value("RESET_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.pause_hotkey_line_edit.text(), self.settings_window.pause_hotkey_line_edit.key_code
-        if key_name != settings.get_str("PAUSE_HOTKEY_NAME"):
-            settings.set_value("PAUSE_HOTKEY_NAME", key_name)
-            settings.set_value("PAUSE_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.undo_split_hotkey_line_edit.text(), self.settings_window.undo_split_hotkey_line_edit.key_code
-        if key_name != settings.get_str("UNDO_HOTKEY_NAME"):
-            settings.set_value("UNDO_HOTKEY_NAME", key_name)
-            settings.set_value("UNDO_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.skip_split_hotkey_line_edit.text(), self.settings_window.skip_split_hotkey_line_edit.key_code
-        if key_name != settings.get_str("SKIP_HOTKEY_NAME"):
-            settings.set_value("SKIP_HOTKEY_NAME", key_name)
-            settings.set_value("SKIP_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.previous_split_hotkey_line_edit.text(), self.settings_window.previous_split_hotkey_line_edit.key_code
-        if key_name != settings.get_str("PREVIOUS_HOTKEY_NAME"):
-            settings.set_value("PREVIOUS_HOTKEY_NAME", key_name)
-            settings.set_value("PREVIOUS_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.next_split_hotkey_line_edit.text(), self.settings_window.next_split_hotkey_line_edit.key_code
-        if key_name != settings.get_str("NEXT_HOTKEY_NAME"):
-            settings.set_value("NEXT_HOTKEY_NAME", key_name)
-            settings.set_value("NEXT_HOTKEY_CODE", key_code)
-
-        key_name, key_code = self.settings_window.screenshot_hotkey_line_edit.text(), self.settings_window.screenshot_hotkey_line_edit.key_code
-        if key_name != settings.get_str("SCREENSHOT_HOTKEY_NAME"):
-            settings.set_value("SCREENSHOT_HOTKEY_NAME", key_name)
-            settings.set_value("SCREENSHOT_HOTKEY_CODE", key_code)
 
     # Called by ui_controller when screenshot button pressed/ shortcut entered
     def _take_screenshot(self) -> None:
@@ -626,6 +600,10 @@ class UIController:
             self.settings_window.screenshot_hotkey_line_edit.setText(key_name)
             self.settings_window.screenshot_hotkey_line_edit.key_code = key_code
 
+        elif self.settings_window.toggle_global_hotkeys_hotkey_line_edit.hasFocus():
+            self.settings_window.toggle_global_hotkeys_hotkey_line_edit.setText(key_name)
+            self.settings_window.toggle_global_hotkeys_hotkey_line_edit.key_code = key_code
+
         elif not self.settings_window.is_showing:
             if str(key_code) == settings.get_str("SPLIT_HOTKEY_CODE"):
                 self._poller.split_hotkey_pressed = True
@@ -648,9 +626,12 @@ class UIController:
             elif str(key_code) == settings.get_str("SCREENSHOT_HOTKEY_CODE"):
                 self._poller.screenshot_hotkey_pressed = True
 
+            elif str(key_code) == settings.get_str("TOGGLE_HOTKEYS_HOTKEY_CODE"):
+                self._poller.toggle_hotkeys_hotkey_pressed = True
 
 class UIPoller:
-    def __init__(self, ui_controller: UIController) -> None:
+    def __init__(self, ui_controller: UIController, application: QApplication) -> None:
+        self._application = application
         self._ui_controller = ui_controller
         self._splitter = ui_controller.splitter
         self._main_window = ui_controller.main_window
@@ -679,6 +660,7 @@ class UIPoller:
         self.previous_hotkey_pressed = False
         self.next_hotkey_pressed = False
         self.screenshot_hotkey_pressed = False
+        self.toggle_hotkeys_hotkey_pressed = False
 
         self._split_hotkey_enabled = False
         self._reset_hotkey_enabled = False
@@ -688,10 +670,12 @@ class UIPoller:
     def update_ui(self):
         self._update_labels()
         self._set_pause_button_text()
-        something_changed = self._update_flags()
-        if something_changed:
-            self._update_buttons_and_hotkeys()
         self._execute_hotkeys()
+        self._execute_split_action()
+
+        buttons_and_hotkeys_flag_changed = self._update_flags()
+        if buttons_and_hotkeys_flag_changed:
+            self._update_buttons_and_hotkeys()
 
     def _update_labels(self) -> None:
         min_view_showing = settings.get_bool("SHOW_MIN_VIEW")
@@ -884,24 +868,25 @@ class UIPoller:
                 self._main_window.screenshot_button.setEnabled(False)
 
     def _execute_hotkeys(self):
+        global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
         if self.split_hotkey_pressed:
             self.split_hotkey_pressed = False
-            if self._split_hotkey_enabled:
+            if self._split_hotkey_enabled and (global_hotkeys_enabled or self._application.focusWindow() is not None):  # QApplication.focusWindow() returns None if this program is not on top
                 self._ui_controller.request_next_split()
 
         elif self.reset_hotkey_pressed:
             self.reset_hotkey_pressed = False 
-            if self._reset_hotkey_enabled:
+            if self._reset_hotkey_enabled and (global_hotkeys_enabled or self._application.focusWindow() is not None):
                 self._ui_controller.reset()
 
         elif self.undo_hotkey_pressed:
             self.undo_hotkey_pressed = False
-            if self._undo_hotkey_enabled:
+            if self._undo_hotkey_enabled and (global_hotkeys_enabled or self._application.focusWindow() is not None):
                 self._ui_controller.request_previous_split()
 
         elif self.skip_hotkey_pressed:
             self.skip_hotkey_pressed = False
-            if self._skip_hotkey_enabled:
+            if self._skip_hotkey_enabled and (global_hotkeys_enabled or self._application.focusWindow() is not None):
                 self._ui_controller.request_next_split()
 
         # These shortcuts don't have an analagous LiveSplit hotkey, so it's safe to connect them directly to the buttons
@@ -909,15 +894,46 @@ class UIPoller:
 
         elif self.previous_hotkey_pressed:
             self.previous_hotkey_pressed = False
-            self._main_window.previous_split_button.click()
+            if global_hotkeys_enabled or self._application.focusWindow() is not None:
+                self._main_window.previous_split_button.click()
 
         elif self.next_hotkey_pressed:
             self.next_hotkey_pressed = False
-            self._main_window.next_split_button.click()
+            if global_hotkeys_enabled or self._application.focusWindow() is not None:
+                self._main_window.next_split_button.click()
 
         elif self.screenshot_hotkey_pressed:
             self.screenshot_hotkey_pressed = False
-            self._main_window.screenshot_button.click()
+            if global_hotkeys_enabled or self._application.focusWindow() is not None:
+                self._main_window.screenshot_button.click()
+        
+        elif self.toggle_hotkeys_hotkey_pressed:
+            self.toggle_hotkeys_hotkey_pressed = False
+            if global_hotkeys_enabled or self._application.focusWindow() is not None:
+                settings.set_value("GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled)
+
+    def _execute_split_action(self):
+        global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
+
+        if self._splitter.pause_split_action:
+            self._splitter.pause_split_action = False
+            key_code = settings.get_str("PAUSE_HOTKEY_CODE")
+            if len(key_code) > 0 and global_hotkeys_enabled:
+                hotkey.press_hotkey(key_code)
+            else:
+                self._splitter.splits.next_split_image()
+
+        elif self._splitter.dummy_split_action:
+            self._splitter.dummy_split_action = False
+            self._splitter.splits.next_split_image()
+
+        elif self._splitter.normal_split_action:
+            self._splitter.normal_split_action = False
+            key_code = settings.get_str("SPLIT_HOTKEY_CODE")
+            if len(key_code) > 0 and global_hotkeys_enabled:
+                hotkey.press_hotkey(key_code)
+            else:
+                self._splitter.splits.next_split_image()
 
     def _null_match_percent_string(self):
         match_percent_string = "--"

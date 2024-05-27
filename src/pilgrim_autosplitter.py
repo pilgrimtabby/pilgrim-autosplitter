@@ -27,10 +27,10 @@ print("Setting everything up...")
  
 class PilgrimAutosplitter:
     def __init__(self) -> None:
-        self.pilgrim_universal_autosplitter = QApplication(sys.argv)
-        self.pilgrim_universal_autosplitter.setStyle("fusion")
-        self.pilgrim_universal_autosplitter.setApplicationName("Pilgrim Autosplitter")
-        self.pilgrim_universal_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
+        self.pilgrim_autosplitter = QApplication(sys.argv)
+        self.pilgrim_autosplitter.setStyle("fusion")
+        self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
+        self.pilgrim_autosplitter.setWindowIcon(QIcon(QPixmap("resources/icon-macos.png")))
 
         settings.load_defaults()
 
@@ -38,10 +38,10 @@ class PilgrimAutosplitter:
         if settings.get_bool("START_WITH_VIDEO"):
             self.splitter.start()
 
-        self.ui_controller = UIController(self.splitter)
+        self.ui_controller = UIController(self.pilgrim_autosplitter, self.splitter)
         self.ui_controller.main_window.show()
         
-        self.pilgrim_universal_autosplitter.exec()
+        self.pilgrim_autosplitter.exec()
          
 
 if __name__ == "__main__":

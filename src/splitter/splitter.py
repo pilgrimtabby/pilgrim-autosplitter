@@ -37,6 +37,9 @@ class Splitter:
         self.highest_match_percent = None  # Referenced by ui_controller to set match percent information, and set by ui_controller ever time it calls split_dir.next_split_image or split_dir.previous_split_image
         self.changing_splits = False  # Set by ui_controller when scrolling back and forth between splits. Akin to a soft reset of the thread
         self.waiting = False
+        self.pause_split_action = False
+        self.dummy_split_action = False
+        self.normal_split_action = False
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
 
@@ -193,21 +196,15 @@ class Splitter:
             if self._compare_thread_finished:
                 return
 
+        self.pause_split_action = False
+        self.dummy_split_action = False
+        self.normal_split_action = False
         if self.splits.list[self.splits.current_image_index].pause_flag:
-            key_code = settings.get_str("PAUSE_HOTKEY_CODE")
-            if key_code != "":
-                hotkey.press_hotkey(key_code)
-            self.splits.next_split_image()
-
+            self.pause_split_action = True
         elif self.splits.list[self.splits.current_image_index].dummy_flag:
-            self.splits.next_split_image()
-
+            self.dummy_split_action = True
         else:
-            key_code = settings.get_str("SPLIT_HOTKEY_CODE")
-            if key_code == "":
-                self.splits.next_split_image()
-            else:
-                hotkey.press_hotkey(key_code)
+            self.normal_split_action = True
 
         if suspend_duration > 0:
             self.suspended = True

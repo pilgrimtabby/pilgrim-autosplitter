@@ -88,19 +88,22 @@ class SplitDir:
         self.current_loop = 0
 
     def set_default_threshold(self):
+        default_threshold = settings.get_float("DEFAULT_THRESHOLD")
         for image in self.list:
             if image.threshold_is_default:
-                image.threshold = settings.get_float("DEFAULT_THRESHOLD")
+                image.threshold = default_threshold
 
     def set_default_delay(self):
+        default_delay = settings.get_float("DEFAULT_DELAY")
         for image in self.list:
             if image.delay_is_default:
-                image.delay_duration = settings.get_float("DEFAULT_DELAY")
+                image.delay_duration = default_delay
 
     def set_default_pause(self):
+        default_pause = settings.get_float("DEFAULT_PAUSE")
         for image in self.list:
             if image.pause_is_default:
-                image.pause_duration = settings.get_float("DEFAULT_PAUSE")
+                image.pause_duration = default_pause
 
     def resize_images(self):
         for image in self.list:
