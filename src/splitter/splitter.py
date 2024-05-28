@@ -522,12 +522,6 @@ class Splitter:
         Euclidean distance for the given image. Details on this are provided in
         split_dir.py's documentation.
 
-        #TODO: The try block is to protect against race conditions that can
-        lead to errors related to the mixing of different attributes from
-        different objects when the UI's aspect ratio is changed. However, this
-        may no longer be necessary now that the cmoparison frame is always the
-        same size, regardless of aspect ratio.
-
         Args:
             frame (numpy.ndarray): The current comparison frame from the video
                 feed.
@@ -536,19 +530,15 @@ class Splitter:
             float: The percent likelihood that the split image and the frame
                 are the same image, expressed as a float between 0 and 1.
         """
-        try:
-            euclidean_dist = cv2.norm(
-                src1=self.splits.list[self.splits.current_image_index].image,
-                src2=frame,
-                normType=cv2.NORM_L2,
-                mask=self.splits.list[self.splits.current_image_index].mask,
-            )
-            return 1 - (
-                euclidean_dist
-                / self.splits.list[self.splits.current_image_index].max_dist
-            )
-        except cv2.error:
-            return self.current_match_percent
+        euclidean_dist = cv2.norm(
+            src1=self.splits.list[self.splits.current_image_index].image,
+            src2=frame,
+            normType=cv2.NORM_L2,
+            mask=self.splits.list[self.splits.current_image_index].mask,
+        )
+        return 1 - (
+            euclidean_dist / self.splits.list[self.splits.current_image_index].max_dist
+        )
 
     def _split(self) -> None:
         """Handle the events immediately before, during, and after a split.

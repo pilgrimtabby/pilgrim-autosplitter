@@ -158,7 +158,7 @@ def load_defaults() -> None:
         # The FPS used by splitter and ui_controller
         set_value("FPS", 60)
 
-        # Determine whether screenshots should be opened using the machine's 
+        # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
         set_value("OPEN_SCREENSHOT_ON_CAPTURE", False)
 

@@ -144,16 +144,12 @@ class SplitDir:
                 image.pause_duration = default_pause
 
     def resize_images(self) -> None:
-        """Regenerate the image, mask, and pixmap attributes of all splits.
+        """Regenerate each split image's pixmap.
 
         Useful when changing aspect ratios, since the size of the pixmap can
         change.
-
-        #TODO: This method may not need to call get_image_and_mask, since the
-        split image should always be the same size anyway.
         """
         for image in self.list:
-            image.image, image.mask = image.get_image_and_mask()
             image.pixmap = image.get_pixmap()
 
     ###############
@@ -248,6 +244,9 @@ class SplitDir:
         def get_image_and_mask(self) -> Tuple[numpy.ndarray, numpy.ndarray]:
             """Read a split image from a file and generate a mask.
 
+            If the split image is grayscale (only 1 channel), convert it to a
+            3-channel BGR image.
+
             If the split image has an alpha channel (transparency), strip the
             alpha channel off and use it as a mask. Doing this will ensure that
             the splitter only checks the non-transparent parts of the image,
@@ -269,6 +268,10 @@ class SplitDir:
                 interpolation=cv2.INTER_AREA,
             )
 
+            # Convert image to BGR if it's grayscale
+            if self._is_single_channel(image):
+                image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
             if self._has_alpha_channel(image):
                 mask = image[:, :, 3]
                 image = image[:, :, 0:3]
@@ -279,6 +282,9 @@ class SplitDir:
 
         def get_pixmap(self) -> QPixmap:
             """Generate a QPixmap from a numpy array.
+
+            If the split image is grayscale (only 1 channel), convert it to a
+            3-channel BGR image.
 
             The process for converting numpy arrays to QImages varies depending
             on the number of channels, so I handle that by using different
@@ -301,7 +307,11 @@ class SplitDir:
                 interpolation=cv2.INTER_NEAREST,
             )
 
-            # QImage has no BGRA Format flag, or we would use that and omit 
+            # Convert image to BGR if it's grayscale
+            if self._is_single_channel(image):
+                image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
+            # QImage has no BGRA Format flag, or we would use that and omit
             # .rgbSwapped()
             if self._has_alpha_channel(image):
                 frame_qimage = QImage(
@@ -352,6 +362,21 @@ class SplitDir:
             else:
                 return math.sqrt(cv2.countNonZero(self.mask) * 3) * 255
 
+        def _is_single_channel(self, image: numpy.ndarray) -> bool:
+            """Check if an image is grayscale (has only 1 channel).
+
+            If an image has only 1 channel, numpy.size returns only two values:
+            length and width. We use that to check how many channels an image
+            has.
+
+            Args:
+                image (numpy.ndarray): The image to check.
+
+            Returns:
+                bool: True if the image is grayscale, False otherwise.
+            """
+            return len(image.shape) == 2
+
         def _has_alpha_channel(self, image: numpy.ndarray) -> bool:
             """Show whether a given image with at least 3 channels has an alpha
             channel.
@@ -362,12 +387,8 @@ class SplitDir:
             the alpha channel is always channel no. 4.
 
             If IndexError is thrown, that means there is only 1 channel. This,
-            of course, means there is no alpha channel.
-
-            #TODO: This method doesn't currently handle single-channel images
-            like it should. The program doesn't crash, but single-channel
-            images fail to generate a match percent when compares against video
-            footage, and the QPixmap is also not generated correctly.
+            of course, means there is no alpha channel, so the method returns
+            False.
 
             Args:
                 image (numpy.ndarray): The image to check.

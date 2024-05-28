@@ -2282,9 +2282,7 @@ class UIController:
         # Explicitly say "is not True", "is not False" on these last three
         # flags to catch None values from __init__()
         if self._most_recent_split_index is None:
-            if (
-                self._splits_active is not False
-            ):
+            if self._splits_active is not False:
                 self._splits_active = False
                 flag_changed = True
         else:
