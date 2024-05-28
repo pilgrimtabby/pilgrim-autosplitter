@@ -241,7 +241,7 @@ If you don't know what you're doing:
 
 You'll need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
 
-Download the source files by going to the most recent release (under Releases on the right-hand side of the page) and downloading `source.zip`. Extract the files and open the folder.
+Download the source files by going to the most recent release (under Releases on the right-hand side of the page) and downloading `Source code (zip)` or `Source code (tar.gz)`. Extract the files and open the folder.
 
 Open the Terminal (if you can't find it, press cmd+space to open Spotlight and search for "Terminal").
 
@@ -267,7 +267,7 @@ If you don't know what you're doing:
 
 You'll need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
 
-Download the source files by going to the most recent release (under Releases on the right-hand side of the page) and downloading `source.zip`. Extract the files and open the folder.
+Download the source files by going to the most recent release (under Releases on the right-hand side of the page) and downloading `Source code (zip)` or `Source code (tar.gz)`. Extract the files and open the folder.
 
 Open the Command Prompt (if you can't find it, open the start menu and type in "Command Prompt", and it should come up).
 
