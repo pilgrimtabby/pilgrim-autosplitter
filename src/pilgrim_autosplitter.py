@@ -101,6 +101,7 @@ def main():
 
     if platform.system() != "Windows":
         import traceback
+
         with open("/tmp/pilgrimautosplitter.log", "a") as log:
             try:
                 PilgrimAutosplitter()

@@ -223,15 +223,19 @@ class UIController:
 
         # Close window convenience shortcut
         self._settings_window.close_window_shortcut.activated.connect(
-            self._settings_window.done
+            lambda: self._settings_window.done(0)
         )
 
         # Cancel button
-        self._settings_window.cancel_button.clicked.connect(self._settings_window.done)
+        self._settings_window.cancel_button.clicked.connect(
+            lambda: self._settings_window.done(0)
+        )
 
         # Save button
         self._settings_window.save_button.clicked.connect(self._save_settings)
-        self._settings_window.save_button.clicked.connect(self._settings_window.done)
+        self._settings_window.save_button.clicked.connect(
+            lambda: self._settings_window.done(0)
+        )
 
         #################
         #               #
