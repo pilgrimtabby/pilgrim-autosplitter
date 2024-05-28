@@ -43,7 +43,7 @@ COMPARISON_FRAME_WIDTH = 320
 COMPARISON_FRAME_HEIGHT = 240
 
 # Pilgrim Autosplitter's current version number
-VERSION_NUMBER = "0.0.1"
+VERSION_NUMBER = "1.0.0"
 
 # Create or access the QSettings file that persists user settings
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")
