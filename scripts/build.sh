@@ -11,12 +11,7 @@
 # Platypus allows it to open and retain an icon, but we still have to deal with the terminal
 # window popping up. Oh, well...
 
-# I couldn't find a way to programatically make the icon show up on the task bar, so you'll have to
-# add it manually:
-# Right click on resources/icon-macos.png and copy it to the clipboard
-# Navigate to /dist/Pilgrim Autosplitter.app/Contents/Resources/Pilgrim Autosplitter
-# Right click, select "get info", click the image icon in the top-left corner, and press cmd+v
-# Sometimes I have to attempt to copy the image again if it doesn't work
+# Also, I tried, but I couldn't find a way to make the correct icon show up on the task bar.
 
 
 # Build the executible

@@ -225,7 +225,13 @@ Download the latest MacOS build by going to the most recent release (under Relea
 
 Pros: It's one file, and it's easy to install and use.
 
-Cons: A quirk of building this program on MacOS is that opening it always opens a Terminal window that can't be closed without shutting the program down too. However, the Terminal window can be easily minimzed and ignored. Also, Pilgrim Autosplitter takes a little longer to load when running from the executible (about 30 seconds on my M1 Macbook Air), so keep that in mind.
+Cons: A quirk of building this program on MacOS is that opening it always opens a Terminal window that can't be closed without shutting the program down too. However, the Terminal window can be easily minimzed and ignored.
+
+Pilgrim Autosplitter takes much longer to load when running from the executible (about 30 seconds on my M1 Macbook Air).
+
+The app's custom icon doesn't show up correctly in the dock (unfortunately, there is apparently no known way to persist MacOS icons for files in Github repositories).
+
+None of these problems exist when [running from source](#download-and-run-using-python), but running from source is much less convenient and can be tricky if you don't have much experience.
 
 TROUBLESHOOTING: If you get the following error:
 
