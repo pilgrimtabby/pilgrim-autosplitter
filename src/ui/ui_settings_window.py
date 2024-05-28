@@ -26,7 +26,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Template for the settings window view. Most functionality is not provided and should be provided in a controller class.
+"""Template for the settings window view. Most functionality is not provided
+and should be provided in a controller class.
 """
 
 
@@ -41,39 +42,66 @@ from PyQt5.QtWidgets import (QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
 
 
 class UISettingsWindow(QDialog):
-    """Initialize settings window widgets and allow the settings window to be executed.
+    """Initialize settings window widgets and allow the settings window to be
+    executed.
 
-    The below widgets are initialized when a UISettingsWindow instance is created but, with few exceptions, they are connected to their helper methods in ui_controller. This is to enforce a view-controller structure, where this file functions primarily as a view.
+    The below widgets are initialized when a UISettingsWindow instance is
+    created but, with few exceptions, they are connected to their helper
+    methods in ui_controller. This is to enforce a view-controller structure,
+    where this file functions primarily as a view.
 
-    Inherits QDialog and, by extension, its attributes and methods. See help(PyQt5.QtWidgets.QDialog).
+    Inherits QDialog and, by extension, its attributes and methods. See
+    help(PyQt5.QtWidgets.QDialog).
 
     Attributes:
-        aspect_ratio_combo_box (QComboBox): Store and allow selection of aspect ratio settings.
-        border_helper_frame (QFrame): Draw a border around the edge of the menu for aesthetic purposes.
-        cancel_button (QPushButton): Close the menu without saving. Same as clicking the "x button", pressing esc, etc.
+        aspect_ratio_combo_box (QComboBox): Store and allow selection of aspect
+            ratio settings.
+        border_helper_frame (QFrame): Draw a border around the edge of the menu
+            for aesthetic purposes.
+        cancel_button (QPushButton): Close the menu without saving. Same as
+            clicking the "x button", pressing esc, etc.
         close_window_shortcut (QShortcut): Same as cancel_button.
-        default_delay_double_spinbox (QDoubleSpinBox): Store and allow selection of default delay before splitting.
-        default_pause_double_spinbox (QDoubleSpinBox): Store and allow selection of default pause after splitting.
-        default_threshold_double_spinbox (QDoubleSpinBox): Store and allow selection of default match percent threshold for triggering a split.
-        fps_spinbox (QSpinBox): Store and allow selection of default frames per second.
-        global_hotkeys_checkbox (QCheckBox): Store and allow selection of whether global hotkeys are enabled.
-        match_percent_decimals_spinbox (QSpinBox): Store and allow selection of amount of decimal places shown when displaying match percents.
-        next_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of next split hotkey.
-        open_screenshots_checkbox (QCheckBox): Store and allow selection of whether screenshots are opened when they are captured.
-        pause_hotkey_line_edit (KeyLineEdit): Store and allow selection of pause timer hotkey.
-        previous_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of previous split hotkey.
-        reset_hotkey_line_edit (KeyLineEdit): Store and allow selection of reset splits hotkey.
+        default_delay_double_spinbox (QDoubleSpinBox): Store and allow
+            selection of default delay before splitting.
+        default_pause_double_spinbox (QDoubleSpinBox): Store and allow
+            selection of default pause after splitting.
+        default_threshold_double_spinbox (QDoubleSpinBox): Store and allow
+            selection of default match percent threshold for triggering a
+            split.
+        fps_spinbox (QSpinBox): Store and allow selection of default frames per
+            second.
+        global_hotkeys_checkbox (QCheckBox): Store and allow selection of
+            whether global hotkeys are enabled.
+        match_percent_decimals_spinbox (QSpinBox): Store and allow selection of
+            amount of decimal places shown when displaying match percents.
+        next_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+            next split hotkey.
+        open_screenshots_checkbox (QCheckBox): Store and allow selection of
+            whether screenshots are opened when they are captured.
+        pause_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+            pause timer hotkey.
+        previous_split_hotkey_line_edit (KeyLineEdit): Store and allow
+            selection of previous split hotkey.
+        reset_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+            reset splits hotkey.
         save_button (QPushButton): Save all settings and close the window.
-        screenshot_hotkey_line_edit (KeyLineEdit): Store and allow selection of screenshot hotkey.
-        skip_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of skip split hotkey.
-        start_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of split hotkey.
-        start_with_video_checkbox (QCheckBox): Store and allow selection of whether this program should try to open a video feed on startup.
+        screenshot_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+            screenshot hotkey.
+        skip_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+            skip split hotkey.
+        start_split_hotkey_line_edit (KeyLineEdit): Store and allow selection
+            of split hotkey.
+        start_with_video_checkbox (QCheckBox): Store and allow selection of
+            whether this program should try to open a video feed on startup.
         theme_combo_box (QComboBox): Store and allow selection of UI theme.
-        toggle_global_hotkeys_hotkey_line_edit (KeyLineEdit): Store and allow selection of toggle global hotkeys enabled hotkey.
-        undo_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of undo split hotkey.
+        toggle_global_hotkeys_hotkey_line_edit (KeyLineEdit): Store and allow
+            selection of toggle global hotkeys enabled hotkey.
+        undo_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+            undo split hotkey.
     """
     def __init__(self) -> None:
-        """Initialize all widgets in the settings window, including helper widgets.
+        """Initialize all widgets in the settings window, including helper
+        widgets.
         """
         #################
         #               #
@@ -403,12 +431,15 @@ class UISettingsWindow(QDialog):
         self.save_button.setFocusPolicy(Qt.NoFocus)
 
     def event(self, event) -> Union[bool, QWidget.event]:
-        """Allow the user to take focus off a widget by clicking somewhere else.
+        """Allow the user to take focus off a widget by clicking somewhere
+        else.
 
-        Overrides QDialog.event. See help(PyQt5.QtWidgets.QDialog) for implementation details.
+        Overrides QDialog.event. See help(PyQt5.QtWidgets.QDialog) for
+        implementation details.
 
         Returns:
-            Union[bool, QWidget.event]: True if the mouse press was handled; otherwise, return the event for further handling by the system.
+            Union[bool, QWidget.event]: True if the mouse press was handled;
+                otherwise, return the event for further handling by the system.
         """
         if (event.type() == QEvent.MouseButtonPress):
             self.setFocus(True)
@@ -418,18 +449,25 @@ class UISettingsWindow(QDialog):
 class KeyLineEdit(QLineEdit):
     """Box that allows users to enter a single key as a hotkey.
 
-    KeyLineEdit depends on ui_controller._handle_hotkey_press for its implementation. See that method for details. Alternatively, you can create listener that will catch keypresses and write their values into this class.
+    KeyLineEdit depends on ui_controller._handle_hotkey_press for its
+    implementation. See that method for details. Alternatively, you can create
+    a listener that will catch keypresses and write their values into this
+    class.
     
-    KeyLineEdit extends QLineEdit. See help(PyQt5.QtWidgets.QLineEdit) for implementation details.
+    KeyLineEdit extends QLineEdit. See help(PyQt5.QtWidgets.QLineEdit) for
+    implementation details.
 
     Attributes:
-        key_code (str): A string representation of a pynput.keyboard.Key.vk value. In other words, the virtual key integer value of a given key.
+        key_code (str): A string representation of a pynput.keyboard.Key.vk
+            value. In other words, the virtual key integer value of a given
+            key.
     """
     def __init__(self, parent=None) -> None:
         """Initialize a KeyLineEdit with a blank key_code value.
 
         Args:
-            parent (QWidget, optional): The parent QWidget. Defaults to None. See help(PyQt5.QtWidgets.QLineEdit) for details. 
+            parent (QWidget, optional): The parent QWidget. Defaults to None.
+                See help(PyQt5.QtWidgets.QLineEdit) for details. 
         """
         QLineEdit.__init__(self, parent)
         self.key_code = ""

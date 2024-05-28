@@ -69,7 +69,9 @@ def get_str(key: str) -> str:
 def get_bool(key: str) -> bool:
     """Return a bool from settings, regardless of the stored value's type.
 
-    If this is used on a setting that is not a boolean, it will always return True if the setting is populated, so only use this function to get values that are stored as True or False.
+    If this is used on a setting that is not a boolean, it will always return
+    True if the setting is populated, so only use this function to get values
+    that are stored as True or False.
 
     Args:
         key (str): The name of the setting. E.g. "CHEESE_FLAVOR".
@@ -85,7 +87,8 @@ def get_bool(key: str) -> bool:
 def get_int(key: str) -> int:
     """Return an int from settings, regardless of the stored value's type.
 
-    This should only be used on settings for which is_digit would return True, or Python will throw a TypeError.
+    This should only be used on settings for which is_digit would return True,
+    or Python will throw a TypeError.
 
     Args:
         key (str): The name of the setting. E.g. "CHEESE_FLAVOR".
@@ -98,7 +101,8 @@ def get_int(key: str) -> int:
 def get_float(key: str) -> float:
     """Return a float from settings, regardless of the stored value's type.
 
-    This should only be used to retrieve settings for which float(foo) would not throw a TypeError.
+    This should only be used to retrieve settings for which float(foo) would
+    not throw a TypeError.
 
     Args:
         key (str): The name of the setting. E.g. "CHEESE_FLAVOR".
@@ -111,7 +115,8 @@ def get_float(key: str) -> float:
 def set_value(key: str, value: any) -> None:
     """Persist a setting as a str, regardless of the value's type.
 
-    Strings are preferred because QSettings doesn't remember types on all platforms-- it depends on the backend used.
+    Strings are preferred because QSettings doesn't remember types on all
+    platforms-- it depends on the backend used.
 
     Args:
         key (str): The name of the setting. E.g. "CHEESE_FLAVOR".
@@ -122,7 +127,11 @@ def set_value(key: str, value: any) -> None:
 def load_defaults() -> None:
     """Ensure that settings values make sense before they are used.
 
-    Populates settings with default values if they have not yet been set. Ensures that LAST_IMAGE_DIR points to an existing path. Ensures that the program starts in full view if START_WITH_VIDEO is false, since the user would have to exit minimal view to turn the video on anyway. Makes sure that the correct aspect ratio is shown.
+    Populates settings with default values if they have not yet been set.
+    Ensures that LAST_IMAGE_DIR points to an existing path. Ensures that the
+    program starts in full view if START_WITH_VIDEO is false, since the user
+    would have to exit minimal view to turn the video on anyway. Makes sure
+    that the correct aspect ratio is shown.
     """
     if not get_bool("SETTINGS_SET"):
 

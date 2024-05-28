@@ -45,12 +45,16 @@ class PilgrimAutosplitter:
     """Initialize and run Pilgrim Autosplitter.
 
     Attributes:
-        pilgrim_autosplitter (QApplication): The application container that allows QObjects, including the UI, to be initialized.
-        splitter (Splitter): Backend for capturing and comparing images to video.
-        ui_controller (UIController): Backend for updating the UI and handling user input.
+        pilgrim_autosplitter (QApplication): The application container that
+            allows QObjects, including the UI, to be initialized.
+        splitter (Splitter): Backend for capturing and comparing images to
+            video.
+        ui_controller (UIController): Backend for updating the UI and handling
+            user input.
     """
     def __init__(self) -> None:
-        """Create an application, a splitter, and a UI, then run the application.
+        """Create an application, a splitter, and a UI, then run the
+        application.
         """
         self.pilgrim_autosplitter = QApplication(sys.argv)
         self.pilgrim_autosplitter.setStyle("fusion")

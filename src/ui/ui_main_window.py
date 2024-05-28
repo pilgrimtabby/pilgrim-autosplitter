@@ -26,7 +26,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Template for the main window view. Most functionality is not provided and should be provided in a controller class.
+"""Template for the main window view. Most functionality is not provided and
+should be provided in a controller class.
 """
 
 
@@ -43,56 +44,112 @@ from settings import VERSION_NUMBER
 class UIMainWindow(QMainWindow):
     """Initialize main window widgets and allow the main window to be executed.
 
-    The below widgets are initialized when a UIMainWindow instance is created but, with few exceptions, they are connected to their helper methods in ui_controller. This is to enforce a view-controller structure, where this file functions primarily as a view.
+    The below widgets are initialized when a UIMainWindow instance is created
+    but, with few exceptions, they are connected to their helper methods in
+    ui_controller. This is to enforce a view-controller structure, where this
+    file functions primarily as a view.
 
-    Inherits QMainWindow and, by extension, its attributes and methods. See help(PyQt5.QtWidgets.QMainWindow).
+    Inherits QMainWindow and, by extension, its attributes and methods. See
+    help(PyQt5.QtWidgets.QMainWindow).
 
     Attributes:
-        HEIGHT_CORRECTION (int): The pixels the window's height is extended by. Useful on Windows, where QMenuBar is displayed on top of the main window, increasing window size.
-        LEFT_EDGE_CORRECTION (int): The pixels the window's widgets are all pushed to the right.
-        TOP_EDGE_CORRECTION (int): The pixels the window's widgets are all pushed down.
-        close_window_shortcut (QShortcut): Keyboard shortcut to close the main window.
-        current_match_percent (QLabel): Displays the current image match percent, or a null string (see ui_controller._update_ui for details).
-        current_match_percent_label (QLabel): Displays text describing the current image match percent.
-        current_match_percent_sign (QLabel): Displays a percent sign after the current image match percent.
-        help_action (QAction): Adds a menu bar item which triggers opening the user manual.
-        highest_match_percent (QLabel): Displays the highest image match percent so far, or a null string (see ui_controller._update_ui for details).
-        highest_match_percent_label (QLabel): Displays text describing the highest image match percent.
-        highest_match_percent_sign (QLabel): Displays a percent sign after the highest image match percent.
-        minimal_view_button (QPushButton): Allows the user to show or hide minimal view.
-        minimal_view_no_splits_label (QLabel): In minimal view, displays text saying no splits are active.
-        next_source_button (QPushButton): Allows the user to attempt to connect to the next video source, if one exists.
-        next_split_button (QPushButton): Allows the user to move to the next split without triggering any hotkeys.
-        pause_comparison_button (QPushButton): Allows the user to stop the splitter from comparing images to the split image.
-        pause_comparison_button_pause_text_default (str): Text prompting the user to pause the splitter (default length).
-        pause_comparison_button_pause_text_truncated (str): Text prompting the user to pause the splitter (short length).
-        pause_comparison_button_unpause_text_default (str): Text prompting the user to unpause the splitter (default length).
-        pause_comparison_button_unpause_text_truncated (str): Text prompting the user to unpause the splitter (short length).
-        previous_split_button (QPushButton): Allows the user to move to the previous split without triggering any hotkeys.
-        reload_video_button (QPushButton): Allows the user to attempt to reconnect to the current video source.
-        reset_splits_button (QPushButton): Allows the user to reset a run. This also refreshes the split image list if more splits have been added to the folder or if names have been updated.
-        screenshot_button (QPushButton): Allows the user to take a screenshot of the current video frame and save it to the current split directory.
-        screenshot_error_message_box (QMessageBox): Message to display if the screenshot button was pressed but the screenshot couldn't be taken.
-        screenshot_success_message_box (QMessageBox): Message to display if a screenshot was taken successfully and the user doesn't have "open screenshots on capture" enabled.
-        settings_action (QAction): Adds a menu bar item which triggers opening the settings menu.
-        skip_split_button (QPushButton): Allows the user to move to the next split. Does the same thing as pressing the skip split hotkey.
-        split_directory_button (QPushButton): Allows the user to select a split image folder.
-        split_directory_line_edit (QLineEdit): Shows the path to the current split image folder.
-        split_image_default_text (str): Informs the user there are no split images loaded currently.
-        split_image_display (QLabel): Display split images if loaded, or else show the split_image_default_text.
-        split_image_loop_label (QLabel): Informs the user about the current split's loop information.
-        split_image_overlay (QLabel): Informs the user that a pre-split delay or post-split pause is taking place.
+        HEIGHT_CORRECTION (int): The pixels the window's height is extended by.
+            Useful on Windows, where QMenuBar is displayed on top of the main
+            window, increasing window size.
+        LEFT_EDGE_CORRECTION (int): The pixels the window's widgets are all
+            pushed to the right.
+        TOP_EDGE_CORRECTION (int): The pixels the window's widgets are all
+            pushed down.
+        close_window_shortcut (QShortcut): Keyboard shortcut to close the main
+            window.
+        current_match_percent (QLabel): Displays the current image match
+            percent, or a null string (see ui_controller._update_ui for
+            details).
+        current_match_percent_label (QLabel): Displays text describing the
+            current image match percent.
+        current_match_percent_sign (QLabel): Displays a percent sign after the
+            current image match percent.
+        help_action (QAction): Adds a menu bar item which triggers opening the
+            user manual.
+        highest_match_percent (QLabel): Displays the highest image match
+            percent so far, or a null string (see ui_controller._update_ui for
+            details).
+        highest_match_percent_label (QLabel): Displays text describing the
+            highest image match percent.
+        highest_match_percent_sign (QLabel): Displays a percent sign after the
+            highest image match percent.
+        minimal_view_button (QPushButton): Allows the user to show or hide
+            minimal view.
+        minimal_view_no_splits_label (QLabel): In minimal view, displays text
+            saying no splits are active.
+        next_source_button (QPushButton): Allows the user to attempt to connect
+            to the next video source, if one exists.
+        next_split_button (QPushButton): Allows the user to move to the next
+            split without triggering any hotkeys.
+        pause_comparison_button (QPushButton): Allows the user to stop the
+            splitter from comparing images to the split image.
+        pause_comparison_button_pause_text_default (str): Text prompting the
+            user to pause the splitter (default length).
+        pause_comparison_button_pause_text_truncated (str): Text prompting the
+            user to pause the splitter (short length).
+        pause_comparison_button_unpause_text_default (str): Text prompting the
+            user to unpause the splitter (default length).
+        pause_comparison_button_unpause_text_truncated (str): Text prompting
+            the user to unpause the splitter (short length).
+        previous_split_button (QPushButton): Allows the user to move to the
+            previous split without triggering any hotkeys.
+        reload_video_button (QPushButton): Allows the user to attempt to
+            reconnect to the current video source.
+        reset_splits_button (QPushButton): Allows the user to reset a run. This
+            also refreshes the split image list if more splits have been added
+            to the folder or if names have been updated.
+        screenshot_button (QPushButton): Allows the user to take a screenshot
+            of the current video frame and save it to the current split
+            directory.
+        screenshot_error_message_box (QMessageBox): Message to display if the
+            screenshot button was pressed but the screenshot couldn't be taken.
+        screenshot_success_message_box (QMessageBox): Message to display if a
+            screenshot was taken successfully and the user doesn't have "open
+            screenshots on capture" enabled.
+        settings_action (QAction): Adds a menu bar item which triggers opening
+            the settings menu.
+        skip_split_button (QPushButton): Allows the user to move to the next
+            split. Does the same thing as pressing the skip split hotkey.
+        split_directory_button (QPushButton): Allows the user to select a split
+            image folder.
+        split_directory_line_edit (QLineEdit): Shows the path to the current
+            split image folder.
+        split_image_default_text (str): Informs the user there are no split
+            images loaded currently.
+        split_image_display (QLabel): Display split images if loaded, or else 
+            show the split_image_default_text.
+        split_image_loop_label (QLabel): Informs the user about the current
+            split's loop information.
+        split_image_overlay (QLabel): Informs the user that a pre-split delay
+            or post-split pause is taking place.
         split_name_label (QLabel): Shows the current split name.
-        threshold_match_percent (QLabel): Displays the threshold image match percent for the current split, or a null string (see ui_controller._update_ui for details).
-        threshold_match_percent_label (QLabel): Displays text describing the threshold image match percent.
-        threshold_match_percent_sign (QLabel): Displays a percent sign after the threshold image match percent.
-        undo_split_button (QPushButton): Allows the user to move to the previous split. Does the same thing as pressing the undo split hotkey.
-        video_feed_display (QLabel): Display video feed if connected, or else show the video_feed_display_default_text.
-        video_feed_display_default_text (str): Informs the user there is no video connected currently.
-        video_feed_label (QLabel): Show information about the current video if loaded.
-        video_feed_label_down_text_min (str): In minimal view, inform the user there is no video connected.
-        video_feed_label_live_text (str): In full view, inform the user the video is connected.
-        video_feed_label_live_text_min (str): In minimal view, inform the user the video is connected.
+        threshold_match_percent (QLabel): Displays the threshold image match
+            percent for the current split, or a null string (see
+            ui_controller._update_ui for details).
+        threshold_match_percent_label (QLabel): Displays text describing the
+            threshold image match percent.
+        threshold_match_percent_sign (QLabel): Displays a percent sign after
+            the threshold image match percent.
+        undo_split_button (QPushButton): Allows the user to move to the
+            previous split. Does the same thing as pressing the undo split
+            hotkey.
+        video_feed_display (QLabel): Display video feed if connected, or else
+            show the video_feed_display_default_text.
+        video_feed_display_default_text (str): Informs the user there is no
+            video connected currently.
+        video_feed_label (QLabel): Show information about the current video if
+            loaded.
+        video_feed_label_down_text_min (str): In minimal view, inform the user
+            there is no video connected.
+        video_feed_label_live_text (str): In full view, inform the user the
+            video is connected.
+        video_feed_label_live_text_min (str): In minimal view, inform the user
+            the video is connected.
     """
     def __init__(self) -> None:
         """Initialize all widgets in the main window.

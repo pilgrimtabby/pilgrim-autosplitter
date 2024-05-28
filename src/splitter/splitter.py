@@ -46,30 +46,52 @@ from splitter.split_dir import SplitDir
 class Splitter:
     """Capture video and compare it to a split image.
 
-    Video capture and image matching are both performed in their own dedicated threads, which means that thread safety is always a top priority when working with this class. _capture_thread saves information about the current frame to class attributes, which are in turn used by _compare_thread to generate a probability of match with the current split image. If a match is found, a flag is set indicating which type of split (dummy, normal, or pause) should occur.
+    Video capture and image matching are both performed in their own dedicated
+    threads, which means that thread safety is always a top priority when
+    working with this class. _capture_thread saves information about the
+    current frame to class attributes, which are in turn used by
+    _compare_thread to generate a probability of match with the current split
+    image. If a match is found, a flag is set indicating which type of split
+    (dummy, normal, or pause) should occur.
 
-    ui_controller is constantly accessing the public attributes of this class, whether or not the threads are active, which is why several of these attributes are set to None after use.
+    ui_controller is constantly accessing the public attributes of this class,
+    whether or not the threads are active, which is why several of these
+    attributes are set to None after use.
 
     Attributes:
-        capture_thread (threading.Thread): Thread instance that reads and resizes images from a cv2.VideoCapture instance.
-        changing_splits (bool): Flag set by ui_controller before telling self.splits to go to a new split image.
-        comparison_frame (numpy.ndarray): Numpy array used to generate a comparison with a split image.
-        current_match_percent (float): The most recent match percent between a frame and a split image.
-        delay_remaining (float): The amount of time left (in seconds) until a planned split occurs.
-        delaying (bool): Indicates whether _split is waiting before setting a split action flag.
-        dummy_split_action (bool): When True, tells ui_controller to perform a dummy split action.
+        capture_thread (threading.Thread): Thread instance that reads and
+            resizes images from a cv2.VideoCapture instance.
+        changing_splits (bool): Flag set by ui_controller before telling
+            self.splits to go to a new split image.
+        comparison_frame (numpy.ndarray): Numpy array used to generate a
+            comparison with a split image.
+        current_match_percent (float): The most recent match percent between a
+            frame and a split image.
+        delay_remaining (float): The amount of time left (in seconds) until a
+            planned split occurs.
+        delaying (bool): Indicates whether _split is waiting before setting a
+            split action flag.
+        dummy_split_action (bool): When True, tells ui_controller to perform a
+            dummy split action.
         frame_pixmap (QPixmap): QPixmap used to show video feed on UI.
-        highest_match_percent (float): The highest match percent so far between a frame and a split image.
-        normal_split_action (bool): When True, tells ui_controller to perform a normal split action.
-        pause_split_action (bool): When True, tells ui_controller to perform a pause split action.
+        highest_match_percent (float): The highest match percent so far between
+            a frame and a split image.
+        normal_split_action (bool): When True, tells ui_controller to perform a
+            normal split action.
+        pause_split_action (bool): When True, tells ui_controller to perform a
+            pause split action.
         splits (SplitDir): The directory of split images currently in use.
-        suspend_remaining (float): The amount of time left (in seconds) before the end of a pause after a split.
+        suspend_remaining (float): The amount of time left (in seconds) before
+            the end of a pause after a split.
         suspended (bool): Indicates whether _compare_thread is alive.
         target_fps (int): The framerate set by the user.
-        waiting_for_split_change (bool): Indicates to ui_controller that _look_for_match received its changing_splits request and is waiting for the new split.
+        waiting_for_split_change (bool): Indicates to ui_controller that
+            _look_for_match received its changing_splits request and is waiting
+            for the new split.
     """
     def __init__(self) -> None:
-        """Set all flags and values needed to operate _capture_thread and _compare_thread.
+        """Set all flags and values needed to operate _capture_thread and
+        _compare_thread.
         """
         self.target_fps = settings.get_int("FPS")
         self._capture_max_fps = 60
@@ -110,7 +132,8 @@ class Splitter:
     def start(self) -> None:
         """Start _capture_thread and, if possible, start _compare_thread.
 
-        It is essential to ensure that all previous _capture_threads and _compare_threads have been safely exited before calling this method.
+        It is essential to ensure that all previous _capture_threads and 
+        _compare_threads have been safely exited before calling this method.
         """
         self._start_capture_thread()
         if len(self.splits.list) > 0:
@@ -119,7 +142,8 @@ class Splitter:
     def safe_exit_all_threads(self) -> None:
         """Safely kill _capture_thread.
 
-        Because killing _capture_thread also kills _compare_thread, this will always safely exit _compare_thread too.
+        Because killing _capture_thread also kills _compare_thread, this will
+        always safely exit _compare_thread too.
         """
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
@@ -128,7 +152,8 @@ class Splitter:
     def start_compare_thread(self) -> None:
         """Safely start _compare_thread.
 
-        It is essential to ensure that all previous _compare_threads have been safely exited before calling this method.
+        It is essential to ensure that all previous _compare_threads have been
+        safely exited before calling this method.
         """
         self._compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
@@ -147,7 +172,10 @@ class Splitter:
     def set_next_capture_index(self) -> None:
         """Try to find the next valid cv2 capture index, if it exists.
 
-        cv2 capture indexes can be separated by invalid indexes (for example, 0 and 2 could be valid indexes but not 1). To account for this, this method will try 3 invalid indexes before returning to index 0.
+        cv2 capture indexes can be separated by invalid indexes (for example, 0
+        and 2 could be valid indexes but not 1). To account for this, this
+        method will try 3 invalid indexes before returning to index 0.
+
         Saves the new index to settings, has no return value. 
         """
         source = settings.get_int("LAST_CAPTURE_SOURCE_INDEX") + 1
@@ -184,7 +212,8 @@ class Splitter:
     def _start_capture_thread(self) -> None:
         """Safely start capture_thread.
 
-        It is essential to ensure that all previous _capture_threads have been safely exited before calling this method.
+        It is essential to ensure that all previous _capture_threads have been
+        safely exited before calling this method.
         """
         self._cap = self._open_capture()
         self.capture_thread = threading.Thread(target=self._capture)
@@ -196,8 +225,14 @@ class Splitter:
         """Open and configure a cv2 VideoCapture.
 
         Sets CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
-        Sets CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to their respective values because these appear to be the smallest available values. The smaller the capture's width and height, the fast images can be downscaled, and the less CPU is required to do so.
-        Sets self._capture_max_fps to the capture's maximum FPS on platforms where this is supported. This is done to prevent unnecessary comparisons from being generated in _compare due to a mismatch between the user's selected framerate and a capture-imposed cap which is lower.
+        Sets CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to their respective
+        values because these appear to be the smallest available values. The
+        smaller the capture's width and height, the fast images can be
+        downscaled, and the less CPU is required to do so.
+        Sets self._capture_max_fps to the capture's maximum FPS on platforms
+        where this is supported. This is done to prevent unnecessary
+        comparisons from being generated in _compare due to a mismatch between
+        the user's selected framerate and a capture-imposed cap which is lower.
         
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
@@ -213,14 +248,28 @@ class Splitter:
         return cap
         
     def _capture(self) -> None:
-        """Read frames from a capture source, resize them, and expose them to _compare and ui_controller.
+        """Read frames from a capture source, resize them, and expose them to
+        _compare and ui_controller.
 
-        self.comparison_frame should always be 320x240. This helps with results consistency when matching split images; it also saves a lot of time and CPU power when making comparisons in _compare, and saves users space because they don't have to store dozens of massive image files. The ui_frame, on the other hand, is designed to be the size the user chooses, so it is resized accordingly and converted into a QPixmap.
+        self.comparison_frame should always be 320x240. This helps with results
+        consistency when matching split images; it also saves a lot of time and
+        CPU power when making comparisons in _compare, and saves users space
+        because they don't have to store dozens of massive image files. The
+        ui_frame, on the other hand, is designed to be the size the user
+        chooses, so it is resized accordingly and converted into a QPixmap.
 
-        The choices of cv2.INTER_LINEAR and cv2.INTER_NEAREST are deliberate. cv2.INTER_NEAREST provides the fastest method, by far, for downscaling images, but the quality is much worse and can throw off comparisons. For that reason, I use it when reading the ui_frame, but stick to cv2.INTER_LINEAR for the comparison_frame.
-        cv2.INTER_LINEAR is the next fastest setting after cv2.INTER_NEAREST. Its quality is significantly better for only a minor performance cost, which makes it a good choice for image matching.
+        The choices of cv2.INTER_LINEAR and cv2.INTER_NEAREST are deliberate.
+        cv2.INTER_NEAREST provides the fastest method, by far, for downscaling
+        images, but the quality is much worse and can throw off comparisons.
+        For that reason, I use it when reading the ui_frame, but stick to
+        cv2.INTER_LINEAR for the comparison_frame.
+
+        cv2.INTER_LINEAR is the next fastest setting after cv2.INTER_NEAREST.
+        Its quality is significantly better for only a minor performance cost,
+        which makes it a good choice for image matching.
         
-        This method continues indefinitely until self._capture_thread_finished is set.
+        This method continues indefinitely until self._capture_thread_finished
+        is set.
         """
         start_time = time.perf_counter()
         while not self._capture_thread_finished:
@@ -264,13 +313,15 @@ class Splitter:
         self.safe_exit_compare_thread()
 
     def _frame_to_pixmap(self, frame: numpy.ndarray) -> QPixmap:
-        """Generate a QPixmap instance from a 3-channel image stored as a numpy array.
+        """Generate a QPixmap instance from a 3-channel image stored as a numpy
+        array.
 
         Args:
             frame (numpy.ndarray): The source image.
 
         Returns:
-            QPixmap: The converted image. Returns a plain QPixmap instance is frame is None.
+            QPixmap: The converted image. Returns a plain QPixmap instance is
+                frame is None.
         """
         if frame is None:
             return QPixmap()
@@ -286,7 +337,8 @@ class Splitter:
     ###################################
 
     def _compare(self) -> None:
-        """Look for matches for each split image, splitting when matches are found.
+        """Look for matches for each split image, splitting when matches are
+        found.
         """
         still_going = True
         while still_going:
@@ -295,18 +347,28 @@ class Splitter:
                 self._split()
 
     def _look_for_match(self) -> bool:
-        """Compare each frame generated by _capture with the current split image.
+        """Compare each frame generated by _capture with the current split
+        image.
 
-        The block beginning with "if self.changing_split" is used to let the ui_controller pause and restart this method without killing the thread. Changing the split image while this method is running is theoretically thread-safe, but it can lead to odd side effects if the flags at the top aren't reset.
+        The block beginning with "if self.changing_split" is used to let the
+        ui_controller pause and restart this method without killing the thread.
+        Changing the split image while this method is running is theoretically
+        thread-safe, but it can lead to odd side effects if the flags at the
+        top aren't reset.
 
         The following flags are used to determine when to return a value:
             match_found: False until one of two conditions is met--
-                1) The split image's below_flag is False, and current_match_percent >= threshold_match_percent
-                2) went_above_threshold_flag is True and current_match_percent < threshold_match_percent
-            went_above_threshold_flag: False until the split image's below_flag is True, and current_match_percent >= threshold_match_percent
+                1) The split image's below_flag is False, and
+                    current_match_percent >= threshold_match_percent
+                2) went_above_threshold_flag is True and current_match_percent
+                    < threshold_match_percent
+            went_above_threshold_flag: False until the split image's below_flag
+                is True, and current_match_percent >= threshold_match_percent
         
         Returns:
-            bool: True if one of the two above match_found conditions are met. False if self._compare_thread_finished is called, terminating the thread.
+            bool: True if one of the two above match_found conditions are met.
+                False if self._compare_thread_finished is called, terminating
+                the thread.
         """
         self.current_match_percent = 0
         self.highest_match_percent = 0
@@ -359,18 +421,32 @@ class Splitter:
         return match_found
 
     def _update_fps_factor(self, frames_this_second: int, frame_counter_start_time: float) -> Tuple[int, float]:
-        """Watch _look_for_match's actual FPS count and adjusts self._interval as needed to reach the target framerate. This is needed since using time.sleep, as this method does, always introduces a little bit of drag, but the amount of drag depends on the machine and on the FPS setting the user chooses.
+        """Watch _look_for_match's actual FPS count and adjusts self._interval
+        as needed to reach the target framerate. This is needed since using
+        time.sleep, as this method does, always introduces a little bit of
+        drag, but the amount of drag depends on the machine and on the FPS
+        setting the user chooses.
 
-        This method is currently only implemented in _look_for_match. It could be implemented in _capture, too, but there are two reasons I don't want to:
-            1) _look_for_match runs a little slower than _capture, at least on my machine, so basing self._interval off the speed of _look_for_match guarantees that the _capture framerate isn't needlessly throttled.
-            2) Implementing this method inside more than one method would require tracking multiple intervals, which I feel would be needlessly complicated.
+        This method is currently only implemented in _look_for_match. It could
+        be implemented in _capture, too, but there are two reasons I don't want
+        to:
+            1) _look_for_match runs a little slower than _capture, at least on
+                my machine, so basing self._interval off the speed of
+                _look_for_match guarantees that the _capture framerate isn't
+                needlessly throttled.
+            2) Implementing this method inside more than one method would
+                require tracking multiple intervals, which I feel would be
+                needlessly complicated.
 
         Args:
-            frames_this_second (int): The amount of frames processed this second so far.
-            frame_counter_start_time (float): The exact time, measured by time.perf_counter(), the current second started.
+            frames_this_second (int): The amount of frames processed this
+                second so far.
+            frame_counter_start_time (float): The exact time, measured by
+                time.perf_counter(), the current second started.
 
         Returns:
-            Tuple[int, float]: The update frames_this_second and frame_counter_start_time values.
+            Tuple[int, float]: The update frames_this_second and 
+                frame_counter_start_time values.
         """
         if time.perf_counter() - frame_counter_start_time >= 1:
             fps = min(self.target_fps, self._capture_max_fps)
@@ -386,9 +462,12 @@ class Splitter:
         return frames_this_second, frame_counter_start_time
 
     def _get_interval(self) -> float:
-        """Return the amount of time loops in this class should sleep before each round.
+        """Return the amount of time loops in this class should sleep before
+        each round.
 
-        Calculated using the maximum fps available to the splitter multiplied by some adjustment factor, which is dynamically tweaked by _update_fps_factor.
+        Calculated using the maximum fps available to the splitter multiplied
+        by some adjustment factor, which is dynamically tweaked by
+        _update_fps_factor.
         
         Returns:
             float: The time.
@@ -398,19 +477,35 @@ class Splitter:
     def _get_match_percent(self, frame: numpy.ndarray) -> float:
         """Get the percent likelihood that two images are the same.
 
-        I do this by calculating the Euclidean distance between the two images. Euclidean distance is calculated by summing the squares of the value differences of each pixel in each channel when comparing two images of the same size, then taking the square root of that sum. For more information, see, e.g., https://en.wikipedia.org/wiki/Euclidean_distance.
+        I do this by calculating the Euclidean distance between the two images.
+        Euclidean distance is calculated by summing the squares of the value
+        differences of each pixel in each channel when comparing two images of
+        the same size, then taking the square root of that sum. For more
+        information, see, e.g., https://en.wikipedia.org/wiki/Euclidean_distance.
         
-        Fortunately, cv2.norm provides an easy way to do this by passing in normType=cv2.NORM_L2. In images with transparency, a mask must be supplied also which tells cv2.norm which pixels matter and which should be ignored.
+        Fortunately, cv2.norm provides an easy way to do this by passing in
+        normType=cv2.NORM_L2. In images with transparency, a mask must be
+        supplied also which tells cv2.norm which pixels matter and which should
+        be ignored.
         
-        To generate a match value between 0 and 1, you need to normalize the result. This can be done by dividing the result by the largest possible Euclidean distance for the given image. Details on this are provided in split_dir.py's documentation.
+        To generate a match value between 0 and 1, you need to normalize the
+        result. This can be done by dividing the result by the largest possible
+        Euclidean distance for the given image. Details on this are provided in
+        split_dir.py's documentation.
 
-        #TODO: The try block is to protect against race conditions that can lead to errors related to the mixing of different attributes from different objects when the UI's aspect ratio is changed. However, this may no longer be necessary now that the cmoparison frame is always the same size, regardless of aspect ratio.
+        #TODO: The try block is to protect against race conditions that can
+        lead to errors related to the mixing of different attributes from
+        different objects when the UI's aspect ratio is changed. However, this
+        may no longer be necessary now that the cmoparison frame is always the
+        same size, regardless of aspect ratio.
 
         Args:
-            frame (numpy.ndarray): The current comparison frame from the video feed.
+            frame (numpy.ndarray): The current comparison frame from the video
+                feed.
 
         Returns:
-            float: The percent likelihood that the split image and the frame are the same image, expressed as a float between 0 and 1.
+            float: The percent likelihood that the split image and the frame
+                are the same image, expressed as a float between 0 and 1.
         """
         try:
             euclidean_dist = cv2.norm(
@@ -426,7 +521,8 @@ class Splitter:
     def _split(self) -> None:
         """Handle the events immediately before, during, and after a split.
 
-        The various flags set by this method are read by ui_controller, which references them to update the UI and send hotkey presses.
+        The various flags set by this method are read by ui_controller, which
+        references them to update the UI and send hotkey presses.
         """
         # Get these values up front so that changing splits behind the scenes doesn't mess anything up
         delay_duration = self.splits.list[self.splits.current_image_index].delay_duration

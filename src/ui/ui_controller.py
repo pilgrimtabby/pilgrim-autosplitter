@@ -26,7 +26,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Manage the passing of information from the splitter to the UI, and from user input to the UI and the splitter.
+"""Manage the passing of information from the splitter to the UI, and from user
+input to the UI and the splitter.
 """
 
 
@@ -51,20 +52,31 @@ from ui.ui_settings_window import UISettingsWindow
 
 
 class UIController:
-    """Manage the passing of information from the splitter to the UI, and from user input to the UI and the splitter.
+    """Manage the passing of information from the splitter to the UI, and from
+    user input to the UI and the splitter.
 
-    Perhaps the most important class method is _update_ui, which is ran once per frame using a QTimer. This method updates the UI and handles all user inputs.
+    Perhaps the most important class method is _update_ui, which is ran once
+    per frame using a QTimer. This method updates the UI and handles all user
+    inputs.
 
-    UIController has no public attributes, as it is meant to operate after initialization without further input. For details about each attribute, see method documentation.
+    UIController has no public attributes, as it is meant to operate after
+    initialization without further input. For details about each attribute,
+    see method documentation.
     """
     def __init__(self, application: QApplication, splitter: Splitter) -> None:
         """Initialize the UI, then update it each frame.
 
-        Creates each UI window and then shows the main window. Connects pyqtSignals from each UI window to their respective slots. Sets initial flags and values used by _update_ui. Starts the hotkey listener. Starts _update_ui_timer, which polls user input and splitter output at regular intervals.
+        Creates each UI window and then shows the main window. Connects
+        pyqtSignals from each UI window to their respective slots. Sets initial
+        flags and values used by _update_ui. Starts the hotkey listener. Starts
+        _update_ui_timer, which polls user input and splitter output at regular
+        intervals.
         
         Args:
-            application (QApplication): The QApplication that the program is based on.
-            splitter (Splitter): The splitter capturing video and comparing video to splits.
+            application (QApplication): The QApplication that the program is
+                based on.
+            splitter (Splitter): The splitter capturing video and comparing
+                video to splits.
         """
         # Initialize the UI
         self._application = application
@@ -212,7 +224,8 @@ class UIController:
     def _attempt_undo_hotkey(self) -> None:
         """Try to press the undo split hotkey.
 
-        If global hotkeys are enabled and an undo split hotkey is defined, presses the hotkey. Otherwise, simply requests the previous split.
+        If global hotkeys are enabled and an undo split hotkey is defined,
+        presses the hotkey. Otherwise, simply requests the previous split.
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
@@ -223,7 +236,8 @@ class UIController:
     def _attempt_skip_hotkey(self) -> None:
         """Try to press the skip split hotkey.
 
-        If global hotkeys are enabled and a skip split hotkey is defined, presses the hotkey. Otherwise, simply requests the next split.
+        If global hotkeys are enabled and a skip split hotkey is defined,
+        presses the hotkey. Otherwise, simply requests the next split.
         """
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
         if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
@@ -234,7 +248,8 @@ class UIController:
     def _attempt_reset_hotkey(self) -> None:
         """Try to press the reset splits hotkey.
 
-        If global hotkeys are enabled and a reset splits hotkey is defined, presses the hotkey. Otherwise, simply resets splits.
+        If global hotkeys are enabled and a reset splits hotkey is defined,
+        presses the hotkey. Otherwise, simply resets splits.
         """
         key_code = settings.get_str("RESET_HOTKEY_CODE")
         if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
@@ -243,9 +258,13 @@ class UIController:
             self._request_reset_splits()
 
     def _request_previous_split(self) -> None:
-        """Tell `splitter.splits` to call `previous_split_image`, and ask splitter._look_for_match to reset its flags.
+        """Tell `splitter.splits` to call `previous_split_image`, and ask
+        splitter._look_for_match to reset its flags.
 
-        If splitter is delaying or suspended, call `split_dir.previous_split_image`, since it is safe to do so. Otherwise, attempt for 1 second to pause the splitter (by setting `splitter.changing_splits` to True) before calling.
+        If splitter is delaying or suspended, call
+        `split_dir.previous_split_image`, since it is safe to do so. Otherwise,
+        attempt for 1 second to pause the splitter (by setting
+        `splitter.changing_splits` to True) before calling.
         """
         if self._splitter.delaying or self._splitter.suspended:
             self._splitter.splits.previous_split_image()
@@ -258,9 +277,13 @@ class UIController:
             self._splitter.changing_splits = False
 
     def _request_next_split(self) -> None:
-        """Tell `splitter.splits` to call `next_split_image`, and ask splitter._look_for_match to reset its flags.
+        """Tell `splitter.splits` to call `next_split_image`, and ask
+        splitter._look_for_match to reset its flags.
 
-        If splitter is delaying or suspended, call `split_dir.next_split_image`, since it is safe to do so. Otherwise, attempt for 1 second to pause the splitter (by setting `splitter.changing_splits` to True) before calling.
+        If splitter is delaying or suspended, call
+        `split_dir.next_split_image`, since it is safe to do so. Otherwise,
+        attempt for 1 second to pause the splitter (by setting
+        `splitter.changing_splits` to True) before calling.
         """
         if self._splitter.delaying or self._splitter.suspended:
             self._splitter.splits.next_split_image()
@@ -273,9 +296,12 @@ class UIController:
             self._splitter.changing_splits = False
 
     def _request_reset_splits(self) -> None:
-        """Tell `splitter.splits` to call `reset_split_images`, and ask splitter._look_for_match to reset its flags.
+        """Tell `splitter.splits` to call `reset_split_images`, and ask
+        splitter._look_for_match to reset its flags.
 
-        Kills `splitter.compare_thread` (this allows the splitter to exit gracefully if the split image directory has changed to an empty directory, for example).
+        Kills `splitter.compare_thread` (this allows the splitter to exit
+        gracefully if the split image directory has changed to an empty
+        directory, for example).
         """
         self._redraw_split_labels = True
         self._splitter.safe_exit_compare_thread()
@@ -283,9 +309,12 @@ class UIController:
         self._splitter.start_compare_thread()
 
     def _set_image_directory_path(self) -> None:
-        """Prompt the user to select a split image directory, then open the new directory in a threadsafe manner.
+        """Prompt the user to select a split image directory, then open the new
+        directory in a threadsafe manner.
 
-        If the directory exists and is different from the last one, change `LAST_IMAGE_DIR` to the new choice. Then reset splits so the new ones show up.
+        If the directory exists and is different from the last one, change
+        `LAST_IMAGE_DIR` to the new choice. Then reset splits so the new ones
+        show up.
         """
         path = QFileDialog.getExistingDirectory(self._main_window, "Select splits folder", settings.get_str("LAST_IMAGE_DIR"))
         if path != "" and path != settings.get_str("LAST_IMAGE_DIR"):
@@ -294,7 +323,8 @@ class UIController:
             self._request_reset_splits()
 
     def _set_split_directory_line_edit_text(self) -> None:
-        """Convert the split image directory path to an elided string, based on the current size of main window's split directory line edit.
+        """Convert the split image directory path to an elided string,
+        based on the current size of main window's split directory line edit.
         """
         path = settings.get_str("LAST_IMAGE_DIR")
         elided_path = self._main_window.split_directory_line_edit.fontMetrics().elidedText(path, Qt.ElideMiddle, self._main_window.split_directory_line_edit.width())
@@ -303,7 +333,8 @@ class UIController:
     def _exec_settings_window(self) -> None:
         """Set up and open the settings window UI.
 
-        Because exec() blocks, _settings_window_showing isn't set to false until the user closes the settings window.
+        Because exec() blocks, _settings_window_showing isn't set to false
+        until the user closes the settings window.
         """
         self._settings_window.setFocus(True)  # Make sure no child widgets have focus
         self._reset_settings()
@@ -312,7 +343,8 @@ class UIController:
         self._settings_window_showing = False
 
     def _reset_settings(self) -> None:
-        """Read settings from `settings.py` and write them into the settings menu UI.
+        """Read settings from `settings.py` and write them into the settings
+        menu UI.
         """
         # Spinboxes
         for spinbox, value in {
@@ -369,7 +401,8 @@ class UIController:
             self._settings_window.theme_combo_box.setCurrentIndex(1)
 
     def _save_settings(self) -> None:
-        """Write the current values in settings_window to settings, and update program variables as needed.
+        """Write the current values in settings_window to settings, and update
+        program variables as needed.
         """
         # Spinboxes
         for spinbox, setting_string in {
@@ -456,7 +489,8 @@ class UIController:
             style_sheet.set_style(self._settings_window, theme)
 
     def _take_screenshot(self) -> None:
-        """Write `spltter.comparison_frame` to a file (and optionally open it in machine's default image viewer).
+        """Write `spltter.comparison_frame` to a file (and optionally open it
+        in machine's default image viewer).
         """
         frame = self._splitter.comparison_frame
         if frame is None:
@@ -482,13 +516,16 @@ class UIController:
             self._main_window.screenshot_error_message_box.exec()
         
     def _get_unique_filename_number(self, dir: str) -> str:
-        """Return the lowest three-digit number that will allow a unique filename in this format: "xxx_screenshot.png"
+        """Return the lowest three-digit number that will allow a unique
+        filename in this format: "xxx_screenshot.png"
 
         Args:
             dir (str): The target directory for the file
 
         Raises:
-            Exception: Throw an exception if there are more than 1,000 files in the abovementioned format. This should never happen, but it's included because I didn't feel like thinking up a workaround.
+            Exception: Throw an exception if there are more than 1,000 files in
+                the abovementioned format. This should never happen, but it's
+                included because I didn't feel like thinking up a workaround.
 
         Returns:
             file_number (str): The lowest three-digit number as a string.
@@ -519,7 +556,8 @@ class UIController:
             subprocess.call(["xdg-open", path])
 
     def _set_main_window_layout(self) -> None:
-        """Set the size, location, and visibility of the main window's widgets according to minimum view status and aspect ratio.
+        """Set the size, location, and visibility of the main window's widgets
+        according to minimum view status and aspect ratio.
         """
         if settings.get_bool("SHOW_MIN_VIEW"):
             self._set_minimal_view()
@@ -713,10 +751,12 @@ class UIController:
         self._main_window.setFixedSize(904, 452 + self._main_window.HEIGHT_CORRECTION)
 
     def _set_button_and_label_text(self, truncate: bool) -> None:
-        """Adjust button and label text according to aspect ratio and minimal view status.
+        """Adjust button and label text according to aspect ratio and minimal
+        view status.
 
         Args:
-            truncate (bool): If True, each widget's short text is used; otherwise, each widget's default (long) text is used.
+            truncate (bool): If True, each widget's short text is used;
+                otherwise, each widget's default (long) text is used.
         """
         if settings.get_bool("SHOW_MIN_VIEW"):
             self._main_window.minimal_view_button.setText("Full view")
@@ -753,7 +793,8 @@ class UIController:
         """Set widget visibility according to minimal view status.
 
         Args:
-            visible (bool): If True, show all non-minimal-view widgets. If False, hide all non-minimal-view widgets.
+            visible (bool): If True, show all non-minimal-view widgets. If
+                False, hide all non-minimal-view widgets.
         """
         self._main_window.split_directory_line_edit.setVisible(visible)
         self._main_window.split_directory_button.setVisible(visible)
@@ -771,9 +812,14 @@ class UIController:
     #################################
 
     def _update_ui(self) -> None:
-        """Read values from the splitter and use them to update the UI; also read inputs from the user and use them to update the UI and the splitter.
+        """Read values from the splitter and use them to update the UI; also
+        read inputs from the user and use them to update the UI and the
+        splitter.
 
-        Since this method is called many times per second, most of its method calls are wrapped in if statements. This diminishes readability significantly, but also cuts down so much on CPU usage that I thought it was worth it.
+        Since this method is called many times per second, most of its method
+        calls are wrapped in if statements. This diminishes readability
+        significantly, but also cuts down so much on CPU usage that I thought
+        it was worth it.
         """
         self._update_label_and_button_text()
         self._execute_hotkey()
@@ -786,11 +832,19 @@ class UIController:
     def _handle_hotkey_press(self, key: keyboard.Key) -> None:
         """Set flags when hotkeys are pressed.
 
-        Called each time any key is pressed globally. This method has two main uses:
-            1) Hears and reacts to user keypresses when setting hotkey settings. It does this by checking if a given hotkey "line edit" has focus and, if it does, by changing its properties when a key is pressed.
-            2) Hears and sets flags when hotkeys are pressed in the main window.
+        Called each time any key is pressed globally. This method has two main
+        uses:
+            1) Hears and reacts to user keypresses when setting hotkey
+                settings. It does this by checking if a given hotkey "line
+                edit" has focus and, if it does, by changing its properties
+                when a key is pressed.
+            2) Hears and sets flags when hotkeys are pressed in the main 
+                window.
 
-        For #2, the reason flags are set instead of taking an action directly is that PyQt5 doesn't play nice when other threads try to manipulate the GUI. I couldn't get anything direct to work without throwing a zsh trace trap error, so this is what we're going with.
+        For #2, the reason flags are set instead of taking an action directly
+        is that PyQt5 doesn't play nice when other threads try to manipulate
+        the GUI. I couldn't get anything direct to work without throwing a zsh
+        trace trap error, so this is what we're going with.
 
         Args:
             key (keyboard.Key): The key that was pressed.
@@ -841,9 +895,15 @@ class UIController:
         
         When a hotkey is pressed, this method determines what happens.
         The dict contains the following:
-            1) `flags`: A tuple with three values. Value 1 is the flag set `in _handle_hotkey_press`; value 2 is a string representation of value 1; value 3 is the flag enabling or disabling the hotkey, which is set in `_set_buttons_and_hotkeys_enabled`.
-            2) `action`: The method or function to be called when the hotkey is executed.
-        This dict implementation is kind of messy and hard to understand, but I feel that the alternative of having everything laid out in if-blocks was worse.
+            1) `flags`: A tuple with three values. Value 1 is the flag set
+                `in _handle_hotkey_press`; value 2 is a string representation
+                of value 1; value 3 is the flag enabling or disabling the
+                hotkey, which is set in `_set_buttons_and_hotkeys_enabled`.
+            2) `action`: The method or function to be called when the hotkey is
+                executed.
+        This dict implementation is kind of messy and hard to understand, but I
+        feel that the alternative of having everything laid out in if-blocks
+        was worse.
         """
         # This value is used frequently, so I define it once here for simplicity
         global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
@@ -869,7 +929,9 @@ class UIController:
         """Press and release a hotkey.
 
         Args:
-            key_code (str): A string representation of a pynput.keyboard.Key.vk value. Passed as a string because I use QSettings, which only handles strings when used cross-platform.
+            key_code (str): A string representation of a pynput.keyboard.Key.vk
+                value. Passed as a string because I use QSettings, which only
+                handles strings when used cross-platform.
         """
         key_code = int(key_code)
         key = keyboard.KeyCode(vk=key_code)
@@ -877,9 +939,11 @@ class UIController:
         self._keyboard_controller.release(key)
 
     def _execute_split_action(self) -> None:
-        """Send a hotkey press and request the next split image when the splitter finds a matching image.
+        """Send a hotkey press and request the next split image when the
+        splitter finds a matching image.
 
-        If no hotkey is set for a given action, ignore the hotkey press and request the next split image anyway.
+        If no hotkey is set for a given action, ignore the hotkey press and
+        request the next split image anyway.
         """
         # This value is used frequently, so I define it once here for simplicity
         global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
@@ -1018,7 +1082,8 @@ class UIController:
             self._toggle_pause_comparison_button_text()
 
     def _toggle_pause_comparison_button_text(self) -> None:
-        """Adjust the length and content of the pause button's text according to aspect ratio and splitter status.
+        """Adjust the length and content of the pause button's text according
+        to aspect ratio and splitter status.
         """
         if settings.get_bool("SHOW_MIN_VIEW") or settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
             if self._splitter_suspended:
@@ -1033,16 +1098,25 @@ class UIController:
                 self._main_window.pause_comparison_button.setText(self._main_window.pause_comparison_button_pause_text_default)
 
     def _update_flags(self) -> bool:
-        """Check the splitter to see if certain states have changed since the last check.
+        """Check the splitter to see if certain states have changed since the
+        last check.
 
         The following states are checked:
             video_active: Whether `splitter.capture_thread` is alive.
-            splits_active: Whether `self.most_recent_split_index` is None. That value is set by _update_label_and_button_text, which is called just before this method.
-            first_split_active: Whether the current split is the first split (if there is a current split). This means a split image is active, it's the first split image, and it's the first loop of the image.
-            last_split_active: Whether the current split is the last split (if there is a current split). This means a split image is active, it's the last split image, and it's the last loop of the image.
+            splits_active: Whether `self.most_recent_split_index` is None. That
+                value is set by _update_label_and_button_text, which is called
+                just before this method.
+            first_split_active: Whether the current split is the first split
+                (if there is a current split). This means a split image is
+                active, it's the first split image, and it's the first loop of
+                the image.
+            last_split_active: Whether the current split is the last split (if
+                there is a current split). This means a split image is active,
+                it's the last split image, and it's the last loop of the image.
 
         Returns:
-            flag_changed (bool): True if any of the above flags were set or unset, False otherwise.
+            flag_changed (bool): True if any of the above flags were set or
+                unset, False otherwise.
         """
         flag_changed = False
 
@@ -1084,9 +1158,12 @@ class UIController:
         return flag_changed
 
     def _set_buttons_and_hotkeys_enabled(self) -> None:
-        """Set the enabled status of buttons and hotkeys, depending on the flags set in `_update_flags`.
+        """Set the enabled status of buttons and hotkeys, depending on the
+        flags set in `_update_flags`.
 
-        Since the status of these buttons and hotkeys depends entirely on the flags in `_update_flags`, this method is only called if `_update_flags` returns True.
+        Since the status of these buttons and hotkeys depends entirely on the
+        flags in `_update_flags`, this method is only called if `_update_flags`
+        returns True.
         """
         if self._splits_active:
             # Enable split and reset
@@ -1142,10 +1219,12 @@ class UIController:
                 self._main_window.screenshot_button.setEnabled(False)
 
     def _null_match_percent_string(self) -> None:
-        """Return a string representing a blank match percent with the number of decimal places the user chooses in settings.
+        """Return a string representing a blank match percent with the number
+        of decimal places the user chooses in settings.
 
         Returns:
-            str: The null match percent string. Possible values are "--", "--.-", and "--.--".
+            str: The null match percent string. Possible values are "--",
+                "--.-", and "--.--".
         """
         match_percent_string = "--"
         decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
@@ -1157,7 +1236,8 @@ class UIController:
         return match_percent_string
 
     def _formatted_match_percent_string(self, match_percent: float, decimals: int) -> str:
-        """Format a raw match percent into a string with the number of decimal places the user chooses.
+        """Format a raw match percent into a string with the number of decimal
+        places the user chooses.
 
         Args:
             match_percent (float): The raw integer match. E.g., 0.8931285.

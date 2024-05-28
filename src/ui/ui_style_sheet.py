@@ -26,9 +26,11 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Stores css-style Template strings that can be edited by changing dict variable values.
+"""Stores css-style Template strings that can be edited by changing dict
+variable values.
 
-This could fit in ui_controller.py, but it is bulky enough that I felt it would be less awkward to simply keep it in a separate file.
+This could fit in ui_controller.py, but it is bulky enough that I felt it would
+be less awkward to simply keep it in a separate file.
 """
 
 
