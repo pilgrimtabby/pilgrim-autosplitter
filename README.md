@@ -221,7 +221,7 @@ Example: `001_mysplit_{b}.png` Once the splitter finds a match, it will wait unt
 
 #### Latest release
 
-Download the latest MacOS build by clicking on the link in Releases on the right-hand side of the page.
+Download the latest MacOS build by going to the most recent release (under Releases on the right-hand side of the page) and downloading `pilgrim-autosplitter.v1.0.0.zip` (or whatever the newest version number is). Put it with your other applications, or wherever you want it.
 
 Pros: It's one file, and it's easy to install and use.
 
@@ -241,7 +241,7 @@ If you don't know what you're doing:
 
 You'll need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
 
-Download the source files by clicking on the green "Code <>" button near the top of the page (you can just download the .zip). Extract the files and open the folder.
+Download the source files by going to the most recent release (under Releases on the right-hand side of the page) and downloading `source.zip`. Extract the files and open the folder.
 
 Open the Terminal (if you can't find it, press cmd+space to open Spotlight and search for "Terminal").
 
@@ -267,7 +267,7 @@ If you don't know what you're doing:
 
 You'll need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
 
-Download the source files by clicking on the green "Code <>" button near the top of the page (you can just download the .zip). Extract the files and open the folder.
+Download the source files by going to the most recent release (under Releases on the right-hand side of the page) and downloading `source.zip`. Extract the files and open the folder.
 
 Open the Command Prompt (if you can't find it, open the start menu and type in "Command Prompt", and it should come up).
 
