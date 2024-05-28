@@ -45,7 +45,7 @@ def main():
     import os
 
     os.system("cls || clear")  # This works cross-platform
-    print("Welcome to Pilgrim Autosplitter.")
+    print("Welcome to Pilgrim Autosplitter!")
     print("You can minimize this window, but DO NOT close it.")
 
     print("\nImporting external packages...")
