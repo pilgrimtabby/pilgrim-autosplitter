@@ -221,7 +221,7 @@ Example: `001_mysplit_{b}.png` Once the splitter finds a match, it will wait unt
 
 #### Latest release
 
-Download the latest MacOS build by going to the most recent release (under Releases on the right-hand side of the page) and downloading `pilgrim-autosplitter.v1.0.0.zip` (or whatever the newest version number is). Put it with your other applications, or wherever you want it.
+Download the latest MacOS build by going to the most recent release (under Releases on the right-hand side of the page) and downloading `pilgrim-autosplitter-v1.0.0.zip` (or whatever the newest version number is). Put it with your other applications, or wherever you want it.
 
 Pros: It's one file, and it's easy to install and use.
 
