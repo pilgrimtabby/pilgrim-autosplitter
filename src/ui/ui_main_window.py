@@ -1,20 +1,20 @@
 # Copyright (c) 2024 pilgrim_tabby
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # * Redistributions of source code must retain the above copyright notice, this
 #   list of conditions and the following disclaimer.
-# 
+#
 # * Redistributions in binary form must reproduce the above copyright notice,
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
-# 
+#
 # * Neither the name of the copyright holder nor the names of its
 #   contributors may be used to endorse or promote products derived from
 #   this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -34,8 +34,17 @@ should be provided in a controller class.
 import platform
 
 from PyQt5.QtCore import QRect, Qt
-from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QMessageBox, QPushButton, QShortcut, QWidget)
+from PyQt5.QtWidgets import (
+    QAction,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMenuBar,
+    QMessageBox,
+    QPushButton,
+    QShortcut,
+    QWidget,
+)
 
 import settings
 from settings import VERSION_NUMBER
@@ -121,7 +130,7 @@ class UIMainWindow(QMainWindow):
             split image folder.
         split_image_default_text (str): Informs the user there are no split
             images loaded currently.
-        split_image_display (QLabel): Display split images if loaded, or else 
+        split_image_display (QLabel): Display split images if loaded, or else
             show the split_image_default_text.
         split_image_loop_label (QLabel): Informs the user about the current
             split's loop information.
@@ -151,9 +160,9 @@ class UIMainWindow(QMainWindow):
         video_feed_label_live_text_min (str): In minimal view, inform the user
             the video is connected.
     """
+
     def __init__(self) -> None:
-        """Initialize all widgets in the main window.
-        """
+        """Initialize all widgets in the main window."""
         #################
         #               #
         # Window Config #
@@ -176,7 +185,9 @@ class UIMainWindow(QMainWindow):
         self._menu_bar = QMenuBar(self._container)
         self.setMenuBar(self._menu_bar)
 
-        self._menu_bar_pilgrim_autosplitter = self._menu_bar.addMenu("&Autosplitter Settings")
+        self._menu_bar_pilgrim_autosplitter = self._menu_bar.addMenu(
+            "&Autosplitter Settings"
+        )
         self._menu_bar_pilgrim_autosplitter.addAction(self.settings_action)
         self._menu_bar_pilgrim_autosplitter.addAction(self.help_action)
 
@@ -184,7 +195,7 @@ class UIMainWindow(QMainWindow):
         self.LEFT_EDGE_CORRECTION = -44
         self.TOP_EDGE_CORRECTION = -215
         if platform.system() == "Windows":
-            self.HEIGHT_CORRECTION = 22  # Windows adds the menu bar as a tab-style widget, so the window needs to be taller
+            self.HEIGHT_CORRECTION = 22
         else:
             self.HEIGHT_CORRECTION = 0
 
@@ -199,7 +210,9 @@ class UIMainWindow(QMainWindow):
         ###########
 
         # Split directory button and display
-        self.split_directory_button = QPushButton("Select split image folder:", self._container)
+        self.split_directory_button = QPushButton(
+            "Select split image folder:", self._container
+        )
         self.split_directory_button.setFocusPolicy(Qt.NoFocus)
 
         self.split_directory_line_edit = QLineEdit(self._container)
@@ -220,13 +233,20 @@ class UIMainWindow(QMainWindow):
         self.video_feed_display.setAlignment(Qt.AlignCenter)
         self.video_feed_display.setObjectName("image_label_inactive")
 
-        self.video_feed_display_default_text = "No video feed detected"        
+        self.video_feed_display_default_text = "No video feed detected"
 
         # Split image
         self.minimal_view_no_splits_label = QLabel(self._container)
-        self.minimal_view_no_splits_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.minimal_view_no_splits_label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
         self.minimal_view_no_splits_label.setAlignment(Qt.AlignCenter)
-        self.minimal_view_no_splits_label.setGeometry(QRect(92 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 251, 31))  # Always in the same spot
+        # This widget is, uniquely, always in the same spot
+        self.minimal_view_no_splits_label.setGeometry(
+            QRect(
+                92 + self.LEFT_EDGE_CORRECTION, 225 + self.TOP_EDGE_CORRECTION, 251, 31
+            )
+        )
 
         self.split_name_label = QLabel(self._container)
         self.split_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -248,42 +268,72 @@ class UIMainWindow(QMainWindow):
 
         # Match percent (current)
         self.current_match_percent_label = QLabel(self._container)
-        self.current_match_percent_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.current_match_percent_label.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.current_match_percent_label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.current_match_percent_label.setAlignment(
+            Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
+        )
 
         self.current_match_percent = QLabel(self._container)
         self.current_match_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.current_match_percent.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.current_match_percent.setAlignment(
+            Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
+        )
 
         self.current_match_percent_sign = QLabel("%", self._container)
-        self.current_match_percent_sign.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.current_match_percent_sign.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignVCenter)
-        
+        self.current_match_percent_sign.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.current_match_percent_sign.setAlignment(
+            Qt.AlignLeading | Qt.AlignLeft | Qt.AlignVCenter
+        )
+
         # Match percent (highest)
         self.highest_match_percent_label = QLabel(self._container)
-        self.highest_match_percent_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.highest_match_percent_label.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.highest_match_percent_label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.highest_match_percent_label.setAlignment(
+            Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
+        )
 
         self.highest_match_percent = QLabel(self._container)
         self.highest_match_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.highest_match_percent.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.highest_match_percent.setAlignment(
+            Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
+        )
 
         self.highest_match_percent_sign = QLabel("%", self._container)
-        self.highest_match_percent_sign.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.highest_match_percent_sign.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignVCenter)
+        self.highest_match_percent_sign.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.highest_match_percent_sign.setAlignment(
+            Qt.AlignLeading | Qt.AlignLeft | Qt.AlignVCenter
+        )
 
         # Match percent (threshold)
         self.threshold_match_percent_label = QLabel(self._container)
-        self.threshold_match_percent_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.threshold_match_percent_label.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.threshold_match_percent_label.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.threshold_match_percent_label.setAlignment(
+            Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
+        )
 
         self.threshold_match_percent = QLabel(self._container)
         self.threshold_match_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.threshold_match_percent.setAlignment(Qt.AlignRight|Qt.AlignTrailing|Qt.AlignVCenter)
+        self.threshold_match_percent.setAlignment(
+            Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
+        )
 
         self.threshold_match_percent_sign = QLabel("%", self._container)
-        self.threshold_match_percent_sign.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.threshold_match_percent_sign.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignVCenter)
+        self.threshold_match_percent_sign.setTextInteractionFlags(
+            Qt.TextSelectableByMouse
+        )
+        self.threshold_match_percent_sign.setAlignment(
+            Qt.AlignLeading | Qt.AlignLeft | Qt.AlignVCenter
+        )
 
         # Minimal view button
         self.minimal_view_button = QPushButton(self._container)
@@ -305,7 +355,9 @@ class UIMainWindow(QMainWindow):
         # Screenshot error message box
         self.screenshot_error_message_box = QMessageBox(self)
         self.screenshot_error_message_box.setText("Could not take screenshot")
-        self.screenshot_error_message_box.setInformativeText("No video feed detected. Please make sure video feed is active and try again.")
+        self.screenshot_error_message_box.setInformativeText(
+            "No video feed detected. Please make sure video feed is active and try again."
+        )
         self.screenshot_error_message_box.setIcon(QMessageBox.Warning)
 
         # Reload video button

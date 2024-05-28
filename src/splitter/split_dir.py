@@ -1,20 +1,20 @@
 # Copyright (c) 2024 pilgrim_tabby
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 # * Redistributions of source code must retain the above copyright notice, this
 #   list of conditions and the following disclaimer.
-# 
+#
 # * Redistributions in binary form must reproduce the above copyright notice,
 #   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
-# 
+#
 # * Neither the name of the copyright holder nor the names of its
 #   contributors may be used to endorse or promote products derived from
 #   this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -41,8 +41,12 @@ import numpy
 from PyQt5.QtGui import QImage, QPixmap
 
 import settings
-from settings import (COMPARISON_FRAME_HEIGHT, COMPARISON_FRAME_WIDTH,
-                      MAX_LOOPS_AND_WAIT, MAX_THRESHOLD)
+from settings import (
+    COMPARISON_FRAME_HEIGHT,
+    COMPARISON_FRAME_WIDTH,
+    MAX_LOOPS_AND_WAIT,
+    MAX_THRESHOLD,
+)
 
 
 class SplitDir:
@@ -56,6 +60,7 @@ class SplitDir:
         list (list[_SplitImage]): A list of all split images in
             settings.get_str("LAST_IMAGE_DIR").
     """
+
     def __init__(self):
         """Initialize a list of SplitImage objects; set flags based on whether
         the list is empty.
@@ -67,7 +72,7 @@ class SplitDir:
         else:
             self.current_image_index = None
             self.current_loop = None
-    
+
     ##################
     #                #
     # Public Methods #
@@ -85,7 +90,7 @@ class SplitDir:
 
         else:
             self.current_loop += 1
-        
+
     def previous_split_image(self) -> None:
         """Go to the previous split image or, if current_loop > 0, to the
         previous loop.
@@ -94,10 +99,10 @@ class SplitDir:
             if self.current_image_index > 0:
                 self.current_image_index -= 1
                 self.current_loop = self.list[self.current_image_index].loops
-            
+
         else:
             self.current_loop -= 1
-        
+
     def reset_split_images(self) -> None:
         """Recreate the split image list from scratch, resetting appropriate
         flags.
@@ -114,8 +119,7 @@ class SplitDir:
         self.current_loop = 0
 
     def set_default_threshold(self) -> None:
-        """Update threshold in each SplitImage whose threshold is default.
-        """
+        """Update threshold in each SplitImage whose threshold is default."""
         default_threshold = settings.get_float("DEFAULT_THRESHOLD")
         for image in self.list:
             if image.threshold_is_default:
@@ -171,7 +175,7 @@ class SplitDir:
         dir_path = settings.get_str("LAST_IMAGE_DIR")
         if not pathlib.Path(dir_path).is_dir():
             return split_images
-        
+
         image_paths = (
             glob.glob(f"{dir_path}/*.png")
             + glob.glob(f"{dir_path}/*.jpg")
@@ -182,7 +186,7 @@ class SplitDir:
 
         return split_images
 
-    class _SplitImage:        
+    class _SplitImage:
         """Store and modify details attributes of a single split image.
 
         Attributes:
@@ -215,6 +219,7 @@ class SplitDir:
             threshold_is_default (bool): Whether this split's threshold match
                 percent is the default.
         """
+
         def __init__(self, image_path: str) -> None:
             """Set flags and read values from split image and pathname.
 
@@ -226,7 +231,9 @@ class SplitDir:
             self.image, self.mask = self.get_image_and_mask()
             self.max_dist = self._get_max_dist()
             self.pixmap = self.get_pixmap()
-            self.below_flag, self.dummy_flag, self.pause_flag = self._get_flags_from_name()
+            self.below_flag, self.dummy_flag, self.pause_flag = (
+                self._get_flags_from_name()
+            )
             self.delay_duration, self.delay_is_default = self._get_delay_from_name()
             self.pause_duration, self.pause_is_default = self._get_pause_from_name()
             self.threshold, self.threshold_is_default = self._get_threshold_from_name()
@@ -256,8 +263,12 @@ class SplitDir:
                 respectively.
             """
             image = cv2.imread(self._path, cv2.IMREAD_UNCHANGED)
-            image = cv2.resize(image, (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT), interpolation=cv2.INTER_AREA)
-            
+            image = cv2.resize(
+                image,
+                (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
+                interpolation=cv2.INTER_AREA,
+            )
+
             if self._has_alpha_channel(image):
                 mask = image[:, :, 3]
                 image = image[:, :, 0:3]
@@ -279,17 +290,27 @@ class SplitDir:
             here, especially if the user has a large number of split images.
             Image quality is not a huge concern, since this image isn't being
             used for image matching.
-            
+
             Returns:
                 QPixmap: The generated QPixmap.
             """
             image = cv2.imread(self._path, cv2.IMREAD_UNCHANGED)
-            image = cv2.resize(image, (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")), interpolation=cv2.INTER_NEAREST)
+            image = cv2.resize(
+                image,
+                (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")),
+                interpolation=cv2.INTER_NEAREST,
+            )
 
+            # QImage has no BGRA Format flag, or we would use that and omit 
+            # .rgbSwapped()
             if self._has_alpha_channel(image):
-                frame_qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format_RGBA8888).rgbSwapped()  # QImage has no BGRA Format flag, or we would use that and omit .rgbSwapped()
+                frame_qimage = QImage(
+                    image, image.shape[1], image.shape[0], QImage.Format_RGBA8888
+                ).rgbSwapped()
             else:
-                frame_qimage = QImage(image, image.shape[1], image.shape[0], QImage.Format_BGR888)
+                frame_qimage = QImage(
+                    image, image.shape[1], image.shape[0], QImage.Format_BGR888
+                )
             return QPixmap.fromImage(frame_qimage)
 
         ###################
@@ -317,14 +338,17 @@ class SplitDir:
             3 in this method.
 
             See splitter._get_match_percent for details on Euclidean distance
-            in general. 
+            in general.
 
             Returns:
                 float: The maximum Euclidean distance for the current split
                 image.
             """
             if self.mask is None:  # No alpha channel
-                return math.sqrt(COMPARISON_FRAME_WIDTH * COMPARISON_FRAME_HEIGHT * 3) * 255
+                return (
+                    math.sqrt(COMPARISON_FRAME_WIDTH * COMPARISON_FRAME_HEIGHT * 3)
+                    * 255
+                )
             else:
                 return math.sqrt(cv2.countNonZero(self.mask) * 3) * 255
 
