@@ -30,62 +30,82 @@
 """
 
 
-import platform
-import sys
+def main():
+    """Initialize PilgrimAutosplitter (with logging if not on Windows).
 
-from PyQt5.QtGui import QIcon, QPixmap
-from PyQt5.QtWidgets import QApplication
-
-import settings
-from splitter.splitter import Splitter
-from ui.ui_controller import UIController
-
-
-class PilgrimAutosplitter:
-    """Initialize and run Pilgrim Autosplitter.
-
-    Attributes:
-        pilgrim_autosplitter (QApplication): The application container that
-            allows QObjects, including the UI, to be initialized.
-        splitter (Splitter): Backend for capturing and comparing images to
-            video.
-        ui_controller (UIController): Backend for updating the UI and handling
-            user input.
+    This module is in an unusual format, with all the import statements behind
+    main() and the class declaration inside of main(), to accomodate the time
+    required to boot up the executable if this program is run after being built
+    with PyInstaller. To reassure the user, I've placed print messages before
+    and after the import statements, which take a very long time (sometimes as
+    long as 30 seconds).
     """
 
-    def __init__(self) -> None:
-        """Create an application, a splitter, and a UI, then run the
-        application.
+    # Initial setup
+    import os
+
+    os.system("cls || clear")  # This works cross-platform
+    print("Welcome to Pilgrim Autosplitter.")
+    print("You can minimize this window, but DO NOT close it.")
+
+    print("\nImporting external packages...")
+
+    import platform
+    import sys
+
+    from PyQt5.QtGui import QIcon, QPixmap
+    from PyQt5.QtWidgets import QApplication
+
+    print("\nImporting internal packages...")
+
+    # Class definition
+    class PilgrimAutosplitter:
+        """Initialize and run Pilgrim Autosplitter.
+
+        Attributes:
+            pilgrim_autosplitter (QApplication): The application container that
+                allows QObjects, including the UI, to be initialized.
+            splitter (Splitter): Backend for capturing and comparing images to
+                video.
+            ui_controller (UIController): Backend for updating the UI and handling
+                user input.
         """
-        self.pilgrim_autosplitter = QApplication(sys.argv)
-        self.pilgrim_autosplitter.setStyle("fusion")
-        self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
-        self.pilgrim_autosplitter.setWindowIcon(
-            QIcon(QPixmap("resources/icon-macos.png"))
-        )
 
-        settings.load_defaults()
+        def __init__(self) -> None:
+            """Create an application, a splitter, and a UI, then run the
+            application.
+            """
+            import settings
+            from splitter.splitter import Splitter
+            from ui.ui_controller import UIController
 
-        self.splitter = Splitter()
-        if settings.get_bool("START_WITH_VIDEO"):
-            self.splitter.start()
+            self.pilgrim_autosplitter = QApplication(sys.argv)
+            self.pilgrim_autosplitter.setStyle("fusion")
+            self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
+            self.pilgrim_autosplitter.setWindowIcon(
+                QIcon(QPixmap("resources/icon-macos.png"))
+            )
 
-        self.ui_controller = UIController(self.pilgrim_autosplitter, self.splitter)
+            settings.load_defaults()
 
-        self.pilgrim_autosplitter.exec()
+            self.splitter = Splitter()
+            if settings.get_bool("START_WITH_VIDEO"):
+                self.splitter.start()
 
+            self.ui_controller = UIController(self.pilgrim_autosplitter, self.splitter)
 
-def main() -> None:
-    """Initialize PilgrimAutosplitter (with logging if not on Windows)."""
+            self.pilgrim_autosplitter.exec()
+
+    # Open application
+    print("\nStarting Pilgrim Autosplitter...")
+
     if platform.system() != "Windows":
         import traceback
-
         with open("/tmp/pilgrimautosplitter.log", "a") as log:
             try:
                 PilgrimAutosplitter()
             except Exception:
                 traceback.print_exc(file=log)
-
     else:
         PilgrimAutosplitter()
 
