@@ -1,7 +1,47 @@
+# Copyright (c) 2024 pilgrim_tabby
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+# 
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+# 
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+# 
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+"""Stores css-style Template strings that can be edited by changing dict variable values.
+
+This could fit in ui_controller.py, but it is bulky enough that I felt it would be less awkward to simply keep it in a separate file.
+"""
+
+
 from string import Template
 
-import settings
+from PyQt5.QtCore import QObject
 
+
+##########################
+#                        #
+# Dark Theme Style Sheet #
+#                        #
+##########################
 
 style_dict_dark = {
     "default_background": "#333333",
@@ -109,6 +149,13 @@ style_sheet_dark = Template(
     """
 ).substitute(style_dict_dark)
 
+
+###########################
+#                         #
+# Light Theme Style Sheet #
+#                         #
+###########################
+
 style_dict_light = {
     "default_background": "#D3D3D3",
     "widget_fill_color": "#bbbbbb",
@@ -212,8 +259,15 @@ style_sheet_light = Template(
     """
 ).substitute(style_dict_light)
 
-def set_style(window):
-    if settings.get_str("THEME") == "dark":
+
+def set_style(window: QObject, theme: str) -> None:
+    """Set the style sheet of a QWidget.
+
+    Args:
+        window (QWidget): The widget whose style is being set.
+        theme (str): The theme to be set.
+    """
+    if theme == "dark":
         window.setStyleSheet(style_sheet_dark)
-    elif settings.get_str("THEME") == "light":
+    elif theme == "light":
         window.setStyleSheet(style_sheet_light)
