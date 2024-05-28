@@ -227,6 +227,12 @@ Pros: It's one file, and it's easy to install and use.
 
 Cons: A quirk of building this program on MacOS is that opening it always opens a Terminal window that can't be closed without shutting the program down too. However, the Terminal window can be easily minimzed and ignored. Also, Pilgrim Autosplitter takes a little longer to load when running from the executible (about 30 seconds on my M1 Macbook Air), so keep that in mind.
 
+TROUBLESHOOTING: If you get the following error:
+
+`“Pilgrim Autosplitter.app” cannot be opened because the developer cannot be verified.`
+
+Right-click on the app, hold the `option` key, and press `open`. Then you will have the option to select `open` and ignore the warning. The app won't give the same warning after you open it like this the first time.
+
 #### Download and run using Python
 
 If you know what you're doing, make sure your Python version is 3.9 or greater, then go ahead and run:
