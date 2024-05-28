@@ -478,6 +478,10 @@ class SplitDir:
             Using is_digit guarantees that this method will not return negative
             numbers, which is what we want.
 
+            The pause can never be less than 1 second, which is the reason for
+            the complicated last line of this method. The semantic meaning is:
+            make sure the pause is below MAX_LOOPS_AND_WAIT and not less than 1.
+
             Returns:
                 float: The pause duration indicated in the filename, or the
                 default if none is indicated.
@@ -485,7 +489,7 @@ class SplitDir:
             pause = re.search(r"_\[(.+?)\]", self.name)
             if pause is None or not str(pause[1]).replace(".", "", 1).isdigit():
                 return settings.get_float("DEFAULT_PAUSE"), True
-            return min(float(pause[1]), MAX_LOOPS_AND_WAIT), False
+            return max(min(float(pause[1]), MAX_LOOPS_AND_WAIT), 1), False
 
         def _get_threshold_from_name(self) -> float:
             """Set split image's threshold match percent by reading filename
