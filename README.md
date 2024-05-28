@@ -1,8 +1,29 @@
-# Pilgrim Autosplitter
+# Pilgrim Autosplitter for MacOS
 
 Finally, an image-based autosplitter for MacOS!
 
 ![Demonstration GIF](resources/demo.gif)
+
+Table of Contents
+=================
+
+* [Pilgrim Autosplitter](#pilgrim-autosplitter)
+   * [Introduction](#works-on-macos-and-windows)
+   * [Usage](#usage)
+      * [Connect video](#connect-video)
+      * [Create split images](#create-split-images)
+   * [Settings](#settings)
+   * [Hotkeys](#hotkeys)
+   * [Customize Splits](#customize-splits)
+      * [Threshold](#threshold)
+      * [Delay](#delay)
+      * [Pause](#pause)
+      * [Loops](#loops)
+      * [Special Options](#special-options)
+   * [Installation](#installation)
+      * [MacOS](#macos)
+      * [Windows](#windows)
+      * [Linux](#linux)
 
 ## Works on MacOS and Windows
 
@@ -22,7 +43,7 @@ I don't have plans to introduce Linux support, but if you're interested in addin
 
 If you're using a capture card, all you need to do is have it connected to your computer. In Pilgrim Autosplitter, click the Next Source button until your capture card feed appears.
 
-(Note: because of limitations related to video capturing backends on MacOS, you have to scroll through each source until you find the one you want. This might lead to triggering webcams or other connected devices, so don't be alarmed, no one is spying on you.)
+(Note: because of limitations related to video capturing backends on MacOS, you have to scroll through each source until you find the one you want. This might lead to triggering webcams or other connected devices, so don't be alarmed; no one is spying on you.)
 
 #### OBS Virtual Camera
 
@@ -51,6 +72,8 @@ In the application you choose, use the magic wand tool to extract unneeded eleme
 ![Example split 2](resources/example-2.png)
 
 Pilgrim Autosplitter only compares the video feed with non-transparent pixels, so once it finds matching text, it will split.
+
+Press the Reset Splits button at any time to reload all images from your splits folder, allowing new/ modified images to show up in Pilgrim Autosplitter.
 
 ## Settings
 
