@@ -86,7 +86,7 @@ def main():
                 QIcon(QPixmap("resources/icon-macos.png"))
             )
 
-            settings.load_defaults()
+            settings.set_defaults()
 
             self.splitter = Splitter()
             if settings.get_bool("START_WITH_VIDEO"):

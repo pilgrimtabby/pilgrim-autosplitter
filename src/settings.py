@@ -129,17 +129,19 @@ def set_value(key: str, value: any) -> None:
     settings.setValue(key, str(value))
 
 
-def load_defaults() -> None:
+def set_defaults() -> None:
     """Ensure that settings values make sense before they are used.
 
     Populates settings with default values if they have not yet been set.
-    Ensures that LAST_IMAGE_DIR points to an existing path. Ensures that the
-    program starts in full view if START_WITH_VIDEO is false, since the user
-    would have to exit minimal view to turn the video on anyway. Makes sure
-    that the correct aspect ratio is shown.
+
+    Ensures that LAST_IMAGE_DIR points to an existing path.
+
+    Ensures that the program starts in full view if START_WITH_VIDEO is false,
+    since the user would have to exit minimal view to turn the video on anyway.
+
+    Makes sure that the correct aspect ratio is shown.
     """
     if not get_bool("SETTINGS_SET"):
-
         # Indicate whether default settings have been populated
         set_value("SETTINGS_SET", True)
 
@@ -157,6 +159,9 @@ def load_defaults() -> None:
 
         # The FPS used by splitter and ui_controller
         set_value("FPS", 60)
+
+        # The location of split images
+        set_value("LAST_IMAGE_DIR", "")
 
         # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
@@ -241,8 +246,10 @@ def load_defaults() -> None:
         # Whether global hotkeys are enabled (default) or only local hotkeys
         set_value("GLOBAL_HOTKEYS_ENABLED", True)
 
-    # Set last image dir to home dir if last image dir doesn't exist
-    if not Path(get_str("LAST_IMAGE_DIR")).is_dir():
+    # Set last image dir to home dir if last image dir doesn't exist, or if the
+    # path is empty
+    last_image_dir = get_str("LAST_IMAGE_DIR")
+    if not Path(last_image_dir).is_dir() or last_image_dir == "":
         home_dir = os.path.expanduser("~")
         set_value("LAST_IMAGE_DIR", home_dir)
 
