@@ -25,6 +25,7 @@ description: >- # this means to ignore newlines until "baseurl:"
   Set up global hotkeys, customize split images, choose from
   different themes, and never touch a keyboard while speedrunning
   again — even on MacOS.
+domain: pilgrimtabby.github.io
 baseurl: /pilgrim-autosplitter/ # the subpath of your site, e.g. /blog
 url: https://pilgrimtabby.github.io # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: pilgrim_tabby
