@@ -79,11 +79,16 @@ def main():
             from splitter.splitter import Splitter
             from ui.ui_controller import UIController
 
+            program_directory = os.path.dirname(os.path.abspath(__file__))
+
             self.pilgrim_autosplitter = QApplication(sys.argv)
             self.pilgrim_autosplitter.setStyle("fusion")
             self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
+            # Without the absolute path, the icon only shows up when running
+            # the program from the same directory /resources is in. This makes
+            # it show up no matter what
             self.pilgrim_autosplitter.setWindowIcon(
-                QIcon(QPixmap("resources/icon-macos.png"))
+                QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
             )
 
             settings.set_defaults()
@@ -95,6 +100,11 @@ def main():
             self.ui_controller = UIController(self.pilgrim_autosplitter, self.splitter)
 
             self.pilgrim_autosplitter.exec()
+
+            # Prevent segmentation fault or other clumsy errors on exit
+            # The threads won't persist since they're daemons, but this helps
+            # make sure they stop BEFORE the main thread ends
+            self.splitter.safe_exit_all_threads()
 
     # Open application
     print("\nStarting Pilgrim Autosplitter...")
