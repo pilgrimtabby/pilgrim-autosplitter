@@ -18,7 +18,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 
-title: Pilgrim Autosplitter for MacOS
+title: Pilgrim Autosplitter
 email: pilgrimtabby@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   Finally, an image-based autosplitter for MacOS speedrunners!
@@ -32,9 +32,29 @@ twitter_username: pilgrim_tabby
 github_username:  pilgrim_tabby
 
 # Build settings
-theme: minima
-plugins:
-  - jekyll-feed
+theme: just-the-docs
+color_scheme: dark
+
+# Callouts
+callouts:
+  warning:
+    title: Warning
+    color: red
+  note:
+    title: Note
+    color: purple
+  tip:
+    title: Tip
+    color: blue
+  important:
+    title: Important
+    color: pink
+  example:
+    title: Example
+    color: yellow
+
+# plugins:
+#   - jekyll-feed
 
 # Exclude from processing.
 # The following items will not be processed, by default.
