@@ -24,7 +24,7 @@ Custom split settings don't need to be listed in any particular order.
 
 ## Threshold
 
-Override the [default threshold]({{ site.baseurl }}{% link 04-settings.markdown %}#default-threshold) for this split.
+Override the [default threshold]({{ site.baseurl }}{% link docs/04-settings.markdown %}#default-threshold) for this split.
 
 The value is inserted between parentheses: `(value)`.
 
@@ -33,7 +33,7 @@ The value is inserted between parentheses: `(value)`.
 
 ## Delay
 
-Override the [default delay]({{ site.baseurl }}{% link 04-settings.markdown %}#default-delay) for this split.
+Override the [default delay]({{ site.baseurl }}{% link docs/04-settings.markdown %}#default-delay) for this split.
 
 The value is inserted between pound signs: `#value#`.
 
@@ -42,7 +42,7 @@ The value is inserted between pound signs: `#value#`.
 
 ## Pause
 
-Override the [default pause]({{ site.baseurl }}{% link 04-settings.markdown %}#default-pause) for this split.
+Override the [default pause]({{ site.baseurl }}{% link docs/04-settings.markdown %}#default-pause) for this split.
 
 The value is inserted between brackets: `[value]`.
 
@@ -71,7 +71,7 @@ Special split types can be used together, but the dummy type `{d}` will always o
 
 ## Pause type
 
-Force Pilgrim Autosplitter to press the [pause hotkey]({{ site.baseurl }}{% link 04-settings.markdown %}#pause-timer) instead of the [split hotkey]({{ site.baseurl }}{% link 04-settings.markdown %}#start--split) when splitting. 
+Force Pilgrim Autosplitter to press the [pause hotkey]({{ site.baseurl }}{% link docs/04-settings.markdown %}#pause-timer) instead of the [split hotkey]({{ site.baseurl }}{% link docs/04-settings.markdown %}#start--split) when splitting. 
 
 Insert a `p` between curly braces: `{p}`.
 
@@ -80,7 +80,7 @@ Insert a `p` between curly braces: `{p}`.
 
 ## Dummy type
 
-Force Pilgrim Autosplitter NOT to press a [hotkey]({{ site.baseurl }}{% link 04-settings.markdown %}#hotkeys) when splitting.
+Force Pilgrim Autosplitter NOT to press a [hotkey]({{ site.baseurl }}{% link docs/04-settings.markdown %}#hotkeys) when splitting.
 
 Useful if you rely on a certain image to know a split is coming, but you don't want to split ON that image.
 
