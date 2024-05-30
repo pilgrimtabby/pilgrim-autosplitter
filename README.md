@@ -18,7 +18,7 @@ For usage instructions, see the [Pilgrim Autosplitter user manual](https://pilgr
 
 # Installation
 
-Installation method depends on your operating system.
+The installation method depends on your operating system.
 
 ## MacOS
 
