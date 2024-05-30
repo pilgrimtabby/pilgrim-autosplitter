@@ -178,7 +178,7 @@ class UIMainWindow(QMainWindow):
         self._container = QWidget(self)
         self.setCentralWidget(self._container)
 
-        self.setWindowTitle(f"Pilgrim Autosplitter v{VERSION_NUMBER}")
+        self.setWindowTitle(f"Pilgrim Autosplitter {VERSION_NUMBER}")
 
         # Menu bar
         self.settings_action = QAction("Open settings menu", self)

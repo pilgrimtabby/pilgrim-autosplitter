@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Don't forget to increment the version number!
+
 # IMPORTANT: After building, you MUST zip the app yourself, or it will not run when unzipped after
 #            being downloaded from GitHub. I have no idea why, but it works.
 
