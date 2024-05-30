@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# IMPORTANT: After building, you MUST zip the app yourself, or it will not run when unzipped after
+#            being downloaded from GitHub. I have no idea why, but it works.
+
 # To build on MacOS, navigate to the project root directory and run this (`bash scripts/build.sh`)
 # A working app will be placed in /dist
 
