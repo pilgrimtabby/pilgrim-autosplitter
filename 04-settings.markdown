@@ -32,7 +32,7 @@ The current video feed and the current split image must match this much for Pilg
 
 If splits are happening too often, try increasing this value. 
 
-This value [can be adjusted]({{ site.baseurl }}{% link docs/03-customize-splits.markdown %}#threshold) for individual splits.
+This value [can be adjusted]({{ site.baseurl }}{% link 03-customize-splits.markdown %}#threshold) for individual splits.
 
 Minimum: `0%`  
 Default: `90%`  
@@ -49,7 +49,7 @@ Maximum: `2`
 
 Pilgrim Autosplitter will wait this many seconds to split after finding a match.
 
-This value [can be adjusted]({{ site.baseurl }}{% link docs/03-customize-splits.markdown %}#delay) for individual splits.
+This value [can be adjusted]({{ site.baseurl }}{% link 03-customize-splits.markdown %}#delay) for individual splits.
 
 Minimum: `0 seconds`
 
@@ -57,7 +57,7 @@ Minimum: `0 seconds`
 
 Pilgrim Autosplitter will wait this many seconds AFTER splitting before starting to look for the next match. This is a great option to save computing power!
 
-This value [can be adjusted]({{ site.baseurl }}{% link docs/03-customize-splits.markdown %}#pause) for individual splits.
+This value [can be adjusted]({{ site.baseurl }}{% link 03-customize-splits.markdown %}#pause) for individual splits.
 
 Minimum: `1 second`
 
@@ -114,7 +114,7 @@ Go back to the first split. Also refreshes your split images, so pressing `reset
 
 ## Pause timer
 
-Pilgrim Autosplitter presses this key when it matches a [pause type]({{ site.baseurl }}{% link docs/03-customize-splits.markdown %}#pause-type) split.
+Pilgrim Autosplitter presses this key when it matches a [pause type]({{ site.baseurl }}{% link 03-customize-splits.markdown %}#pause-type) split.
 
 ## Undo split
 
