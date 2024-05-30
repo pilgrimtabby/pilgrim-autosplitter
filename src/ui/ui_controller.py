@@ -350,15 +350,12 @@ class UIController:
         Kills `splitter.compare_thread` (this allows the splitter to exit
         gracefully if the split image directory has changed to an empty
         directory, for example). Restarts the thread if the split list isn't
-        empty and if the splitter was alive originally.
+        empty and if video is running.
         """
         self._redraw_split_labels = True
-        # Save this value before we set it to True in the next line
-        splitter_suspended = self._splitter.suspended
-
         self._splitter.safe_exit_compare_thread()
         self._splitter.splits.reset_split_images()
-        if len(self._splitter.splits.list) > 0 and not splitter_suspended:
+        if len(self._splitter.splits.list) > 0 and self._splitter.capture_thread.is_alive():
             self._splitter.start_compare_thread()
 
     def _set_image_directory_path(self) -> None:
