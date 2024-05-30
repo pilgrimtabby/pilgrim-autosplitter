@@ -31,4 +31,4 @@ If you're not using a capture card, the recommended capture method is via [OBS](
   <figcaption class="square-image-caption">The view from within OBS</figcaption>
 </figure>
 
-Click the gear icon to the right of the "Start Virtual Camera" button to configure your capture window. Once OBS Virtual Camera is open, click the [Next Source](#method-1:-capture-card) button until your game feed appears.
+Click the gear icon to the right of the "Start Virtual Camera" button to configure your capture window. Once OBS Virtual Camera is open, click the [Next Source](#method-1-capture-card) button until your game feed appears.
