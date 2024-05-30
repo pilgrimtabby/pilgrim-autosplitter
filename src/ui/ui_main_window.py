@@ -115,8 +115,12 @@ class UIMainWindow(QMainWindow):
         screenshot_button (QPushButton): Allows the user to take a screenshot
             of the current video frame and save it to the current split
             directory.
-        screenshot_error_message_box (QMessageBox): Message to display if the
-            screenshot button was pressed but the screenshot couldn't be taken.
+        screenshot_error_no_video_message_box (QMessageBox): Message to display
+            if the screenshot button or hotkey was pressed, ui_controller.
+            take_screenshot was called, but splitter.comparison_frame was None.
+        screenshot_error_no_file_message_box (QMessageBox): Message to display
+            if the screenshot was captured but could not be written to a file
+            (99% this should come down to permissions errors).
         screenshot_success_message_box (QMessageBox): Message to display if a
             screenshot was taken successfully and the user doesn't have "open
             screenshots on capture" enabled.
@@ -352,13 +356,21 @@ class UIMainWindow(QMainWindow):
         self.screenshot_success_message_box = QMessageBox(self)
         self.screenshot_success_message_box.setText("Screenshot taken")
 
-        # Screenshot error message box
-        self.screenshot_error_message_box = QMessageBox(self)
-        self.screenshot_error_message_box.setText("Could not take screenshot")
-        self.screenshot_error_message_box.setInformativeText(
+        # Screenshot error message box (no video)
+        self.screenshot_error_no_video_message_box = QMessageBox(self)
+        self.screenshot_error_no_video_message_box.setText("Could not take screenshot")
+        self.screenshot_error_no_video_message_box.setInformativeText(
             "No video feed detected. Please make sure video feed is active and try again."
         )
-        self.screenshot_error_message_box.setIcon(QMessageBox.Warning)
+        self.screenshot_error_no_video_message_box.setIcon(QMessageBox.Warning)
+
+        # Screenshot error message box (file couldn't be saved)
+        self.screenshot_error_no_file_message_box = QMessageBox(self)
+        self.screenshot_error_no_file_message_box.setText("Could not save screenshot")
+        self.screenshot_error_no_file_message_box.setInformativeText(
+            "Pilgrim Autosplitter can't write files to this folder. Please select a different folder and try again."
+        )
+        self.screenshot_error_no_file_message_box.setIcon(QMessageBox.Warning)
 
         # Reload video button
         self.reload_video_button = QPushButton("Reconnect video", self._container)
@@ -396,5 +408,4 @@ class UIMainWindow(QMainWindow):
 
         # Reset splits button
         self.reset_splits_button = QPushButton(self._container)
-        self.reset_splits_button.setEnabled(False)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)

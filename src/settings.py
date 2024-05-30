@@ -249,7 +249,7 @@ def set_defaults() -> None:
     # Set last image dir to home dir if last image dir doesn't exist, or if the
     # path is empty
     last_image_dir = get_str("LAST_IMAGE_DIR")
-    if not Path(last_image_dir).is_dir() or last_image_dir == "":
+    if len(last_image_dir) < 2 or not Path(last_image_dir).is_dir():
         home_dir = os.path.expanduser("~")
         set_value("LAST_IMAGE_DIR", home_dir)
 

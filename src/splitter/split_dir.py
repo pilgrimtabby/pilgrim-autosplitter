@@ -107,16 +107,17 @@ class SplitDir:
         """Recreate the split image list from scratch, resetting appropriate
         flags.
 
-        Use the old list after all if the new list is empty, for thread safety.
+        Set flags to None if the list is empty; otherwise, set them to 0.
         """
         new_list = self._get_split_images()
         if len(new_list) == 0:
-            pass
+            self.list = []
+            self.current_image_index = None
+            self.current_loop = None
         else:
             self.list = new_list
-
-        self.current_image_index = 0
-        self.current_loop = 0
+            self.current_image_index = 0
+            self.current_loop = 0
 
     def set_default_threshold(self) -> None:
         """Update threshold in each SplitImage whose threshold is default."""

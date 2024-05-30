@@ -122,7 +122,6 @@ class UIController:
         self._first_split_active = None
         self._last_split_active = None
         self._split_hotkey_enabled = False
-        self._reset_hotkey_enabled = False
         self._undo_hotkey_enabled = False
         self._skip_hotkey_enabled = False
 
@@ -350,12 +349,15 @@ class UIController:
 
         Kills `splitter.compare_thread` (this allows the splitter to exit
         gracefully if the split image directory has changed to an empty
-        directory, for example).
+        directory, for example). Restarts the thread if the split list isn't
+        empty.
         """
         self._redraw_split_labels = True
+
         self._splitter.safe_exit_compare_thread()
         self._splitter.splits.reset_split_images()
-        self._splitter.start_compare_thread()
+        if len(self._splitter.splits.list) > 0:
+            self._splitter.start_compare_thread()
 
     def _set_image_directory_path(self) -> None:
         """Prompt the user to select a split image directory, then open the new
@@ -370,7 +372,7 @@ class UIController:
             "Select splits folder",
             settings.get_str("LAST_IMAGE_DIR"),
         )
-        if path != "" and path != settings.get_str("LAST_IMAGE_DIR"):
+        if len(path) > 1 and path != settings.get_str("LAST_IMAGE_DIR"):
             settings.set_value("LAST_IMAGE_DIR", path)
             self._set_split_directory_line_edit_text()
             self._request_reset_splits()
@@ -622,11 +624,11 @@ class UIController:
         """
         frame = self._splitter.comparison_frame
         if frame is None:
-            self._main_window.screenshot_error_message_box.exec()
+            self._main_window.screenshot_error_no_video_message_box.exec()
             return
 
         image_dir = settings.get_str("LAST_IMAGE_DIR")
-        if image_dir is None or not Path(image_dir).is_dir:
+        if not Path(image_dir).is_dir:
             image_dir = os.path.expanduser("~")  # Home directory is default
 
         screenshot_path = (
@@ -646,8 +648,8 @@ class UIController:
                 )
                 self._main_window.screenshot_success_message_box.exec()
 
-        else:  # Something went wrong saving the file
-            self._main_window.screenshot_error_message_box.exec()
+        else:  # File couldn't be written to the split image directory
+            self._main_window.screenshot_error_no_file_message_box.exec()
 
     def _get_unique_filename_number(self, dir: str) -> str:
         """Return the lowest three-digit number that will allow a unique
@@ -1785,7 +1787,7 @@ class UIController:
                 )
             self._main_window.undo_split_button.setText("Undo split")
             self._main_window.skip_split_button.setText("Skip split")
-            self._main_window.reset_splits_button.setText("Reset run")
+            self._main_window.reset_splits_button.setText("Reset splits")
 
     def _set_nonessential_widgets_visible(self, visible: bool) -> None:
         """Set widget visibility according to minimal view status.
@@ -1900,7 +1902,8 @@ class UIController:
             1) `flags`: A tuple with three values. Value 1 is the flag set
                 `in _handle_hotkey_press`; value 2 is a string representation
                 of value 1; value 3 is the flag enabling or disabling the
-                hotkey, which is set in `_set_buttons_and_hotkeys_enabled`.
+                hotkey, which is set in `_set_buttons_and_hotkeys_enabled`
+                (or just `True` if there is no flag).
             2) `action`: The method or function to be called when the hotkey is
                 executed.
         This dict implementation is kind of messy and hard to understand, but I
@@ -1920,7 +1923,7 @@ class UIController:
             (
                 self._reset_hotkey_pressed,
                 "_reset_hotkey_pressed",
-                self._reset_hotkey_enabled,
+                True,
             ): self._request_reset_splits,
             (
                 self._undo_hotkey_pressed,
@@ -2162,14 +2165,12 @@ class UIController:
             )
 
         # Current match percent
-        if (
-            self._splitter.current_match_percent is None
-            and self._main_window.current_match_percent
-            != self._most_recent_match_percent_null_string
-        ):  # Match percent is blank, but is still showing a number
-            self._main_window.current_match_percent.setText(
-                self._most_recent_match_percent_null_string
-            )
+        if self._splitter.current_match_percent is None:
+            # Match percent is None, but UI is still showing a number
+            if self._main_window.current_match_percent.text() != self._most_recent_match_percent_null_string:
+                self._main_window.current_match_percent.setText(
+                    self._most_recent_match_percent_null_string
+                )
         else:
             self._main_window.current_match_percent.setText(
                 self._most_recent_match_percent_format_string.format(
@@ -2178,14 +2179,12 @@ class UIController:
             )
 
         # Highest match percent
-        if (
-            self._splitter.highest_match_percent is None
-            and self._main_window.highest_match_percent
-            != self._most_recent_match_percent_null_string
-        ):  # Match percent is blank, but is still showing a number
-            self._main_window.highest_match_percent.setText(
-                self._most_recent_match_percent_null_string
-            )
+        if self._splitter.highest_match_percent is None:
+            # Match percent is None, but UI is still showing a number
+            if self._main_window.highest_match_percent.text() != self._most_recent_match_percent_null_string:
+                self._main_window.highest_match_percent.setText(
+                    self._most_recent_match_percent_null_string
+                )
         else:
             self._main_window.highest_match_percent.setText(
                 self._most_recent_match_percent_format_string.format(
@@ -2194,12 +2193,13 @@ class UIController:
             )
 
         # Threshold match percent
-        # Make sure the splits list isn't empty before invoking it below
+        # Make sure the splits list isn't empty before trying to access it
         if self._most_recent_split_index is None:
+            # Match percent is blank, but UI is still showing a number
             if (
-                self._main_window.threshold_match_percent
+                self._main_window.threshold_match_percent.text()
                 != self._most_recent_match_percent_null_string
-            ):  # Match percent is blank, but is still showing a number
+            ):
                 self._main_window.threshold_match_percent.setText(
                     self._most_recent_match_percent_null_string
                 )
@@ -2207,20 +2207,11 @@ class UIController:
             threshold_match_percent = self._splitter.splits.list[
                 self._most_recent_split_index
             ].threshold
-            if (
-                threshold_match_percent is None
-                and self._main_window.threshold_match_percent
-                != self._most_recent_match_percent_null_string
-            ):  # Match percent is blank, but is still showing a number
-                self._main_window.threshold_match_percent.setText(
-                    self._most_recent_match_percent_null_string
+            self._main_window.threshold_match_percent.setText(
+                self._most_recent_match_percent_format_string.format(
+                    threshold_match_percent * 100
                 )
-            else:
-                self._main_window.threshold_match_percent.setText(
-                    self._most_recent_match_percent_format_string.format(
-                        threshold_match_percent * 100
-                    )
-                )
+            )
 
         # Pause / unpause button text
         if self._splitter_suspended != self._splitter.suspended:
@@ -2333,10 +2324,8 @@ class UIController:
         returns True.
         """
         if self._splits_active:
-            # Enable split and reset
+            # Enable split
             self._split_hotkey_enabled = True
-            self._reset_hotkey_enabled = True
-            self._main_window.reset_splits_button.setEnabled(True)
 
             # Enable screenshots if video is on
             if self._video_active:
@@ -2367,12 +2356,10 @@ class UIController:
                 self._main_window.next_split_button.setEnabled(True)
 
         else:
-            # Disable split, undo, skip, previous, next split, reset, pause
+            # Disable split, undo, skip, previous, next split, pause
             self._split_hotkey_enabled = False
-            self._reset_hotkey_enabled = False
             self._undo_hotkey_enabled = False
             self._skip_hotkey_enabled = False
-            self._main_window.reset_splits_button.setEnabled(False)
             self._main_window.undo_split_button.setEnabled(False)
             self._main_window.skip_split_button.setEnabled(False)
             self._main_window.previous_split_button.setEnabled(False)

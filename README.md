@@ -14,7 +14,7 @@ I don't have plans to introduce Linux support, but if you're interested in addin
 
 # Usage
 
-For usage instructions, see the [Pilgrim Autosplitter wiki](https://pilgrimtabby.github.io/pilgrim-autosplitter/).
+For usage instructions, see the [Pilgrim Autosplitter user manual](https://pilgrimtabby.github.io/pilgrim-autosplitter/).
 
 # Installation
 
