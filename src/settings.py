@@ -257,6 +257,18 @@ def set_defaults() -> None:
     if not get_bool("START_WITH_VIDEO"):
         set_value("SHOW_MIN_VIEW", False)
 
+    # If the user has a hotkey bound for toggling global hotkeys, I think it's
+    # safe to assume that they use global hotkeys and toggle regularly. If
+    # that's the case, it makes sense to set global hotkeys enabled on startup
+    # if they're not enabled already (lest there be confusion when the user
+    # opens the app, expecting global hotkeys to work, only to discover they're
+    # off because they quit the app after disabling them last time). On the
+    # other hand, if the user has global hotkeys disabled and no key bound to
+    # enable them, they're probably just not interested, so we can leave them
+    # off.
+    if not get_bool("GLOBAL_HOTKEYS_ENABLED") and len(get_str("TOGGLE_HOTKEYS_HOTKEY_NAME")) > 0:
+        set_value("GLOBAL_HOTKEYS_ENABLED", True)
+
     # Set correct video, split image width and height relative to aspect ratio
     aspect_ratio = get_str("ASPECT_RATIO")
     if aspect_ratio == "4:3 (480x360)":
