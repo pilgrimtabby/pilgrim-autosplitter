@@ -1,10 +1,6 @@
 **/.DS_Store
-**/.venv
-**/__pycache__
 **/.vscode
 **/.unpublished
-**/build
-**/dist
 _site
 .sass-cache
 .jekyll-cache
