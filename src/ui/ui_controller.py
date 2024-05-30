@@ -355,7 +355,10 @@ class UIController:
         self._redraw_split_labels = True
         self._splitter.safe_exit_compare_thread()
         self._splitter.splits.reset_split_images()
-        if len(self._splitter.splits.list) > 0 and self._splitter.capture_thread.is_alive():
+        if (
+            len(self._splitter.splits.list) > 0
+            and self._splitter.capture_thread.is_alive()
+        ):
             self._splitter.start_compare_thread()
 
     def _set_image_directory_path(self) -> None:
@@ -2166,7 +2169,10 @@ class UIController:
         # Current match percent
         if self._splitter.current_match_percent is None:
             # Match percent is None, but UI is still showing a number
-            if self._main_window.current_match_percent.text() != self._most_recent_match_percent_null_string:
+            if (
+                self._main_window.current_match_percent.text()
+                != self._most_recent_match_percent_null_string
+            ):
                 self._main_window.current_match_percent.setText(
                     self._most_recent_match_percent_null_string
                 )
@@ -2180,7 +2186,10 @@ class UIController:
         # Highest match percent
         if self._splitter.highest_match_percent is None:
             # Match percent is None, but UI is still showing a number
-            if self._main_window.highest_match_percent.text() != self._most_recent_match_percent_null_string:
+            if (
+                self._main_window.highest_match_percent.text()
+                != self._most_recent_match_percent_null_string
+            ):
                 self._main_window.highest_match_percent.setText(
                     self._most_recent_match_percent_null_string
                 )

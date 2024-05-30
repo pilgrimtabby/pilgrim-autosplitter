@@ -266,7 +266,10 @@ def set_defaults() -> None:
     # other hand, if the user has global hotkeys disabled and no key bound to
     # enable them, they're probably just not interested, so we can leave them
     # off.
-    if not get_bool("GLOBAL_HOTKEYS_ENABLED") and len(get_str("TOGGLE_HOTKEYS_HOTKEY_NAME")) > 0:
+    if (
+        not get_bool("GLOBAL_HOTKEYS_ENABLED")
+        and len(get_str("TOGGLE_HOTKEYS_HOTKEY_NAME")) > 0
+    ):
         set_value("GLOBAL_HOTKEYS_ENABLED", True)
 
     # Set correct video, split image width and height relative to aspect ratio
