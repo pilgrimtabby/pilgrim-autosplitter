@@ -70,6 +70,8 @@ class UIMainWindow(QMainWindow):
             current image match percent.
         current_match_percent_sign (QLabel): Displays a percent sign after the
             current image match percent.
+        file_not_found_message_box (QMessageBox): Message to display if the
+            controller attempts to open a file or directory that doesn't exist.
         help_action (QAction): Adds a menu bar item which triggers opening the
             user manual.
         highest_match_percent (QLabel): Displays the highest image match
@@ -372,7 +374,7 @@ class UIMainWindow(QMainWindow):
         self.screenshot_error_no_file_message_box.setIcon(QMessageBox.Warning)
 
         # Couldn't find file or directory error message box
-        self.file_not_found_message_box = QMessageBox(self) #TODO add this to docstring
+        self.file_not_found_message_box = QMessageBox(self)
         self.file_not_found_message_box.setText("File or folder not found")
         self.file_not_found_message_box.setInformativeText(
             "The file or folder could not be found. Please try again."

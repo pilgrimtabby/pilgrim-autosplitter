@@ -735,7 +735,7 @@ class UIController:
 
         If path points to a file, the file opens with the default application.
         If path points to a dir, the dir opens in the OS's file explorer.
-        
+
         If the path doesn't exist, show an error message and return.
 
         Args:
@@ -2034,8 +2034,12 @@ class UIController:
                 if flags[2] and (
 
                     # Global hotkeys enabled, OR the program is in focus
+                    # Also allow an exception for the toggle global hotkeys
+                    # key, which should be toggleable whether the app is in
+                    # focus or not.
                     global_hotkeys_enabled
                     or self._application.focusWindow() is not None
+                    or flags[1] == "_toggle_hotkeys_hotkey_pressed"
                 ):
 
                     # Do the hotkey's associated action
