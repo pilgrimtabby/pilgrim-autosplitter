@@ -33,18 +33,10 @@ should be provided in a controller class.
 
 import platform
 
-from PyQt5.QtCore import QRect, Qt
-from PyQt5.QtWidgets import (
-    QAction,
-    QLabel,
-    QLineEdit,
-    QMainWindow,
-    QMenuBar,
-    QMessageBox,
-    QPushButton,
-    QShortcut,
-    QWidget,
-)
+from PyQt5.QtCore import QRect, Qt, pyqtSignal
+from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
+                             QMessageBox, QPushButton, QShortcut, QWidget)
 
 import settings
 from settings import VERSION_NUMBER
@@ -219,10 +211,16 @@ class UIMainWindow(QMainWindow):
         )
         self.split_directory_button.setFocusPolicy(Qt.NoFocus)
 
-        self.split_directory_line_edit = QLineEdit(self._container)
+        self.split_directory_line_edit = ClickableLineEdit(self._container)
         self.split_directory_line_edit.setAlignment(Qt.AlignLeft)
         self.split_directory_line_edit.setText(settings.get_str("LAST_IMAGE_DIR"))
-        self.split_directory_line_edit.setEnabled(False)
+        # Make sure cursor doesn't change on hover
+        self.split_directory_line_edit.setFocusPolicy(Qt.NoFocus)
+        # Needed to make sure text can't be selected, including blank spaces
+        # before and after text. I'm not sure why this is necessary since mouse
+        # events are intercepted in ClickableLineEdit anyway, but in my testing
+        # this is the case.
+        self.split_directory_line_edit.setReadOnly(True)
 
         # Video feed
         self.video_feed_label = QLabel(self._container)
@@ -409,3 +407,66 @@ class UIMainWindow(QMainWindow):
         # Reset splits button
         self.reset_splits_button = QPushButton(self._container)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
+
+
+class ClickableLineEdit(QLineEdit):
+    """QLineEdit subclass that understands and reacts to single mouse presses.
+
+    Double clicks and drags are neutralized, since they otherwise would allow
+    the user to highlight the text in the line edit, which could be confusing
+    given that its purpose is to serve as a pseudo-button.
+
+    This whole class is probably unnecessary -- the same kind of thing could be
+    implemented with a button or a label, probably. But I like the look of the
+    QLineEdit class and figuring out custom css with QWidgets is a nightmare,
+    so I'm going with this.
+
+    Attributes:
+        clicked (PyQt5.QtCore.pyqtSignal): Emitted when a click is successfully
+            done and released on the ClickableLineEdit.
+    """
+    clicked = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        """Inherit from QLineEdit and set attributes to None.
+
+        Args:
+            parent (QWidget, optional): The parent class. Defaults to None.
+        """
+        QLineEdit.__init__(self, parent)
+
+    def mouseMoveEvent(self, a0: QMouseEvent | None) -> None:
+        """Prevent the mouse moving from having any effect.
+        
+        I override this method specifically to prevent selecting text by
+        clicking and dragging, since it's hard to deselect text once it's
+        selected (that's a side effect of making this widget clickable).
+
+        Args:
+            a0 (QMouseEvent | None): The mouse drag event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        pass
+
+    def mouseDoubleClickEvent(self, a0: QMouseEvent | None) -> None:
+        """Prevent a double click from having any effect.
+
+        I override this method specifically to prevent double-clicking to
+        select text, since single clicking will open a dialog (it would
+        be confusing for a single click to open a window and a double
+        click to do nothing).
+
+        Args:
+            a0 (QMouseEvent | None): The mouse double click event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        pass
+
+    def mouseReleaseEvent(self, event):
+        """Emit self.clicked if the mouse was pressed and released.
+
+        Args:
+            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+        """
+        if (event.button() == Qt.LeftButton and event.pos() in self.rect()):
+            self.clicked.emit()

@@ -146,6 +146,9 @@ class UIController:
         # Set layout
         self._set_main_window_layout()
 
+        # Split directory line edit
+        self._main_window.split_directory_line_edit.clicked.connect(lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR")))
+
         # Split directory button
         self._main_window.split_directory_button.clicked.connect(
             self._set_image_directory_path
@@ -423,7 +426,7 @@ class UIController:
         path = settings.get_str("LAST_IMAGE_DIR")
         elided_path = (
             self._main_window.split_directory_line_edit.fontMetrics().elidedText(
-                path,
+                f" {path} ",
                 Qt.ElideMiddle,
                 self._main_window.split_directory_line_edit.width(),
             )
@@ -680,7 +683,7 @@ class UIController:
 
         if Path(screenshot_path).is_file():
             if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
-                self._open_file(screenshot_path)
+                self._open_file_or_dir(screenshot_path)
             else:
                 self._main_window.screenshot_success_message_box.setInformativeText(
                     f"Screenshot saved to:\n{screenshot_path}"
@@ -727,8 +730,11 @@ class UIController:
             else:
                 return file_number
 
-    def _open_file(self, path: str) -> None:
-        """Enables cross-platform opening of a file.
+    def _open_file_or_dir(self, path: str) -> None:
+        """Enables cross-platform opening of a file or directory.
+
+        If path points to a file, the file opens with the default application.
+        If path points to a dir, the dir opens in the OS's file explorer.
 
         Args:
             path (str): The file to open.
