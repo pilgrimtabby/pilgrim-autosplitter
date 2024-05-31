@@ -19,12 +19,16 @@ Press the Take Screenshot button to take a screenshot of the currently displayed
   <img src="images/take-screenshot.png" class="square-image" alt="Take screenshot">
 </figure>
 
-By default, split images are read from and saved to your home directory. Choose a custom folder by clicking the Select Split Image Folder button.
-
-You can also open the currently loaded splits folder directly by clicking on the box containing your folder's path.
+By default, split images are read from and saved to your home directory. Choose a custom folder by clicking the Select Split Image Folder button:
 
 <figure>
   <img src="images/select-folder.png" class="square-image" alt="Select split image folder">
+</figure>
+
+You can also browse the contents of the current folder by clicking on the folder's path:
+
+<figure>
+  <img src="images/open-folder.png" class="square-image" alt="Open current split images folder">
 </figure>
 
 {: .tip }
