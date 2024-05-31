@@ -663,7 +663,10 @@ class UIController:
         """
         frame = self._splitter.comparison_frame
         if frame is None:
-            self._main_window.screenshot_error_no_video_message_box.exec()
+            message = self._main_window.screenshot_error_no_video_message_box
+            message.show()
+            # Close message box after 10 seconds
+            QTimer.singleShot(10000, lambda : message.done(0))
             return
 
         image_dir = settings.get_str("LAST_IMAGE_DIR")
@@ -685,10 +688,17 @@ class UIController:
                 self._main_window.screenshot_success_message_box.setIconPixmap(
                     QPixmap(screenshot_path).scaledToWidth(150)
                 )
-                self._main_window.screenshot_success_message_box.exec()
+
+                message = self._main_window.screenshot_success_message_box
+                message.show()
+                # Close message box after 10 seconds
+                QTimer.singleShot(10000, lambda : message.done(0))
 
         else:  # File couldn't be written to the split image directory
-            self._main_window.screenshot_error_no_file_message_box.exec()
+            message = self._main_window.screenshot_error_no_file_message_box
+            message.show()
+            # Close message box after 10 seconds
+            QTimer.singleShot(10000, lambda : message.done(0))
 
     def _get_unique_filename_number(self, dir: str) -> str:
         """Return the lowest three-digit number that will allow a unique
@@ -1925,7 +1935,6 @@ class UIController:
                 if str(key_code) == settings.get_str(settings_string):
                     # Use setattr because that allows us to use this dict format
                     setattr(self, hotkey_flag, True)
-                    return
 
     def _handle_hotkey_press(self) -> None:
         """React to the flags set in _handle_key_press.
