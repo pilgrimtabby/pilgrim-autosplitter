@@ -735,10 +735,19 @@ class UIController:
 
         If path points to a file, the file opens with the default application.
         If path points to a dir, the dir opens in the OS's file explorer.
+        
+        If the path doesn't exist, show an error message and return.
 
         Args:
             path (str): The file to open.
         """
+        if not Path(path).exists():
+            message = self._main_window.file_not_found_message_box
+            message.show()
+            # Close message box after 10 seconds
+            QTimer.singleShot(10000, lambda : message.done(0))
+            return
+
         if platform.system() == "Windows":
             os.startfile(path)
         elif platform.system() == "Darwin":

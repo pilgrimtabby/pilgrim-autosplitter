@@ -123,7 +123,8 @@ class UIMainWindow(QMainWindow):
         split_directory_button (QPushButton): Allows the user to select a split
             image folder.
         split_directory_line_edit (QLineEdit): Shows the path to the current
-            split image folder.
+            split image folder. If clicked, it opens the split image folder in
+            the OS's file explorer.
         split_image_default_text (str): Informs the user there are no split
             images loaded currently.
         split_image_display (QLabel): Display split images if loaded, or else
@@ -369,6 +370,14 @@ class UIMainWindow(QMainWindow):
             "Pilgrim Autosplitter can't write files to this folder. Please select a different folder and try again."
         )
         self.screenshot_error_no_file_message_box.setIcon(QMessageBox.Warning)
+
+        # Couldn't find file or directory error message box
+        self.file_not_found_message_box = QMessageBox(self) #TODO add this to docstring
+        self.file_not_found_message_box.setText("File or folder not found")
+        self.file_not_found_message_box.setInformativeText(
+            "The file or folder could not be found. Please try again."
+        )
+        self.file_not_found_message_box.setIcon(QMessageBox.Warning)
 
         # Reload video button
         self.reload_video_button = QPushButton("Reconnect video", self._container)
