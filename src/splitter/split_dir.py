@@ -84,7 +84,7 @@ class SplitDir:
 
     def next_split_image(self) -> None:
         """Go to the next split image or next loop (whichever is next).
-        
+
         If splitter has set ignore_split_request to True, unset the flag and
         return without doing anything. This is to prevent a double split (see
         splitter._set_normal_split_action).

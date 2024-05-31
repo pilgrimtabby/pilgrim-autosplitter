@@ -35,8 +35,17 @@ import platform
 
 from PyQt5.QtCore import QRect, Qt, pyqtSignal
 from PyQt5.QtGui import QMouseEvent
-from PyQt5.QtWidgets import (QAction, QLabel, QLineEdit, QMainWindow, QMenuBar,
-                             QMessageBox, QPushButton, QShortcut, QWidget)
+from PyQt5.QtWidgets import (
+    QAction,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMenuBar,
+    QMessageBox,
+    QPushButton,
+    QShortcut,
+    QWidget,
+)
 
 import settings
 from settings import VERSION_NUMBER
@@ -436,6 +445,7 @@ class ClickableLineEdit(QLineEdit):
         clicked (PyQt5.QtCore.pyqtSignal): Emitted when a click is successfully
             done and released on the ClickableLineEdit.
     """
+
     clicked = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
@@ -448,7 +458,7 @@ class ClickableLineEdit(QLineEdit):
 
     def mouseMoveEvent(self, a0: QMouseEvent | None) -> None:
         """Prevent the mouse moving from having any effect.
-        
+
         I override this method specifically to prevent selecting text by
         clicking and dragging, since it's hard to deselect text once it's
         selected (that's a side effect of making this widget clickable).
@@ -479,5 +489,5 @@ class ClickableLineEdit(QLineEdit):
         Args:
             event: The mouse release event. See help(PyQt5.QtCore.QEvent).
         """
-        if (event.button() == Qt.LeftButton and event.pos() in self.rect()):
+        if event.button() == Qt.LeftButton and event.pos() in self.rect():
             self.clicked.emit()

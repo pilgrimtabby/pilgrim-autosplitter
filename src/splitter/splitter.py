@@ -171,7 +171,7 @@ class Splitter:
 
     def safe_exit_compare_thread(self) -> None:
         """Safely kill _compare_thread.
-        
+
         Also kills _split_thread, since _split_thread should only be active if
         _compare_thread is active.
         """
@@ -626,8 +626,7 @@ class Splitter:
                 return
 
     def _start_split_thread(self) -> None:
-        """Start _split_thread with target=self._set_normal_split_action.
-        """
+        """Start _split_thread with target=self._set_normal_split_action."""
         self._split_thread = threading.Thread(target=self._set_normal_split_action)
         self._split_thread_finished = False
         self._split_thread.daemon = True
@@ -665,7 +664,11 @@ class Splitter:
         self.normal_split_action = True
 
         start_time = time.perf_counter()
-        while time.perf_counter() - start_time < 1 and self.splits.ignore_split_request and not self._split_thread_finished:
+        while (
+            time.perf_counter() - start_time < 1
+            and self.splits.ignore_split_request
+            and not self._split_thread_finished
+        ):
             time.sleep(0.001)
 
         self.splits.ignore_split_request = False

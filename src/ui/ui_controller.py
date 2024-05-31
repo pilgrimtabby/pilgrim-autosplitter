@@ -147,7 +147,9 @@ class UIController:
         self._set_main_window_layout()
 
         # Split directory line edit
-        self._main_window.split_directory_line_edit.clicked.connect(lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR")))
+        self._main_window.split_directory_line_edit.clicked.connect(
+            lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR"))
+        )
 
         # Split directory button
         self._main_window.split_directory_button.clicked.connect(
@@ -280,7 +282,7 @@ class UIController:
         to be opened when this method is called, so we don't need to worry
         about whether _settings_window_showing will block the hotkey flag
         from being set.
-        
+
         If this method is ever used to accomplish something
         and it's not guaranteed that the program will be in focus, this may
         need to be rethought.
@@ -304,7 +306,7 @@ class UIController:
         to be opened when this method is called, so we don't need to worry
         about whether _settings_window_showing will block the hotkey flag
         from being set.
-        
+
         If this method is ever used to accomplish something
         and it's not guaranteed that the program will be in focus, this may
         need to be rethought.
@@ -328,7 +330,7 @@ class UIController:
         to be opened when this method is called, so we don't need to worry
         about whether _settings_window_showing will block the hotkey flag
         from being set.
-        
+
         If this method is ever used to accomplish something
         and it's not guaranteed that the program will be in focus, this may
         need to be rethought.
@@ -669,7 +671,7 @@ class UIController:
             message = self._main_window.screenshot_error_no_video_message_box
             message.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda : message.done(0))
+            QTimer.singleShot(10000, lambda: message.done(0))
             return
 
         image_dir = settings.get_str("LAST_IMAGE_DIR")
@@ -695,13 +697,13 @@ class UIController:
                 message = self._main_window.screenshot_success_message_box
                 message.show()
                 # Close message box after 10 seconds
-                QTimer.singleShot(10000, lambda : message.done(0))
+                QTimer.singleShot(10000, lambda: message.done(0))
 
         else:  # File couldn't be written to the split image directory
             message = self._main_window.screenshot_error_no_file_message_box
             message.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda : message.done(0))
+            QTimer.singleShot(10000, lambda: message.done(0))
 
     def _get_unique_filename_number(self, dir: str) -> str:
         """Return the lowest three-digit number that will allow a unique
@@ -745,7 +747,7 @@ class UIController:
             message = self._main_window.file_not_found_message_box
             message.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda : message.done(0))
+            QTimer.singleShot(10000, lambda: message.done(0))
             return
 
         if platform.system() == "Windows":
@@ -1907,7 +1909,7 @@ class UIController:
         We set flags when hotkeys are pressed instead of directly calling a
         method because PyQt5 doesn't allow other threads to manipulate the UI.
         Doing so almost always causes a zsh trace trap error / crash.
-        
+
         Args:
             key (keyboard.Key): The key that was pressed.
         """
@@ -2023,7 +2025,7 @@ class UIController:
                 "GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled
             ),
         }.items():
-            
+
             # If "hotkey is pressed" flag is True
             if flags[0]:
                 # Set "hotkey is pressed" flag to False
@@ -2032,7 +2034,6 @@ class UIController:
                 # If the hotkey is allowed to be pressed
                 # (see _set_buttons_and_hotkeys_enabled)
                 if flags[2] and (
-
                     # Global hotkeys enabled, OR the program is in focus
                     # Also allow an exception for the toggle global hotkeys
                     # key, which should be toggleable whether the app is in
