@@ -57,15 +57,18 @@ class SplitDir:
             exists.
         current_loop (int): The current split image's current loop, if it
             exists.
+        ignore_split_request (bool): A flag that is set exclusively by splitter
+            in the event of a normal split. See splitter's documentation for
+            details, but the idea is to stop splitter and ui_controller from
+            both calling next_split_image for the same split.
         list (list[_SplitImage]): A list of all split images in
             settings.get_str("LAST_IMAGE_DIR").
     """
 
     def __init__(self):
-        """Initialize a list of SplitImage objects; set flags based on whether
-        the list is empty.
-        """
+        """Initialize a list of SplitImage objects and set flags accordingly."""
         self.list = self._get_split_images()
+        self.ignore_split_request = False
         if len(self.list) > 0:
             self.current_image_index = 0
             self.current_loop = 0
@@ -80,9 +83,16 @@ class SplitDir:
     ##################
 
     def next_split_image(self) -> None:
-        """Go to the next split image or, if current_loop < loops, to the next
-        loop.
+        """Go to the next split image or next loop (whichever is next).
+        
+        If splitter has set ignore_split_request to True, unset the flag and
+        return without doing anything. This is to prevent a double split (see
+        splitter._set_normal_split_action).
         """
+        if self.ignore_split_request:
+            self.ignore_split_request = False
+            return
+
         if self.current_loop == self.list[self.current_image_index].loops:
             if self.current_image_index < len(self.list) - 1:
                 self.current_image_index += 1
@@ -104,11 +114,7 @@ class SplitDir:
             self.current_loop -= 1
 
     def reset_split_images(self) -> None:
-        """Recreate the split image list from scratch, resetting appropriate
-        flags.
-
-        Set flags to None if the list is empty; otherwise, set them to 0.
-        """
+        """Rebuild the split image list and reset flags."""
         new_list = self._get_split_images()
         if len(new_list) == 0:
             self.list = []

@@ -99,7 +99,7 @@ class UISettingsWindow(QDialog):
             screenshot hotkey.
         skip_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
             skip split hotkey.
-        start_split_hotkey_line_edit (KeyLineEdit): Store and allow selection
+        split_hotkey_line_edit (KeyLineEdit): Store and allow selection
             of split hotkey.
         start_with_video_checkbox (QCheckBox): Store and allow selection of
             whether this program should try to open a video feed on startup.
@@ -495,8 +495,8 @@ class UISettingsWindow(QDialog):
         self._hotkey_settings_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         # Start / split hotkey
-        self.start_split_hotkey_line_edit = KeyLineEdit(self)
-        self.start_split_hotkey_line_edit.setGeometry(
+        self.split_hotkey_line_edit = KeyLineEdit(self)
+        self.split_hotkey_line_edit.setGeometry(
             QRect(
                 410 + self._LEFT_EDGE_CORRECTION,
                 42 + self._TOP_EDGE_CORRECTION,
@@ -504,28 +504,28 @@ class UISettingsWindow(QDialog):
                 25,
             )
         )
-        self.start_split_hotkey_line_edit.setReadOnly(True)
+        self.split_hotkey_line_edit.setReadOnly(True)
 
-        self._start_split_hotkey_label = QLabel("Start / split", self)
-        self._start_split_hotkey_label.setGeometry(
+        self._split_hotkey_label = QLabel("Start / split", self)
+        self._split_hotkey_label.setGeometry(
             QRect(
                 300 + self._LEFT_EDGE_CORRECTION, 40 + self._TOP_EDGE_CORRECTION, 81, 31
             )
         )
-        self._start_split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        self._start_split_hotkey_clear_button = QPushButton("clear", self)
-        self._start_split_hotkey_clear_button.setGeometry(
+        self._split_hotkey_clear_button = QPushButton("clear", self)
+        self._split_hotkey_clear_button.setGeometry(
             QRect(
                 545 + self._LEFT_EDGE_CORRECTION, 45 + self._TOP_EDGE_CORRECTION, 39, 20
             )
         )
-        self._start_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
-        self._start_split_hotkey_clear_button.clicked.connect(
-            lambda: self.start_split_hotkey_line_edit.setText("")
+        self._split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._split_hotkey_clear_button.clicked.connect(
+            lambda: self.split_hotkey_line_edit.setText("")
         )
-        self._start_split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.start_split_hotkey_line_edit, "key_code", "")
+        self._split_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.split_hotkey_line_edit, "key_code", "")
         )
 
         # Reset splits hotkey
