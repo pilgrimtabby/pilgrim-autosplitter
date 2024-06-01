@@ -42,7 +42,7 @@ import cv2
 from pynput import keyboard
 from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QAbstractButton
 
 import settings
 import ui.ui_style_sheet as style_sheet
@@ -146,6 +146,9 @@ class UIController:
         # Set layout
         self._set_main_window_layout()
 
+        # "Update available" message box
+        self._main_window.update_available_message_box.buttonClicked.connect(self._update_message_box_action)
+
         # Split directory line edit
         self._main_window.split_directory_line_edit.clicked.connect(
             lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR"))
@@ -214,7 +217,7 @@ class UIController:
         # Help action
         self._main_window.help_action.triggered.connect(
             lambda: webbrowser.open(
-                "https://github.com/pilgrimtabby/pilgrim-autosplitter/",
+                settings.USER_MANUAL_URL,
                 new=0,
                 autoraise=True,
             )
@@ -435,6 +438,20 @@ class UIController:
         )
         self._main_window.split_directory_line_edit.setText(elided_path)
 
+    def _update_message_box_action(self, button: QAbstractButton):
+        """React to button presses in main_window.update_available_message_box.
+
+        Args:
+            button (QAbstractButton): The button that was pressed.
+        """
+        # "Don't ask again" was clicked -- stop checking for updates
+        if button.text() == self._main_window.update_available_reject_button_text:
+            settings.set_value("CHECK_FOR_UPDATES", False)
+
+        # "Open" was clicked -- open the GitHub releases page
+        elif button.text() == self._main_window.update_available_open_button_text:
+            webbrowser.open(f"{settings.REPO_URL}releases/latest", new=0, autoraise=True)
+
     def _exec_settings_window(self) -> None:
         """Set up and open the settings window UI.
 
@@ -479,6 +496,9 @@ class UIController:
             ),
             self._settings_window.global_hotkeys_checkbox: settings.get_bool(
                 "GLOBAL_HOTKEYS_ENABLED"
+            ),
+            self._settings_window.check_for_updates_checkbox: settings.get_bool(
+                "CHECK_FOR_UPDATES"
             ),
         }.items():
             if value:
@@ -579,6 +599,7 @@ class UIController:
             self._settings_window.open_screenshots_checkbox: "OPEN_SCREENSHOT_ON_CAPTURE",
             self._settings_window.start_with_video_checkbox: "START_WITH_VIDEO",
             self._settings_window.global_hotkeys_checkbox: "GLOBAL_HOTKEYS_ENABLED",
+            self._settings_window.check_for_updates_checkbox: "CHECK_FOR_UPDATES",
         }.items():
             if checkbox.checkState() == 0:
                 value = False

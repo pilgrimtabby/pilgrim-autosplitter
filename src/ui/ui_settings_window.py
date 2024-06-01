@@ -70,6 +70,8 @@ class UISettingsWindow(QDialog):
             for aesthetic purposes.
         cancel_button (QPushButton): Close the menu without saving. Same as
             clicking the "x button", pressing esc, etc.
+        check_for_updates_checkbox (QCheckBox): Enable and disable checking for
+            new versions on launch.
         close_window_shortcut (QShortcut): Same as cancel_button.
         default_delay_double_spinbox (QDoubleSpinBox): Store and allow
             selection of default delay before splitting.
@@ -473,6 +475,48 @@ class UISettingsWindow(QDialog):
             Qt.WidgetAttribute.WA_TransparentForMouseEvents
         )
         self._global_hotkeys_checkbox_helper_label.setGraphicsEffect(
+            self._checkbox_shadow
+        )
+
+        # Check for updates checkbox
+        self._check_for_updates_label = QLabel("Check for updates:", self)
+        self._check_for_updates_label.setGeometry(
+            QRect(
+                20 + self._LEFT_EDGE_CORRECTION,
+                310 + self._TOP_EDGE_CORRECTION,
+                191,
+                31,
+            )
+        )
+        self._check_for_updates_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._check_for_updates_label.setToolTip(
+            "Check for updates to Pilgrim Autosplitter on launch."
+        )
+
+        self.check_for_updates_checkbox = QCheckBox(self)  #TODO add to thingy
+        self.check_for_updates_checkbox.setGeometry(
+            QRect(
+                161 + self._LEFT_EDGE_CORRECTION,
+                319 + self._TOP_EDGE_CORRECTION,
+                13,
+                13,
+            )
+        )
+
+        self._check_for_updates_checkbox_helper_label = QLabel(self)
+        self._check_for_updates_checkbox_helper_label.setGeometry(
+            QRect(
+                161 + self._LEFT_EDGE_CORRECTION,
+                318 + self._TOP_EDGE_CORRECTION,
+                14,
+                15,
+            )
+        )
+        self._check_for_updates_checkbox_helper_label.setObjectName("checkbox_helper")
+        self._check_for_updates_checkbox_helper_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+        self._check_for_updates_checkbox_helper_label.setGraphicsEffect(
             self._checkbox_shadow
         )
 

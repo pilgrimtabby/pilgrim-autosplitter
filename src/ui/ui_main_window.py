@@ -155,6 +155,14 @@ class UIMainWindow(QMainWindow):
         undo_split_button (QPushButton): Allows the user to move to the
             previous split. Does the same thing as pressing the undo split
             hotkey.
+        update_available_later_button_text (str): The text that appears on the
+            "remind me later" button in update_available_message_box.
+        update_available_message_box (QMessageBox): Message that appears when
+            an update is available.
+        update_available_open_button_text (str): The text that appears on the
+            "open" button in update_available_message_box.
+        update_available_reject_button_text (str): The text that appears on the
+            "don't ask again" button in update_available_message_box.
         video_feed_display (QLabel): Display video feed if connected, or else
             show the video_feed_display_default_text.
         video_feed_display_default_text (str): Informs the user there is no
@@ -389,6 +397,26 @@ class UIMainWindow(QMainWindow):
             "The file or folder could not be found. Please try again."
         )
         self.file_not_found_message_box.setIcon(QMessageBox.Warning)
+
+        # Update available message box buttons
+        self._update_available_open_button = QMessageBox.Open
+        self.update_available_open_button_text = "Open"
+        self.update_available_reject_button_text = "Don't ask again"
+        self.update_available_later_button_text = "Remind me later"
+
+        # Update available message box
+        self.update_available_message_box = QMessageBox(self)
+        self.update_available_message_box.setText("New update available!")
+        self.update_available_message_box.setInformativeText(
+            "Pilgrim Autosplitter has been updated!\n"
+            "Open the Releases page?"
+        )
+        self.update_available_message_box.setIcon(QMessageBox.Information)
+        self.update_available_message_box.addButton(self.update_available_reject_button_text, QMessageBox.DestructiveRole)
+        self.update_available_message_box.addButton(self.update_available_later_button_text, QMessageBox.RejectRole)
+        self.update_available_message_box.addButton(self._update_available_open_button)
+        # Make sure "Open" button is highlighted
+        self.update_available_message_box.setDefaultButton(self._update_available_open_button)
 
         # Reload video button
         self.reload_video_button = QPushButton("Reconnect video", self._container)
