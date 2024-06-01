@@ -33,7 +33,8 @@ should be provided in a controller class.
 
 import platform
 
-from PyQt5.QtCore import QRect, Qt
+from PyQt5.QtCore import QRect, Qt, pyqtSignal
+from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import (
     QAction,
     QLabel,
@@ -78,6 +79,8 @@ class UIMainWindow(QMainWindow):
             current image match percent.
         current_match_percent_sign (QLabel): Displays a percent sign after the
             current image match percent.
+        file_not_found_message_box (QMessageBox): Message to display if the
+            controller attempts to open a file or directory that doesn't exist.
         help_action (QAction): Adds a menu bar item which triggers opening the
             user manual.
         highest_match_percent (QLabel): Displays the highest image match
@@ -131,7 +134,8 @@ class UIMainWindow(QMainWindow):
         split_directory_button (QPushButton): Allows the user to select a split
             image folder.
         split_directory_line_edit (QLineEdit): Shows the path to the current
-            split image folder.
+            split image folder. If clicked, it opens the split image folder in
+            the OS's file explorer.
         split_image_default_text (str): Informs the user there are no split
             images loaded currently.
         split_image_display (QLabel): Display split images if loaded, or else
@@ -151,6 +155,14 @@ class UIMainWindow(QMainWindow):
         undo_split_button (QPushButton): Allows the user to move to the
             previous split. Does the same thing as pressing the undo split
             hotkey.
+        update_available_later_button_text (str): The text that appears on the
+            "remind me later" button in update_available_message_box.
+        update_available_message_box (QMessageBox): Message that appears when
+            an update is available.
+        update_available_open_button_text (str): The text that appears on the
+            "open" button in update_available_message_box.
+        update_available_never_button_text (str): The text that appears on the
+            "don't ask again" button in update_available_message_box.
         video_feed_display (QLabel): Display video feed if connected, or else
             show the video_feed_display_default_text.
         video_feed_display_default_text (str): Informs the user there is no
@@ -219,10 +231,16 @@ class UIMainWindow(QMainWindow):
         )
         self.split_directory_button.setFocusPolicy(Qt.NoFocus)
 
-        self.split_directory_line_edit = QLineEdit(self._container)
+        self.split_directory_line_edit = ClickableLineEdit(self._container)
         self.split_directory_line_edit.setAlignment(Qt.AlignLeft)
         self.split_directory_line_edit.setText(settings.get_str("LAST_IMAGE_DIR"))
-        self.split_directory_line_edit.setEnabled(False)
+        # Make sure cursor doesn't change on hover
+        self.split_directory_line_edit.setFocusPolicy(Qt.NoFocus)
+        # Needed to make sure text can't be selected, including blank spaces
+        # before and after text. I'm not sure why this is necessary since mouse
+        # events are intercepted in ClickableLineEdit anyway, but in my testing
+        # this is the case.
+        self.split_directory_line_edit.setReadOnly(True)
 
         # Video feed
         self.video_feed_label = QLabel(self._container)
@@ -372,6 +390,60 @@ class UIMainWindow(QMainWindow):
         )
         self.screenshot_error_no_file_message_box.setIcon(QMessageBox.Warning)
 
+        # Couldn't find file or directory error message box
+        self.file_not_found_message_box = QMessageBox(self)
+        self.file_not_found_message_box.setText("File or folder not found")
+        self.file_not_found_message_box.setInformativeText(
+            "The file or folder could not be found. Please try again."
+        )
+        self.file_not_found_message_box.setIcon(QMessageBox.Warning)
+
+        # Update available message box
+        self.update_available_message_box = QMessageBox(self._container)
+        self.update_available_message_box.setText("New update available!")
+        self.update_available_message_box.setInformativeText(
+            "Pilgrim Autosplitter has been updated!\nOpen the Releases page?"
+        )
+        self.update_available_message_box.setIcon(QMessageBox.Information)
+        self.update_available_message_box.setStandardButtons(
+            QMessageBox.Open | QMessageBox.Close | QMessageBox.Discard
+        )
+        # Make sure "Remind me later" button is highlighted
+        self.update_available_message_box.setDefaultButton(
+            self.update_available_message_box.button(QMessageBox.Close)
+        )
+
+        # Update available message box buttons
+        # You can't directly create QMessageBox buttons -- you either have to
+        # call QMessageBox.addButton, which doesn't let you keep a reference to
+        # the button, or you have to make the buttons by calling
+        # QMessageBox.setStandardButtons, then referencing the buttons by the
+        # role they have. If you do that, you can BOTH set the button's text
+        # AND make one of the buttons the default.
+        self.update_available_open_button_text = "Open"
+        self._update_available_open_button = self.update_available_message_box.button(
+            QMessageBox.Open
+        )
+        self._update_available_open_button.setText(
+            self.update_available_open_button_text
+        )
+
+        self.update_available_later_button_text = "Remind me later"
+        self._update_available_later_button = self.update_available_message_box.button(
+            QMessageBox.Close
+        )
+        self._update_available_later_button.setText(
+            self.update_available_later_button_text
+        )
+
+        self.update_available_never_button_text = "Don't ask again"
+        self._update_available_never_button = self.update_available_message_box.button(
+            QMessageBox.Discard
+        )
+        self._update_available_never_button.setText(
+            self.update_available_never_button_text
+        )
+
         # Reload video button
         self.reload_video_button = QPushButton("Reconnect video", self._container)
         self.reload_video_button.setFocusPolicy(Qt.NoFocus)
@@ -409,3 +481,84 @@ class UIMainWindow(QMainWindow):
         # Reset splits button
         self.reset_splits_button = QPushButton(self._container)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
+
+        #####################
+        #                   #
+        # Check for updates #
+        #                   #
+        #####################
+
+        if settings.get_bool("CHECK_FOR_UPDATES"):
+            latest_version = settings.get_latest_version()
+            if latest_version != settings.VERSION_NUMBER:
+                # Yes, I call both show and open. If you just call show, the
+                # box doesn't always appear centered over the window (it's way
+                # off to the side). If you just call show, then bafflingly, the
+                # wrong button is highlighted by default. Calling both makes
+                # everything work, for some reason.
+                self.update_available_message_box.show()
+                self.update_available_message_box.open()
+
+
+class ClickableLineEdit(QLineEdit):
+    """QLineEdit subclass that understands and reacts to single mouse presses.
+
+    Double clicks and drags are neutralized, since they otherwise would allow
+    the user to highlight the text in the line edit, which could be confusing
+    given that its purpose is to serve as a pseudo-button.
+
+    This whole class is probably unnecessary -- the same kind of thing could be
+    implemented with a button or a label, probably. But I like the look of the
+    QLineEdit class and figuring out custom css with QWidgets is a nightmare,
+    so I'm going with this.
+
+    Attributes:
+        clicked (PyQt5.QtCore.pyqtSignal): Emitted when a click is successfully
+            done and released on the ClickableLineEdit.
+    """
+
+    clicked = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        """Inherit from QLineEdit and set attributes to None.
+
+        Args:
+            parent (QWidget, optional): The parent class. Defaults to None.
+        """
+        QLineEdit.__init__(self, parent)
+
+    def mouseMoveEvent(self, a0: QMouseEvent | None) -> None:
+        """Prevent the mouse moving from having any effect.
+
+        I override this method specifically to prevent selecting text by
+        clicking and dragging, since it's hard to deselect text once it's
+        selected (that's a side effect of making this widget clickable).
+
+        Args:
+            a0 (QMouseEvent | None): The mouse drag event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        pass
+
+    def mouseDoubleClickEvent(self, a0: QMouseEvent | None) -> None:
+        """Prevent a double click from having any effect.
+
+        I override this method specifically to prevent double-clicking to
+        select text, since single clicking will open a dialog (it would
+        be confusing for a single click to open a window and a double
+        click to do nothing).
+
+        Args:
+            a0 (QMouseEvent | None): The mouse double click event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        pass
+
+    def mouseReleaseEvent(self, event):
+        """Emit self.clicked if the mouse was pressed and released.
+
+        Args:
+            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.button() == Qt.LeftButton and event.pos() in self.rect():
+            self.clicked.emit()

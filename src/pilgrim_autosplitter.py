@@ -48,15 +48,17 @@ def main():
     print("Welcome to Pilgrim Autosplitter!")
     print("You can minimize this window, but DO NOT close it.")
 
-    print("\nImporting external packages...")
-
-    import platform
-    import sys
+    print("\nImporting third-party packages...")
 
     from PyQt5.QtGui import QIcon, QPixmap
     from PyQt5.QtWidgets import QApplication
 
-    print("\nImporting internal packages...")
+    print("\nImporting built-in packages...")
+
+    import platform
+    import sys
+
+    print("\nInitializing Pilgrim Autosplitter...")
 
     # Class definition
     class PilgrimAutosplitter:
@@ -72,8 +74,10 @@ def main():
         """
 
         def __init__(self) -> None:
-            """Create an application, a splitter, and a UI, then run the
-            application.
+            """Initialize splitter and controller to run Pilgrim Autosplitter.
+
+            Optionally, check for a newer release version if the user has
+            enabled Check for updates in the settings window.
             """
             import settings
             from splitter.splitter import Splitter

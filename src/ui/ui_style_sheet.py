@@ -105,7 +105,10 @@ style_sheet_dark = Template(
         background-color: #444444;
         border: 1px solid #242424;
         border-radius: 2px;
-        padding-left: 5px;
+    }
+    QLineEdit:hover {
+        color: $text_and_borders;
+        border: 1px solid #383838;
     }
 
     KeyLineEdit {
@@ -216,6 +219,10 @@ style_sheet_light = Template(
         border: 1px solid #cccccc;
         border-radius: 2px;
         padding-left: 5px;
+    }
+    QLineEdit:hover {
+        color: $text_and_borders;
+        border: 1px solid #aaaaaa;
     }
 
     KeyLineEdit {
