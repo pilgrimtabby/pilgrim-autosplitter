@@ -42,7 +42,7 @@ import cv2
 from pynput import keyboard
 from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QFileDialog, QAbstractButton
+from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
 
 import settings
 import ui.ui_style_sheet as style_sheet

@@ -35,6 +35,7 @@ import math
 import os
 import pathlib
 import re
+from multiprocessing import freeze_support
 from multiprocessing.dummy import Pool as ThreadPool
 from typing import Tuple
 
@@ -49,6 +50,10 @@ from settings import (
     MAX_LOOPS_AND_WAIT,
     MAX_THRESHOLD,
 )
+
+# Without this, multiprocessing causes an infinite loop in the Pyinstaller
+# build.
+freeze_support()
 
 
 class SplitDir:
