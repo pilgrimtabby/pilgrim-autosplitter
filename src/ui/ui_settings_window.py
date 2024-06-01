@@ -493,7 +493,7 @@ class UISettingsWindow(QDialog):
             "Check for updates to Pilgrim Autosplitter on launch."
         )
 
-        self.check_for_updates_checkbox = QCheckBox(self)  #TODO add to thingy
+        self.check_for_updates_checkbox = QCheckBox(self)
         self.check_for_updates_checkbox.setGeometry(
             QRect(
                 161 + self._LEFT_EDGE_CORRECTION,

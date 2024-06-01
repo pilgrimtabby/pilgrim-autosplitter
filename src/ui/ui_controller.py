@@ -147,7 +147,9 @@ class UIController:
         self._set_main_window_layout()
 
         # "Update available" message box
-        self._main_window.update_available_message_box.buttonClicked.connect(self._update_message_box_action)
+        self._main_window.update_available_message_box.buttonClicked.connect(
+            self._update_message_box_action
+        )
 
         # Split directory line edit
         self._main_window.split_directory_line_edit.clicked.connect(
@@ -439,18 +441,20 @@ class UIController:
         self._main_window.split_directory_line_edit.setText(elided_path)
 
     def _update_message_box_action(self, button: QAbstractButton):
-        """React to button presses in main_window.update_available_message_box.
+        """React to button press in _main_window.update_available_message_box.
 
         Args:
             button (QAbstractButton): The button that was pressed.
         """
         # "Don't ask again" was clicked -- stop checking for updates
-        if button.text() == self._main_window.update_available_reject_button_text:
+        if button.text() == self._main_window.update_available_never_button_text:
             settings.set_value("CHECK_FOR_UPDATES", False)
 
         # "Open" was clicked -- open the GitHub releases page
         elif button.text() == self._main_window.update_available_open_button_text:
-            webbrowser.open(f"{settings.REPO_URL}releases/latest", new=0, autoraise=True)
+            webbrowser.open(
+                f"{settings.REPO_URL}releases/latest", new=0, autoraise=True
+            )
 
     def _exec_settings_window(self) -> None:
         """Set up and open the settings window UI.

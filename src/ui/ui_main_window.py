@@ -161,7 +161,7 @@ class UIMainWindow(QMainWindow):
             an update is available.
         update_available_open_button_text (str): The text that appears on the
             "open" button in update_available_message_box.
-        update_available_reject_button_text (str): The text that appears on the
+        update_available_never_button_text (str): The text that appears on the
             "don't ask again" button in update_available_message_box.
         video_feed_display (QLabel): Display video feed if connected, or else
             show the video_feed_display_default_text.
@@ -398,25 +398,51 @@ class UIMainWindow(QMainWindow):
         )
         self.file_not_found_message_box.setIcon(QMessageBox.Warning)
 
-        # Update available message box buttons
-        self._update_available_open_button = QMessageBox.Open
-        self.update_available_open_button_text = "Open"
-        self.update_available_reject_button_text = "Don't ask again"
-        self.update_available_later_button_text = "Remind me later"
-
         # Update available message box
-        self.update_available_message_box = QMessageBox(self)
+        self.update_available_message_box = QMessageBox(self._container)
         self.update_available_message_box.setText("New update available!")
         self.update_available_message_box.setInformativeText(
-            "Pilgrim Autosplitter has been updated!\n"
-            "Open the Releases page?"
+            "Pilgrim Autosplitter has been updated!\nOpen the Releases page?"
         )
         self.update_available_message_box.setIcon(QMessageBox.Information)
-        self.update_available_message_box.addButton(self.update_available_reject_button_text, QMessageBox.DestructiveRole)
-        self.update_available_message_box.addButton(self.update_available_later_button_text, QMessageBox.RejectRole)
-        self.update_available_message_box.addButton(self._update_available_open_button)
-        # Make sure "Open" button is highlighted
-        self.update_available_message_box.setDefaultButton(self._update_available_open_button)
+        self.update_available_message_box.setStandardButtons(
+            QMessageBox.Open | QMessageBox.Close | QMessageBox.Discard
+        )
+        # Make sure "Remind me later" button is highlighted
+        self.update_available_message_box.setDefaultButton(
+            self.update_available_message_box.button(QMessageBox.Close)
+        )
+
+        # Update available message box buttons
+        # You can't directly create QMessageBox buttons -- you either have to
+        # call QMessageBox.addButton, which doesn't let you keep a reference to
+        # the button, or you have to make the buttons by calling
+        # QMessageBox.setStandardButtons, then referencing the buttons by the
+        # role they have. If you do that, you can BOTH set the button's text
+        # AND make one of the buttons the default.
+        self.update_available_open_button_text = "Open"
+        self._update_available_open_button = self.update_available_message_box.button(
+            QMessageBox.Open
+        )
+        self._update_available_open_button.setText(
+            self.update_available_open_button_text
+        )
+
+        self.update_available_later_button_text = "Remind me later"
+        self._update_available_later_button = self.update_available_message_box.button(
+            QMessageBox.Close
+        )
+        self._update_available_later_button.setText(
+            self.update_available_later_button_text
+        )
+
+        self.update_available_never_button_text = "Don't ask again"
+        self._update_available_never_button = self.update_available_message_box.button(
+            QMessageBox.Discard
+        )
+        self._update_available_never_button.setText(
+            self.update_available_never_button_text
+        )
 
         # Reload video button
         self.reload_video_button = QPushButton("Reconnect video", self._container)
@@ -455,6 +481,23 @@ class UIMainWindow(QMainWindow):
         # Reset splits button
         self.reset_splits_button = QPushButton(self._container)
         self.reset_splits_button.setFocusPolicy(Qt.NoFocus)
+
+        #####################
+        #                   #
+        # Check for updates #
+        #                   #
+        #####################
+
+        if settings.get_bool("CHECK_FOR_UPDATES"):
+            latest_version = settings.get_latest_version()
+            if latest_version != settings.VERSION_NUMBER:
+                # Yes, I call both show and open. If you just call show, the
+                # box doesn't always appear centered over the window (it's way
+                # off to the side). If you just call show, then bafflingly, the
+                # wrong button is highlighted by default. Calling both makes
+                # everything work, for some reason.
+                self.update_available_message_box.show()
+                self.update_available_message_box.open()
 
 
 class ClickableLineEdit(QLineEdit):

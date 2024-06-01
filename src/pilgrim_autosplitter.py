@@ -103,12 +103,6 @@ def main():
 
             self.ui_controller = UIController(self.pilgrim_autosplitter, self.splitter)
 
-            # Check for updates
-            if settings.get_bool("CHECK_FOR_UPDATES"):
-                latest_version = settings.get_latest_version()
-                if latest_version != settings.VERSION_NUMBER:
-                    self.ui_controller._main_window.update_available_message_box.show()
-
             self.pilgrim_autosplitter.exec()
 
             # Prevent segmentation fault or other clumsy errors on exit
