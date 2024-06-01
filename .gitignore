@@ -5,3 +5,5 @@
 **/.unpublished
 **/build
 **/dist
+**/_site
+**/.jekyll-cache
