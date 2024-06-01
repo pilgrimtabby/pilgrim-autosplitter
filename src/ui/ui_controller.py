@@ -42,7 +42,7 @@ import cv2
 from pynput import keyboard
 from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QAbstractButton
 
 import settings
 import ui.ui_style_sheet as style_sheet
@@ -67,11 +67,12 @@ class UIController:
     def __init__(self, application: QApplication, splitter: Splitter) -> None:
         """Initialize the UI, then update it each frame.
 
-        Creates each UI window and then shows the main window. Connects
-        pyqtSignals from each UI window to their respective slots. Sets initial
-        flags and values used by _update_ui. Starts the hotkey listener. Starts
-        _update_ui_timer, which polls user input and splitter output at regular
-        intervals.
+        Creates each UI window and then shows the main window.
+        Connects pyqtSignals from each UI window to their respective slots.
+        Sets initial flags and values used by _update_ui.
+        Starts the keyboard listener.
+        Starts _update_ui_timer, which checks for user input and splitter
+        output at regular intervals.
 
         Args:
             application (QApplication): The QApplication that the program is
@@ -145,6 +146,16 @@ class UIController:
         # Set layout
         self._set_main_window_layout()
 
+        # "Update available" message box
+        self._main_window.update_available_message_box.buttonClicked.connect(
+            self._update_message_box_action
+        )
+
+        # Split directory line edit
+        self._main_window.split_directory_line_edit.clicked.connect(
+            lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR"))
+        )
+
         # Split directory button
         self._main_window.split_directory_button.clicked.connect(
             self._set_image_directory_path
@@ -208,7 +219,7 @@ class UIController:
         # Help action
         self._main_window.help_action.triggered.connect(
             lambda: webbrowser.open(
-                "https://github.com/pilgrimtabby/pilgrim-autosplitter/",
+                settings.USER_MANUAL_URL,
                 new=0,
                 autoraise=True,
             )
@@ -242,12 +253,12 @@ class UIController:
         #               #
         #################
 
-        # Start hotkey listener
+        # Start keyboard listener
         self._keyboard_controller = keyboard.Controller()
-        self._hotkey_listener = keyboard.Listener(
-            on_press=self._handle_hotkey_press, on_release=None
+        self._keyboard_listener = keyboard.Listener(
+            on_press=self._handle_key_press, on_release=None
         )
-        self._hotkey_listener.start()
+        self._keyboard_listener.start()
 
         # Start timer
         self._update_ui_timer = QTimer()
@@ -266,11 +277,23 @@ class UIController:
     def _attempt_undo_hotkey(self) -> None:
         """Try to press the undo split hotkey.
 
-        If global hotkeys are enabled and an undo split hotkey is defined,
-        presses the hotkey. Otherwise, simply requests the previous split.
+        If an undo split hotkey is defined, press the hotkey.
+        Otherwise, simply go to the previous split.
+
+        We don't need to worry about whether global hotkeys are enabled
+        because when this method is called, we know the user is pressing
+        a button in the UI, so the program MUST be in focus, so hotkeys
+        will always work. Similarly, it is impossible for the settings window
+        to be opened when this method is called, so we don't need to worry
+        about whether _settings_window_showing will block the hotkey flag
+        from being set.
+
+        If this method is ever used to accomplish something
+        and it's not guaranteed that the program will be in focus, this may
+        need to be rethought.
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
-        if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
+        if len(key_code) > 0:
             self._press_hotkey(key_code)
         else:
             self._request_previous_split()
@@ -278,11 +301,23 @@ class UIController:
     def _attempt_skip_hotkey(self) -> None:
         """Try to press the skip split hotkey.
 
-        If global hotkeys are enabled and a skip split hotkey is defined,
-        presses the hotkey. Otherwise, simply requests the next split.
+        If a skip split hotkey is defined, press the hotkey.
+        Otherwise, simply go to the next split.
+
+        We don't need to worry about whether global hotkeys are enabled
+        because when this method is called, we know the user is pressing
+        a button in the UI, so the program MUST be in focus, so hotkeys
+        will always work. Similarly, it is impossible for the settings window
+        to be opened when this method is called, so we don't need to worry
+        about whether _settings_window_showing will block the hotkey flag
+        from being set.
+
+        If this method is ever used to accomplish something
+        and it's not guaranteed that the program will be in focus, this may
+        need to be rethought.
         """
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
-        if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
+        if len(key_code) > 0:
             self._press_hotkey(key_code)
         else:
             self._request_next_split()
@@ -290,11 +325,23 @@ class UIController:
     def _attempt_reset_hotkey(self) -> None:
         """Try to press the reset splits hotkey.
 
-        If global hotkeys are enabled and a reset splits hotkey is defined,
-        presses the hotkey. Otherwise, simply resets splits.
+        If a reset splits hotkey is defined, press the hotkey.
+        Otherwise, simply reset the splits.
+
+        We don't need to worry about whether global hotkeys are enabled
+        because when this method is called, we know the user is pressing
+        a button in the UI, so the program MUST be in focus, so hotkeys
+        will always work. Similarly, it is impossible for the settings window
+        to be opened when this method is called, so we don't need to worry
+        about whether _settings_window_showing will block the hotkey flag
+        from being set.
+
+        If this method is ever used to accomplish something
+        and it's not guaranteed that the program will be in focus, this may
+        need to be rethought.
         """
         key_code = settings.get_str("RESET_HOTKEY_CODE")
-        if len(key_code) > 0 and settings.get_bool("GLOBAL_HOTKEYS_ENABLED"):
+        if len(key_code) > 0:
             self._press_hotkey(key_code)
         else:
             self._request_reset_splits()
@@ -386,12 +433,28 @@ class UIController:
         path = settings.get_str("LAST_IMAGE_DIR")
         elided_path = (
             self._main_window.split_directory_line_edit.fontMetrics().elidedText(
-                path,
+                f" {path} ",
                 Qt.ElideMiddle,
                 self._main_window.split_directory_line_edit.width(),
             )
         )
         self._main_window.split_directory_line_edit.setText(elided_path)
+
+    def _update_message_box_action(self, button: QAbstractButton):
+        """React to button press in _main_window.update_available_message_box.
+
+        Args:
+            button (QAbstractButton): The button that was pressed.
+        """
+        # "Don't ask again" was clicked -- stop checking for updates
+        if button.text() == self._main_window.update_available_never_button_text:
+            settings.set_value("CHECK_FOR_UPDATES", False)
+
+        # "Open" was clicked -- open the GitHub releases page
+        elif button.text() == self._main_window.update_available_open_button_text:
+            webbrowser.open(
+                f"{settings.REPO_URL}releases/latest", new=0, autoraise=True
+            )
 
     def _exec_settings_window(self) -> None:
         """Set up and open the settings window UI.
@@ -438,6 +501,9 @@ class UIController:
             self._settings_window.global_hotkeys_checkbox: settings.get_bool(
                 "GLOBAL_HOTKEYS_ENABLED"
             ),
+            self._settings_window.check_for_updates_checkbox: settings.get_bool(
+                "CHECK_FOR_UPDATES"
+            ),
         }.items():
             if value:
                 checkbox.setCheckState(Qt.Checked)
@@ -446,7 +512,7 @@ class UIController:
 
         # Hotkeys
         for hotkey_line_edit, values in {
-            self._settings_window.start_split_hotkey_line_edit: (
+            self._settings_window.split_hotkey_line_edit: (
                 settings.get_str("SPLIT_HOTKEY_NAME"),
                 settings.get_str("SPLIT_HOTKEY_CODE"),
             ),
@@ -537,6 +603,7 @@ class UIController:
             self._settings_window.open_screenshots_checkbox: "OPEN_SCREENSHOT_ON_CAPTURE",
             self._settings_window.start_with_video_checkbox: "START_WITH_VIDEO",
             self._settings_window.global_hotkeys_checkbox: "GLOBAL_HOTKEYS_ENABLED",
+            self._settings_window.check_for_updates_checkbox: "CHECK_FOR_UPDATES",
         }.items():
             if checkbox.checkState() == 0:
                 value = False
@@ -546,7 +613,7 @@ class UIController:
 
         # Hotkeys
         for hotkey, setting_strings in {
-            self._settings_window.start_split_hotkey_line_edit: (
+            self._settings_window.split_hotkey_line_edit: (
                 "SPLIT_HOTKEY_NAME",
                 "SPLIT_HOTKEY_CODE",
             ),
@@ -626,7 +693,10 @@ class UIController:
         """
         frame = self._splitter.comparison_frame
         if frame is None:
-            self._main_window.screenshot_error_no_video_message_box.exec()
+            message = self._main_window.screenshot_error_no_video_message_box
+            message.show()
+            # Close message box after 10 seconds
+            QTimer.singleShot(10000, lambda: message.done(0))
             return
 
         image_dir = settings.get_str("LAST_IMAGE_DIR")
@@ -640,7 +710,7 @@ class UIController:
 
         if Path(screenshot_path).is_file():
             if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
-                self._open_file(screenshot_path)
+                self._open_file_or_dir(screenshot_path)
             else:
                 self._main_window.screenshot_success_message_box.setInformativeText(
                     f"Screenshot saved to:\n{screenshot_path}"
@@ -648,10 +718,17 @@ class UIController:
                 self._main_window.screenshot_success_message_box.setIconPixmap(
                     QPixmap(screenshot_path).scaledToWidth(150)
                 )
-                self._main_window.screenshot_success_message_box.exec()
+
+                message = self._main_window.screenshot_success_message_box
+                message.show()
+                # Close message box after 10 seconds
+                QTimer.singleShot(10000, lambda: message.done(0))
 
         else:  # File couldn't be written to the split image directory
-            self._main_window.screenshot_error_no_file_message_box.exec()
+            message = self._main_window.screenshot_error_no_file_message_box
+            message.show()
+            # Close message box after 10 seconds
+            QTimer.singleShot(10000, lambda: message.done(0))
 
     def _get_unique_filename_number(self, dir: str) -> str:
         """Return the lowest three-digit number that will allow a unique
@@ -680,12 +757,24 @@ class UIController:
             else:
                 return file_number
 
-    def _open_file(self, path: str) -> None:
-        """Enables cross-platform opening of a file.
+    def _open_file_or_dir(self, path: str) -> None:
+        """Enables cross-platform opening of a file or directory.
+
+        If path points to a file, the file opens with the default application.
+        If path points to a dir, the dir opens in the OS's file explorer.
+
+        If the path doesn't exist, show an error message and return.
 
         Args:
             path (str): The file to open.
         """
+        if not Path(path).exists():
+            message = self._main_window.file_not_found_message_box
+            message.show()
+            # Close message box after 10 seconds
+            QTimer.singleShot(10000, lambda: message.done(0))
+            return
+
         if platform.system() == "Windows":
             os.startfile(path)
         elif platform.system() == "Darwin":
@@ -1810,7 +1899,7 @@ class UIController:
 
     #################################
     #                               #
-    # Update UI, Respond to Hotkeys #
+    # Update UI, Handle Key Presses #
     #                               #
     #################################
 
@@ -1825,45 +1914,40 @@ class UIController:
         it was worth it.
         """
         self._update_label_and_button_text()
-        self._execute_hotkey()
+        self._handle_hotkey_press()
         self._execute_split_action()
 
         splitter_flags_changed = self._update_flags()
         if splitter_flags_changed:
             self._set_buttons_and_hotkeys_enabled()
 
-    def _handle_hotkey_press(self, key: keyboard.Key) -> None:
-        """Set flags when hotkeys are pressed.
+    def _handle_key_press(self, key: keyboard.Key) -> None:
+        """Process key presses, setting flags if the key is a hotkey.
 
-        Called each time any key is pressed globally. This method has two main
-        uses:
-            1) Hears and reacts to user keypresses when setting hotkey
-                settings. It does this by checking if a given hotkey "line
-                edit" has focus and, if it does, by changing its properties
-                when a key is pressed.
-            2) Hears and sets flags when hotkeys are pressed in the main
-                window.
+        Called each time any key is pressed, whether or not the program is in
+        focus. This method has two main uses:
+            1) Updates users' custom hotkey bindings. It does this by checking
+                if a given hotkey "line edit" has focus and, if so, changing
+                its key_code and text to match the key.
+            2) If a hotkey is pressed, sets a flag indicating it was pressed.
 
-        For #2, the reason flags are set instead of taking an action directly
-        is that PyQt5 doesn't play nice when other threads try to manipulate
-        the GUI. I couldn't get anything direct to work without throwing a zsh
-        trace trap error, so this is what we're going with.
+        We set flags when hotkeys are pressed instead of directly calling a
+        method because PyQt5 doesn't allow other threads to manipulate the UI.
+        Doing so almost always causes a zsh trace trap error / crash.
 
         Args:
             key (keyboard.Key): The key that was pressed.
         """
         # Get the key's name and internal value. If the key is not an
-        # alphanumeric key, the first two lines throw AttributeError.
+        # alphanumeric key, the try block throws AttributeError.
         try:
-            key_name = key.char
-            key_code = key.vk
+            key_name, key_code = key.char, key.vk
         except AttributeError:
-            key_name = str(key).replace("Key.", "")
-            key_code = key.value.vk
+            key_name, key_code = str(key).replace("Key.", ""), key.value.vk
 
-        # Use #1 (set hotkey settings in the settings menu)
+        # Use #1 (set hotkey settings in settings window)
         for hotkey_line_edit in [
-            self._settings_window.start_split_hotkey_line_edit,
+            self._settings_window.split_hotkey_line_edit,
             self._settings_window.reset_hotkey_line_edit,
             self._settings_window.pause_hotkey_line_edit,
             self._settings_window.undo_split_hotkey_line_edit,
@@ -1878,7 +1962,7 @@ class UIController:
                 hotkey_line_edit.key_code = key_code
                 return
 
-        # Use #2 (set flag saying hotkey was pressed)
+        # Use #2 (set "hotkey pressed" flag for _handle_hotkey_press)
         if not self._settings_window_showing:
             for hotkey_flag, settings_string in {
                 "_split_hotkey_pressed": "SPLIT_HOTKEY_CODE",
@@ -1891,18 +1975,16 @@ class UIController:
                 "_toggle_hotkeys_hotkey_pressed": "TOGGLE_HOTKEYS_HOTKEY_CODE",
             }.items():
                 if str(key_code) == settings.get_str(settings_string):
-                    # Use setattr because there's not a way to set the variable
-                    # from another variable directly
+                    # Use setattr because that allows us to use this dict format
                     setattr(self, hotkey_flag, True)
-                    return
 
-    def _execute_hotkey(self) -> None:
-        """React to the flags set in _handle_hotkey_press.
+    def _handle_hotkey_press(self) -> None:
+        """React to the flags set in _handle_key_press.
 
         When a hotkey is pressed, this method determines what happens.
         The dict contains the following:
             1) `flags`: A tuple with three values. Value 1 is the flag set
-                `in _handle_hotkey_press`; value 2 is a string representation
+                `in _handle_key_press`; value 2 is a string representation
                 of value 1; value 3 is the flag enabling or disabling the
                 hotkey, which is set in `_set_buttons_and_hotkeys_enabled`
                 (or just `True` if there is no flag).
@@ -1915,43 +1997,51 @@ class UIController:
         # This value is used frequently, so I define it once here for simplicity
         global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
 
-        # Loop through each hotkey and execute any whose flags are set
+        # Call the hotkey's action if it's set
         for flags, action in {
+            # Split hotkey
             (
                 self._split_hotkey_pressed,
                 "_split_hotkey_pressed",
                 self._split_hotkey_enabled,
             ): self._request_next_split,
+            # Reset hotkey
             (
                 self._reset_hotkey_pressed,
                 "_reset_hotkey_pressed",
                 True,
             ): self._request_reset_splits,
+            # Undo hotkey
             (
                 self._undo_hotkey_pressed,
                 "_undo_hotkey_pressed",
                 self._undo_hotkey_enabled,
             ): self._request_previous_split,
+            # Skip hotkey
             (
                 self._skip_hotkey_pressed,
                 "_skip_hotkey_pressed",
                 self._skip_hotkey_enabled,
             ): self._request_next_split,
+            # Previous split hotkey
             (
                 self._previous_hotkey_pressed,
                 "_previous_hotkey_pressed",
                 True,
             ): self._main_window.previous_split_button.click,
+            # Next split hotkey
             (
                 self._next_hotkey_pressed,
                 "_next_hotkey_pressed",
                 True,
             ): self._main_window.next_split_button.click,
+            # Screenshot hotkey
             (
                 self._screenshot_hotkey_pressed,
                 "_screenshot_hotkey_pressed",
                 True,
             ): self._main_window.screenshot_button.click,
+            # Toggle globals hotkey
             (
                 self._toggle_hotkeys_hotkey_pressed,
                 "_toggle_hotkeys_hotkey_pressed",
@@ -1960,12 +2050,25 @@ class UIController:
                 "GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled
             ),
         }.items():
+
+            # If "hotkey is pressed" flag is True
             if flags[0]:
-                setattr(self, flags[1], False)  # Unset the flag
+                # Set "hotkey is pressed" flag to False
+                setattr(self, flags[1], False)
+
+                # If the hotkey is allowed to be pressed
+                # (see _set_buttons_and_hotkeys_enabled)
                 if flags[2] and (
+                    # Global hotkeys enabled, OR the program is in focus
+                    # Also allow an exception for the toggle global hotkeys
+                    # key, which should be toggleable whether the app is in
+                    # focus or not.
                     global_hotkeys_enabled
                     or self._application.focusWindow() is not None
-                ):  # focusWindow() returns None if one of this program's windows isn't in focus
+                    or flags[1] == "_toggle_hotkeys_hotkey_pressed"
+                ):
+
+                    # Do the hotkey's associated action
                     action()
                     return
 
@@ -1989,28 +2092,24 @@ class UIController:
         If no hotkey is set for a given action, ignore the hotkey press and
         request the next split image anyway.
         """
-        # This value is used frequently, so I define it here for simplicity
-        global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
-
-        # Regular split (press split hotkey)
+        # Pause split (press pause hotkey)
         if self._splitter.pause_split_action:
             self._splitter.pause_split_action = False
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
-            if len(key_code) > 0 and global_hotkeys_enabled:
+            if len(key_code) > 0:
                 self._press_hotkey(key_code)
-            else:
-                self._splitter.splits.next_split_image()
+            self._splitter.splits.next_split_image()
 
         # Dummy split (silently advance to next split)
         elif self._splitter.dummy_split_action:
             self._splitter.dummy_split_action = False
             self._splitter.splits.next_split_image()
 
-        # Pause split (press pause hotkey)
+        # Normal split (press split hotkey)
         elif self._splitter.normal_split_action:
             self._splitter.normal_split_action = False
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
-            if len(key_code) > 0 and global_hotkeys_enabled:
+            if len(key_code) > 0:
                 self._press_hotkey(key_code)
             else:
                 self._splitter.splits.next_split_image()

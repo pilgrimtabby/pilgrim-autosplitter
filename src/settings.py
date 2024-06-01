@@ -33,8 +33,8 @@
 import os
 from pathlib import Path
 
+import requests
 from PyQt5.QtCore import QSettings
-
 
 # The width of the frame generated and used by splitter.py to find a match
 COMPARISON_FRAME_WIDTH = 320
@@ -43,7 +43,13 @@ COMPARISON_FRAME_WIDTH = 320
 COMPARISON_FRAME_HEIGHT = 240
 
 # Pilgrim Autosplitter's current version number
-VERSION_NUMBER = "v1.0.2"
+VERSION_NUMBER = "v1.0.3"
+
+# The URL of Pilgrim Autosplitter's GitHub repo
+REPO_URL = "https://github.com/pilgrimtabby/pilgrim-autosplitter/"
+
+# The URL of Pilgrim Autosplitter's user manual
+USER_MANUAL_URL = "https://pilgrimtabby.github.io/pilgrim-autosplitter/"
 
 # Create or access the QSettings file that persists user settings
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")
@@ -246,6 +252,9 @@ def set_defaults() -> None:
         # Whether global hotkeys are enabled (default) or only local hotkeys
         set_value("GLOBAL_HOTKEYS_ENABLED", True)
 
+        # Whether program checks for updates on launch
+        set_value("CHECK_FOR_UPDATES", True)
+
     # Set last image dir to home dir if last image dir doesn't exist, or if the
     # path is empty
     last_image_dir = get_str("LAST_IMAGE_DIR")
@@ -256,21 +265,6 @@ def set_defaults() -> None:
     # Always start in full view if video doesn't come on automatically
     if not get_bool("START_WITH_VIDEO"):
         set_value("SHOW_MIN_VIEW", False)
-
-    # If the user has a hotkey bound for toggling global hotkeys, I think it's
-    # safe to assume that they use global hotkeys and toggle regularly. If
-    # that's the case, it makes sense to set global hotkeys enabled on startup
-    # if they're not enabled already (lest there be confusion when the user
-    # opens the app, expecting global hotkeys to work, only to discover they're
-    # off because they quit the app after disabling them last time). On the
-    # other hand, if the user has global hotkeys disabled and no key bound to
-    # enable them, they're probably just not interested, so we can leave them
-    # off.
-    if (
-        not get_bool("GLOBAL_HOTKEYS_ENABLED")
-        and len(get_str("TOGGLE_HOTKEYS_HOTKEY_NAME")) > 0
-    ):
-        set_value("GLOBAL_HOTKEYS_ENABLED", True)
 
     # Set correct video, split image width and height relative to aspect ratio
     aspect_ratio = get_str("ASPECT_RATIO")
@@ -290,3 +284,34 @@ def set_defaults() -> None:
         set_value("ASPECT_RATIO", "16:9 (432x243)")
         set_value("FRAME_WIDTH", 432)
         set_value("FRAME_HEIGHT", 243)
+
+
+def get_latest_version() -> str:
+    """Get the latest release's version number from the github repo.
+
+    Returns:
+        str: The version number (or the current version if something goes
+            wrong).
+    """
+    try:
+        # Use timeout=1 to prevent hanging for too long
+        github_page_text = requests.get(REPO_URL, timeout=1).text
+    except requests.exceptions.ConnectionError:  # No internet connection
+        return VERSION_NUMBER
+
+    # The way GitHub works right now, releases_text is present in the html
+    # right before the most recent release number. I know this is a pretty
+    # hacky way of finding the latest release number...
+    releases_text = "/pilgrimtabby/pilgrim-autosplitter/releases/tag/"
+    releases_text_index = int(github_page_text.find(releases_text))
+
+    if releases_text_index == -1:
+        return VERSION_NUMBER  # releases_text text not found, don't worry
+    else:
+        version_location = releases_text_index + len(releases_text)
+        # The version number is follow by a quotation mark. 9 extra chars is
+        # more than we need, but we're splitting by the `"` anyway.
+        latest_version = github_page_text[
+            version_location : (version_location + 9)
+        ].split('"')[0]
+        return latest_version

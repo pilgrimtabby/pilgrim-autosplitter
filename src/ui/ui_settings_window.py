@@ -70,6 +70,8 @@ class UISettingsWindow(QDialog):
             for aesthetic purposes.
         cancel_button (QPushButton): Close the menu without saving. Same as
             clicking the "x button", pressing esc, etc.
+        check_for_updates_checkbox (QCheckBox): Enable and disable checking for
+            new versions on launch.
         close_window_shortcut (QShortcut): Same as cancel_button.
         default_delay_double_spinbox (QDoubleSpinBox): Store and allow
             selection of default delay before splitting.
@@ -99,7 +101,7 @@ class UISettingsWindow(QDialog):
             screenshot hotkey.
         skip_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
             skip split hotkey.
-        start_split_hotkey_line_edit (KeyLineEdit): Store and allow selection
+        split_hotkey_line_edit (KeyLineEdit): Store and allow selection
             of split hotkey.
         start_with_video_checkbox (QCheckBox): Store and allow selection of
             whether this program should try to open a video feed on startup.
@@ -476,6 +478,48 @@ class UISettingsWindow(QDialog):
             self._checkbox_shadow
         )
 
+        # Check for updates checkbox
+        self._check_for_updates_label = QLabel("Check for updates:", self)
+        self._check_for_updates_label.setGeometry(
+            QRect(
+                20 + self._LEFT_EDGE_CORRECTION,
+                310 + self._TOP_EDGE_CORRECTION,
+                191,
+                31,
+            )
+        )
+        self._check_for_updates_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._check_for_updates_label.setToolTip(
+            "Check for updates to Pilgrim Autosplitter on launch."
+        )
+
+        self.check_for_updates_checkbox = QCheckBox(self)
+        self.check_for_updates_checkbox.setGeometry(
+            QRect(
+                161 + self._LEFT_EDGE_CORRECTION,
+                319 + self._TOP_EDGE_CORRECTION,
+                13,
+                13,
+            )
+        )
+
+        self._check_for_updates_checkbox_helper_label = QLabel(self)
+        self._check_for_updates_checkbox_helper_label.setGeometry(
+            QRect(
+                161 + self._LEFT_EDGE_CORRECTION,
+                318 + self._TOP_EDGE_CORRECTION,
+                14,
+                15,
+            )
+        )
+        self._check_for_updates_checkbox_helper_label.setObjectName("checkbox_helper")
+        self._check_for_updates_checkbox_helper_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+        self._check_for_updates_checkbox_helper_label.setGraphicsEffect(
+            self._checkbox_shadow
+        )
+
         ######################
         #                    #
         # Right Side Widgets #
@@ -494,9 +538,9 @@ class UISettingsWindow(QDialog):
         )
         self._hotkey_settings_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        # Start / split hotkey
-        self.start_split_hotkey_line_edit = KeyLineEdit(self)
-        self.start_split_hotkey_line_edit.setGeometry(
+        # Split hotkey
+        self.split_hotkey_line_edit = KeyLineEdit(self)
+        self.split_hotkey_line_edit.setGeometry(
             QRect(
                 410 + self._LEFT_EDGE_CORRECTION,
                 42 + self._TOP_EDGE_CORRECTION,
@@ -504,28 +548,28 @@ class UISettingsWindow(QDialog):
                 25,
             )
         )
-        self.start_split_hotkey_line_edit.setReadOnly(True)
+        self.split_hotkey_line_edit.setReadOnly(True)
 
-        self._start_split_hotkey_label = QLabel("Start / split", self)
-        self._start_split_hotkey_label.setGeometry(
+        self._split_hotkey_label = QLabel("Split", self)
+        self._split_hotkey_label.setGeometry(
             QRect(
                 300 + self._LEFT_EDGE_CORRECTION, 40 + self._TOP_EDGE_CORRECTION, 81, 31
             )
         )
-        self._start_split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        self._start_split_hotkey_clear_button = QPushButton("clear", self)
-        self._start_split_hotkey_clear_button.setGeometry(
+        self._split_hotkey_clear_button = QPushButton("clear", self)
+        self._split_hotkey_clear_button.setGeometry(
             QRect(
                 545 + self._LEFT_EDGE_CORRECTION, 45 + self._TOP_EDGE_CORRECTION, 39, 20
             )
         )
-        self._start_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
-        self._start_split_hotkey_clear_button.clicked.connect(
-            lambda: self.start_split_hotkey_line_edit.setText("")
+        self._split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._split_hotkey_clear_button.clicked.connect(
+            lambda: self.split_hotkey_line_edit.setText("")
         )
-        self._start_split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.start_split_hotkey_line_edit, "key_code", "")
+        self._split_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.split_hotkey_line_edit, "key_code", "")
         )
 
         # Reset splits hotkey
