@@ -9,6 +9,11 @@ nav_order: 5
 
 # Settings
 
+To open the settings menu, go to the "Pilgrim Autosplitter" context menu and click `Settings`.
+
+{: .tip }
+You can also open the settings menu by pressing `ctrl+.` (on Windows) or `cmd+.` (on Mac).
+
 This is the settings menu:
 
 <figure>
@@ -92,20 +97,30 @@ Default: `disabled`
 ## Global hotkeys
 
 If enabled, hotkeys will work no matter what app is in focus.  
-If disabled, hotkeys will only work when Pilgrim Autosplitter is in focus.
+If disabled, hotkeys will only work when Pilgrim Autosplitter is in focus. (For an exception to this behavior, see [Toggle global](#toggle-global).)
+
+Default: `enabled`
+
+## Check for updates
+
+When enabled, Pilgrim Autosplitter will automatically check if a new version has been released on launch.
+
+Upgrading to a new version doesn't erase your settings; they are saved by the system.
 
 Default: `enabled`
 
 # Hotkeys
 
-Pilgrim Autosplitter has 9 optional hotkeys. 
+Pilgrim Autosplitter has 9 optional hotkeys.
 
-Each hotkey can be assigned to only one key (i.e. NOT a combination of keys, such as `ctrl+m`). Similarly, each key can only be used for one hotkey.
+A hotkey can only be bound to one key (i.e. you CANNOT use a combination of keys, such as `ctrl+m`).
 
-{: .note }
-If you assign the same key to more than one hotkey, the highest hotkey in the list will take precedence. For instance, if you assign `space` to the `start / split` hotkey and the `screenshot` hotkey, pressing `space` will trigger a split, but will not take a screenshot.
+The same key can be used for more than one hotkey. For instance, you could bind the same key to `split` and `screenshot`. Then, every time Pilgrim Autosplitter splits, it will take a screenshot too.
 
-## Start / split
+{: .warning }
+Using the same key for hotkeys that do opposite things (e.g. `skip` and `undo`) may result in unexpected behavior. Use common sense!
+
+## Split
 Go to the next split. This is the key Pilgrim Autosplitter presses when a split image is matched.
 
 ## Reset splits
@@ -126,11 +141,11 @@ Go forward one split.
 
 ## Previous split
 
-Go back one split. This hotkey is included along with `undo` so you can scroll through splits without affecting the speedrun timer.
+Go back one split. This hotkey is included along with [undo split](#undo-split) so you can scroll through splits without affecting the speedrun timer.
 
 ## Next split
 
-Go forward one split. This hotkey is included along with `skip` so you can scroll through splits without affecting the speedrun timer.
+Go forward one split. This hotkey is included along with [skip split](#skip-split) so you can scroll through splits without affecting the speedrun timer.
 
 ## Screenshot
 
@@ -138,4 +153,7 @@ Take a screenshot.
 
 ## Toggle global
 
-Enabled or disable [global hotkeys](#global-hotkeys). Convenient if you like to use the keyboard during speedruns.
+Enable or disable [global hotkeys](#global-hotkeys). Convenient if you like to use the keyboard during speedruns.
+
+{: .note }
+If you assign this hotkey, it is always enabled, even when [global hotkeys](#global-hotkeys) are disabled.
