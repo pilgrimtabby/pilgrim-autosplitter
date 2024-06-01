@@ -13,16 +13,22 @@ Now that your video's connected, let's make some splits!
 
 ## Taking screenshots
 
-Press the Take Screenshot button to take a screenshot of the currently displayed video frame. 
+Press the Take Screenshot button to take a screenshot of the currently displayed video frame.
 
 <figure>
   <img src="images/take-screenshot.png" class="square-image" alt="Take screenshot">
 </figure>
 
-By default, split images are read from and saved to your home directory. Choose a custom folder by clicking the Select Split Image Folder button.
+By default, split images are read from and saved to your home directory. Choose a custom folder by clicking the Select Split Image Folder button:
 
 <figure>
   <img src="images/select-folder.png" class="square-image" alt="Select split image folder">
+</figure>
+
+You can also browse the contents of the current folder by clicking on the folder's path:
+
+<figure>
+  <img src="images/open-folder.png" class="square-image" alt="Open current split images folder">
 </figure>
 
 {: .tip }
@@ -30,7 +36,7 @@ Press the Reset Splits button at any time to reload all images from your splits 
 
 ## Editing images
 
-Your speedgame may not have a reliable, repeatable frame for each split — that's fine! Almost every split has some on-screen element that is consistent, like an icon or some text. Take this example from The Legend of Zelda: Ocarina of Time:
+Your speedgame may not have a reliable, repeatable frame for each split — that's fine! All you need is some on-screen element that is consistent, like an icon or some text. Take this example from The Legend of Zelda: Ocarina of Time:
 
 <figure>
   <img src="images/example-screenshot.png" class="square-image" alt="A problematic split">
