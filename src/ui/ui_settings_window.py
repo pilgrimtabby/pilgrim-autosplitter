@@ -538,7 +538,7 @@ class UISettingsWindow(QDialog):
         )
         self._hotkey_settings_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        # Start / split hotkey
+        # Split hotkey
         self.split_hotkey_line_edit = KeyLineEdit(self)
         self.split_hotkey_line_edit.setGeometry(
             QRect(
@@ -550,7 +550,7 @@ class UISettingsWindow(QDialog):
         )
         self.split_hotkey_line_edit.setReadOnly(True)
 
-        self._split_hotkey_label = QLabel("Start / split", self)
+        self._split_hotkey_label = QLabel("Split", self)
         self._split_hotkey_label.setGeometry(
             QRect(
                 300 + self._LEFT_EDGE_CORRECTION, 40 + self._TOP_EDGE_CORRECTION, 81, 31
