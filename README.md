@@ -1,12 +1,14 @@
 # Pilgrim Autosplitter for MacOS
 
-Finally, an image-based speedrun autosplitter for MacOS!
+Finally, an image-based speedrun autosplitter compatible with MacOS!
 
 ![Demonstration GIF](resources/demo.gif)
 
-Are you a speedrunner who wants to use an autosplitter, but doesn't have access to a Windows PC?
+Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which are generally incompatible with MacOS.
 
-Pilgrim Autosplitter was designed for MacOS speedrunners to fill the gap left by other image-based autosplitters, which generally only support Windows.
+Bring your best speedgame whether you’re running on console, MacOS, or PC.
+
+## Compatible with MacOS and Windows
 
 This program has only been minimally tested on Windows, so there may be unknown issues. If you encounter problems or have an idea for an improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
