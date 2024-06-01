@@ -32,8 +32,10 @@
 
 import glob
 import math
+import os
 import pathlib
 import re
+from multiprocessing.dummy import Pool as ThreadPool
 from typing import Tuple
 
 import cv2
@@ -171,22 +173,74 @@ class SplitDir:
         Currently supported image types include .png, .jpg, and .jpeg. Only
         .png is tested, and it is the only recommended image format.
 
+        Use multiprocessing.dummy.Pool to construct the split images list. This
+        cuts the time spent making the list by a factor of ten, which matters a
+        lot when there are lots of images.
+
         Returns:
             list[_SplitImage]: The list of SplitImage objects.
         """
-        split_images = []
+
+        def get_split_image(index: int, path: str):
+            """Get a single SplitImage object and put it in split_images.
+
+            Test if the image at the index in self.list is the same image by
+            checking the image's name and its last modified time.
+
+            If these are identical, assume the image hasn't changed and use
+            the current split image. (For long lists, this can save over a
+            second when this method is called multiple times.)
+
+            If they're different, make a new SplitImage object from `path`.
+
+            Args:
+                index (int): The list index where the image should go.
+                path (str): The path to the image.
+            """
+            try:
+                potentially_same_image = self.list[index]  # This can fail
+                if (
+                    path == potentially_same_image._path
+                    and os.path.getmtime(path) == potentially_same_image.last_modified
+                ):
+                    split_images[index] = potentially_same_image
+                else:
+                    split_images[index] = self._SplitImage(path)
+
+            # AttributeError: Thrown when self.list doesn't exist yet
+            #                 (happens when instantiating SplitDir)
+            # IndexError: The new split image list has more images
+            #             than the old list, so self.list[index] is out
+            #             of range
+            except (AttributeError, IndexError):
+                split_images[index] = self._SplitImage(path)
+
         dir_path = settings.get_str("LAST_IMAGE_DIR")
         if not pathlib.Path(dir_path).is_dir():
-            return split_images
+            return []  # The directory doesn't exist; return an empty list
 
-        image_paths = (
+        image_paths = sorted(
             glob.glob(f"{dir_path}/*.png")
             + glob.glob(f"{dir_path}/*.jpg")
             + glob.glob(f"{dir_path}/*.jpeg")
         )
-        for image_path in sorted(image_paths):
-            split_images += [self._SplitImage(image_path)]
 
+        list_length = len(image_paths)
+        if list_length == 0:
+            return []  # The list is empty; return an empty list
+        else:
+            # Initialize split_images with the same number of indexes as images
+            split_images = [None] * (list_length)
+            # pool.starmap accepts an iterable of iterables, so we feed it a
+            # tuple of tuples. Index 0 is the image's index (needed so that no
+            # matter what order the threads finish in, the splits are in the
+            # correct order), and index 1 is the path to the image.
+            indexes_and_paths = zip([i for i in range(list_length)], image_paths)
+
+        pool = ThreadPool(12)  # 12 gave the best times on my machine, YMMV
+        pool.starmap(func=get_split_image, iterable=indexes_and_paths)
+        pool.close()
+        pool.join()
         return split_images
 
     class _SplitImage:
@@ -200,6 +254,9 @@ class SplitDir:
                 default.
             dummy_flag (bool): Whether this split is a "dummy split".
             image (numpy.ndarray): The split image, stored in a numpy array.
+            last_modified (float): The last time the image was modified. Used
+                in SplitDir.get_split_images to check if an image has been
+                changed.
             loops (int): The amount of times this split will loop.
             loops_is_default (bool): Whether this split's loop amount is the
                 default.
@@ -230,6 +287,8 @@ class SplitDir:
                 image_path (str): Path to the image.
             """
             self._path = image_path
+            self._raw_image = self._get_raw_image()
+            self.last_modified = os.path.getmtime(self._path)
             self.name = pathlib.Path(image_path).stem
             self.image, self.mask = self.get_image_and_mask()
             self.max_dist = self._get_max_dist()
@@ -268,9 +327,8 @@ class SplitDir:
                 Tuple[numpy.ndarray, numpy.ndarray]: The split image and mask,
                 respectively.
             """
-            image = cv2.imread(self._path, cv2.IMREAD_UNCHANGED)
             image = cv2.resize(
-                image,
+                self._raw_image,
                 (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
                 interpolation=cv2.INTER_AREA,
             )
@@ -307,9 +365,8 @@ class SplitDir:
             Returns:
                 QPixmap: The generated QPixmap.
             """
-            image = cv2.imread(self._path, cv2.IMREAD_UNCHANGED)
             image = cv2.resize(
-                image,
+                self._raw_image,
                 (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")),
                 interpolation=cv2.INTER_NEAREST,
             )
@@ -335,6 +392,17 @@ class SplitDir:
         # Private Methods #
         #                 #
         ###################
+
+        def _get_raw_image(self) -> numpy.ndarray:
+            """Get a cv2 image from an image file.
+
+            This does not need to be done more than once per image, since the
+            raw_image can be used to create a resized image.
+
+            Returns:
+                numpy.ndarray: The cv2 image.
+            """
+            return cv2.imread(self._path, cv2.IMREAD_UNCHANGED)
 
         def _get_max_dist(self) -> float:
             """Calculate the maximum possible Euclidean distance from an image.
