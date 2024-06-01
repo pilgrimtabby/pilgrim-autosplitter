@@ -9,6 +9,11 @@ nav_order: 5
 
 # Settings
 
+To open the settings menu, go to the "Pilgrim Autosplitter" context menu and click `Settings`.
+
+{: .tip }
+You can also open the settings menu by pressing `ctrl+.` (on Windows) or `cmd+.` (on Mac).
+
 This is the settings menu:
 
 <figure>
@@ -96,6 +101,14 @@ If disabled, hotkeys will only work when Pilgrim Autosplitter is in focus. (For 
 
 Default: `enabled`
 
+## Check for updates
+
+When enabled, Pilgrim Autosplitter will automatically check if a new version has been released on launch.
+
+Upgrading to a new version doesn't erase your settings; they are saved by the system.
+
+Default: `enabled`
+
 # Hotkeys
 
 Pilgrim Autosplitter has 9 optional hotkeys.
@@ -107,7 +120,7 @@ The same key can be used for more than one hotkey. For instance, you could bind 
 {: .warning }
 Using the same key for hotkeys that do opposite things (e.g. `skip` and `undo`) may result in unexpected behavior. Use common sense!
 
-## Start / split
+## Split
 Go to the next split. This is the key Pilgrim Autosplitter presses when a split image is matched.
 
 ## Reset splits
