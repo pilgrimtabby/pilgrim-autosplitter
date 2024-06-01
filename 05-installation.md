@@ -9,9 +9,11 @@ nav_order: 5
 
 # Installation
 
-You can download the latest build and the source code [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/).
+You can download the latest build or the source code [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/).
 
 {: .important }
-The source code should work on Windows and MacOS, but the built app is currently only available on MacOS. See [this page](https://github.com/pilgrimtabby/pilgrim-autosplitter/?tab=readme-ov-file#installation) for more details.
+The source code is compatible with Windows and MacOS. However, the built app is currently only available for silicon-based Macs. See [this page](https://github.com/pilgrimtabby/pilgrim-autosplitter/?tab=readme-ov-file#installation) for more details.
 
-For a step-by-step guide to installation on Windows and MacOS, including tips for installing and running Python, see [this page](https://github.com/pilgrimtabby/pilgrim-autosplitter/?tab=readme-ov-file#installation).
+Even if you can't use the built app, running the source code is straightforward if you follow this [step-by-step guide](https://github.com/pilgrimtabby/pilgrim-autosplitter/?tab=readme-ov-file#installation).
+
+If you have any questions or concerns, please feel free to [open an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) on Pilgrim Autosplitter's repository page or email me directly at pilgrimtabby@gmail.com.
