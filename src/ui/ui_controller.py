@@ -395,7 +395,21 @@ class UIController:
         paused (splitter sets its waiting_for_split_change flag). We change
         the split image, then unset changing_splits, which signals to splitter
         it can reset its flags.
+
+        This method also kills compare_thread if we're on the last loop of the
+        last split when this method is called. The idea is that when the run is
+        over, the comparer stops until the user presses reset or unpauses.
+        However, this only should happen if the last split is accessed by
+        pressing the split hotkey or if the program found a match, so that
+        users can still scroll back and forth between splits without shutting
+        the thread down on accident, so we also check if this method is being
+        called as the result of a hotkey press.
         """
+        # Kill compare_thread if we're on the last split (see docstring for why)
+        if self._last_split_active and self._split_hotkey_pressed:
+            self._splitter.safe_exit_compare_thread()
+            return
+
         # Go to next split, no need to worry about flags / thread safety
         if self._splitter.current_match_percent is None:
             self._splitter.splits.next_split_image()
@@ -410,7 +424,7 @@ class UIController:
             ):
                 time.sleep(0.001)
             self._splitter.splits.next_split_image()
-            self._splitter.changing_splits = False
+            self._splitter.changing_splits = False            
 
     def _request_reset_splits(self) -> None:
         """Tell `splitter.splits` to call `reset_split_images`, and ask
@@ -2075,8 +2089,6 @@ class UIController:
 
             # If "hotkey is pressed" flag is True
             if flags[0]:
-                # Set "hotkey is pressed" flag to False
-                setattr(self, flags[1], False)
 
                 # If the hotkey is allowed to be pressed
                 # (see _set_buttons_and_hotkeys_enabled)
@@ -2092,7 +2104,10 @@ class UIController:
 
                     # Do the hotkey's associated action
                     action()
-                    return
+
+                # Set "hotkey is pressed" flag to False
+                setattr(self, flags[1], False)
+                return
 
     def _press_hotkey(self, key_code: str) -> None:
         """Press and release a hotkey.

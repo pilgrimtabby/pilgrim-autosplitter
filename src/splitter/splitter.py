@@ -546,8 +546,12 @@ class Splitter:
         The various flags set by this method are read by ui_controller, which
         references them to update the UI and send hotkey presses.
         """
-        # Save now so we can use the old image's delay_duration
-        split_image = self.splits.list[self.splits.current_image_index]
+        # Save now so we can execute the delay_duration block correctly
+        # The split will have already changed, but we rely on these values
+        # to execute that block so we need to save them now
+        loop = self.splits.current_loop
+        index = self.splits.current_image_index
+        split_image = self.splits.list[index]
 
         # Handle delay
         if split_image.delay_duration > 0:
@@ -584,8 +588,12 @@ class Splitter:
         else:
             self.normal_split_action = True
 
-        # Handle post-split pause
-        if split_image.pause_duration > 0:
+        # Don't delay after very last split
+        if index == len(self.splits.list) - 1 and loop == split_image.loops:
+            return
+        
+        # Handle post-split delay
+        elif split_image.pause_duration > 0:
             self.suspended = True
             self.suspend_remaining = split_image.pause_duration
             start_time = time.perf_counter()
@@ -599,6 +607,3 @@ class Splitter:
                 time.sleep(self._interval)
             self.suspended = False
             self.suspend_remaining = None
-
-            if self._compare_thread_finished:
-                return

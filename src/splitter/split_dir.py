@@ -64,14 +64,13 @@ class SplitDir:
             exists.
         current_loop (int): The current split image's current loop, if it
             exists.
-        list (list[_SplitImage]): A list of all split images in
+        list (list[_SplitImage]): A list of all split images in the directory
             settings.get_str("LAST_IMAGE_DIR").
     """
 
     def __init__(self):
         """Initialize a list of SplitImage objects and set flags accordingly."""
         self.list = self._get_split_images()
-        self.ignore_split_request = False
         if len(self.list) > 0:
             self.current_image_index = 0
             self.current_loop = 0
