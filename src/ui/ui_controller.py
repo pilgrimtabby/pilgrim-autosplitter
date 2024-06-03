@@ -350,7 +350,7 @@ class UIController:
 
     def _request_previous_split(self) -> None:
         """Tell `splitter.splits` to call `previous_split_image`, and ask
-        splitter._look_for_match to reset its flags.
+        splitter._look_for_match to reset its flags if needed.
 
         If self._splitter.current_match_percent is None, this means that
         splitter.look_for_match isn't active, and we can move to the next split
@@ -382,7 +382,7 @@ class UIController:
 
     def _request_next_split(self) -> None:
         """Tell `splitter.splits` to call `next_split_image`, and ask
-        splitter._look_for_match to reset its flags.
+        splitter._look_for_match to reset its flags if needed.
 
         If self._splitter.current_match_percent is None, this means that
         splitter.look_for_match isn't active, and we can move to the next split
@@ -414,7 +414,7 @@ class UIController:
 
     def _request_reset_splits(self) -> None:
         """Tell `splitter.splits` to call `reset_split_images`, and ask
-        splitter._look_for_match to reset its flags.
+        splitter._look_for_match to reset its flags if necessary.
 
         Kills `splitter.compare_thread` (this allows the splitter to exit
         gracefully if the split image directory has changed to an empty
@@ -2120,12 +2120,12 @@ class UIController:
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
             if len(key_code) > 0:
                 self._press_hotkey(key_code)
-            self._splitter.splits.next_split_image()
+            self._request_next_split()
 
         # Dummy split (silently advance to next split)
         elif self._splitter.dummy_split_action:
             self._splitter.dummy_split_action = False
-            self._splitter.splits.next_split_image()
+            self._request_next_split()
 
         # Normal split (press split hotkey)
         elif self._splitter.normal_split_action:
@@ -2137,7 +2137,7 @@ class UIController:
             # hotkeys are off and the app isn't in focus, move the split image
             # forward, since pressing the key on its own won't do that
             if len(key_code) == 0 or (self._application.focusWindow() is None and not settings.get_bool("GLOBAL_HOTKEYS_ENABLED")):
-                self._splitter.splits.next_split_image()
+                self._request_next_split()
 
     def _update_label_and_button_text(self) -> None:
         """Update label and button text in the UI based on splitter state."""
