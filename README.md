@@ -75,6 +75,9 @@ If you're NOT comfortable using Python:
 
 * You need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
 
+> [!Important]
+> When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
+
 * Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
 
 * Open Terminal (if you can't find it, press `cmd+space` to open Spotlight and search for "Terminal").
@@ -117,6 +120,9 @@ If you're comfortable using Python:
 If you're NOT comfortable using Python:
 
 * You need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
+
+> [!Important]
+> When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
 
 * Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
 
