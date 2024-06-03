@@ -591,7 +591,7 @@ class Splitter:
         # Don't delay after very last split
         if index == len(self.splits.list) - 1 and loop == split_image.loops:
             return
-        
+
         # Handle post-split delay
         elif split_image.pause_duration > 0:
             self.suspended = True

@@ -424,7 +424,7 @@ class UIController:
             ):
                 time.sleep(0.001)
             self._splitter.splits.next_split_image()
-            self._splitter.changing_splits = False            
+            self._splitter.changing_splits = False
 
     def _request_reset_splits(self) -> None:
         """Tell `splitter.splits` to call `reset_split_images`, and ask
@@ -1980,7 +1980,7 @@ class UIController:
             key_name, key_code = key.char, key.vk
         except AttributeError:
             key_name, key_code = str(key).replace("Key.", ""), key.value.vk
-    
+
         # Use #1 (set hotkey settings in settings window)
         for hotkey_line_edit in [
             self._settings_window.split_hotkey_line_edit,
@@ -2151,7 +2151,10 @@ class UIController:
             # If key didn't get pressed, OR if it did get pressed but global
             # hotkeys are off and the app isn't in focus, move the split image
             # forward, since pressing the key on its own won't do that
-            if len(key_code) == 0 or (self._application.focusWindow() is None and not settings.get_bool("GLOBAL_HOTKEYS_ENABLED")):
+            if len(key_code) == 0 or (
+                self._application.focusWindow() is None
+                and not settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
+            ):
                 self._request_next_split()
 
     def _update_label_and_button_text(self) -> None:
