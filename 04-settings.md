@@ -22,7 +22,7 @@ This is the settings menu:
 
 ## Frames per second
 
-The amount of frames per second Pilgrim Autosplitter captures and processes. The lower the FPS, the less energy used, but you might miss frames if you lower the FPS below your capture card's limit or your game's framerate. 
+The amount of frames per second Pilgrim Autosplitter captures and processes. The lower the FPS, the less energy used, but you might miss frames if you lower the FPS below your capture card's limit or your game's framerate.
 
 Minimum: `20`  
 Maximum: `60`
@@ -117,6 +117,9 @@ A hotkey can only be bound to one key (i.e. you CANNOT use a combination of keys
 
 The same key can be used for more than one hotkey. For instance, you could bind the same key to `split` and `screenshot`. Then, every time Pilgrim Autosplitter splits, it will take a screenshot too.
 
+{: .note }
+Pilgrim Autosplitter will not send or detect hotkey presses when the [settings menu](#settings) is open.
+
 {: .warning }
 Using the same key for hotkeys that do opposite things (e.g. `skip` and `undo`) may result in unexpected behavior. Use common sense!
 
@@ -156,4 +159,4 @@ Take a screenshot.
 Enable or disable [global hotkeys](#global-hotkeys). Convenient if you like to use the keyboard during speedruns.
 
 {: .note }
-If you assign this hotkey, it is always enabled, even when [global hotkeys](#global-hotkeys) are disabled.
+If assigned, this hotkey is ALWAYS enabled even if [global hotkeys](#global-hotkeys) are disabled.
