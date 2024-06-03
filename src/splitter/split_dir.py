@@ -64,10 +64,6 @@ class SplitDir:
             exists.
         current_loop (int): The current split image's current loop, if it
             exists.
-        ignore_split_request (bool): A flag that is set exclusively by splitter
-            in the event of a normal split. See splitter's documentation for
-            details, but the idea is to stop splitter and ui_controller from
-            both calling next_split_image for the same split.
         list (list[_SplitImage]): A list of all split images in
             settings.get_str("LAST_IMAGE_DIR").
     """
@@ -90,16 +86,7 @@ class SplitDir:
     ##################
 
     def next_split_image(self) -> None:
-        """Go to the next split image or next loop (whichever is next).
-
-        If splitter has set ignore_split_request to True, unset the flag and
-        return without doing anything. This is to prevent a double split (see
-        splitter._set_normal_split_action).
-        """
-        if self.ignore_split_request:
-            self.ignore_split_request = False
-            return
-
+        """Go to the next split image or next loop (whichever is next)."""
         if self.current_loop == self.list[self.current_image_index].loops:
             if self.current_image_index < len(self.list) - 1:
                 self.current_image_index += 1

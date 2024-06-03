@@ -30,7 +30,6 @@
 input to the UI and the splitter.
 """
 
-
 import os
 import platform
 import subprocess
@@ -127,6 +126,7 @@ class UIController:
         self._skip_hotkey_enabled = False
 
         # React to hotkey presses
+        self._active_key_code = None
         self._settings_window_showing = False
         self._split_hotkey_pressed = False
         self._reset_hotkey_pressed = False
@@ -295,8 +295,7 @@ class UIController:
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0:
             self._press_hotkey(key_code)
-        else:
-            self._request_previous_split()
+        self._request_previous_split()
 
     def _attempt_skip_hotkey(self) -> None:
         """Try to press the skip split hotkey.
@@ -319,8 +318,7 @@ class UIController:
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
         if len(key_code) > 0:
             self._press_hotkey(key_code)
-        else:
-            self._request_next_split()
+        self._request_next_split()
 
     def _attempt_reset_hotkey(self) -> None:
         """Try to press the reset splits hotkey.
@@ -343,20 +341,29 @@ class UIController:
         key_code = settings.get_str("RESET_HOTKEY_CODE")
         if len(key_code) > 0:
             self._press_hotkey(key_code)
-        else:
-            self._request_reset_splits()
+        self._request_reset_splits()
 
     def _request_previous_split(self) -> None:
         """Tell `splitter.splits` to call `previous_split_image`, and ask
         splitter._look_for_match to reset its flags.
 
-        If splitter is delaying or suspended, call
-        `split_dir.previous_split_image`, since it is safe to do so. Otherwise,
-        attempt for 1 second to pause the splitter (by setting
-        `splitter.changing_splits` to True) before calling.
+        If self._splitter.current_match_percent is None, this means that
+        splitter.look_for_match isn't active, and we can move to the next split
+        image without causing a segmentation error or breaking splitter flags.
+
+        Otherwise, we know look_for_match is active, and we need to (1) pause
+        it while we change split images for thread safety, then (2) reset its
+        flags. We do this (or at least try to for 1 second) by by setting the
+        splitter.changing_splits flag, waiting for splitter to confirm it's
+        paused (splitter sets its waiting_for_split_change flag). We change
+        the split image, then unset changing_splits, which signals to splitter
+        it can reset its flags.
         """
-        if self._splitter.delaying or self._splitter.suspended:
+        # Go to next split, no need to worry about flags / thread safety
+        if self._splitter.current_match_percent is None:
             self._splitter.splits.previous_split_image()
+
+        # Pause splitter._look_for_match before getting next split
         else:
             start_time = time.perf_counter()
             self._splitter.changing_splits = True
@@ -372,13 +379,23 @@ class UIController:
         """Tell `splitter.splits` to call `next_split_image`, and ask
         splitter._look_for_match to reset its flags.
 
-        If splitter is delaying or suspended, call
-        `split_dir.next_split_image`, since it is safe to do so. Otherwise,
-        attempt for 1 second to pause the splitter (by setting
-        `splitter.changing_splits` to True) before calling.
+        If self._splitter.current_match_percent is None, this means that
+        splitter.look_for_match isn't active, and we can move to the next split
+        image without causing a segmentation error or breaking splitter flags.
+
+        Otherwise, we know look_for_match is active, and we need to (1) pause
+        it while we change split images for thread safety, then (2) reset its
+        flags. We do this (or at least try to for 1 second) by by setting the
+        splitter.changing_splits flag, waiting for splitter to confirm it's
+        paused (splitter sets its waiting_for_split_change flag). We change
+        the split image, then unset changing_splits, which signals to splitter
+        it can reset its flags.
         """
-        if self._splitter.delaying or self._splitter.suspended:
+        # Go to next split, no need to worry about flags / thread safety
+        if self._splitter.current_match_percent is None:
             self._splitter.splits.next_split_image()
+
+        # Pause splitter._look_for_match before getting next split
         else:
             start_time = time.perf_counter()
             self._splitter.changing_splits = True
@@ -1944,6 +1961,10 @@ class UIController:
             key_name, key_code = key.char, key.vk
         except AttributeError:
             key_name, key_code = str(key).replace("Key.", ""), key.value.vk
+    
+        if key_code == self._active_key_code:
+            self._active_key_code = None
+            return
 
         # Use #1 (set hotkey settings in settings window)
         for hotkey_line_edit in [
@@ -2080,8 +2101,8 @@ class UIController:
                 value. Passed as a string because I use QSettings, which only
                 handles strings when used cross-platform.
         """
-        key_code = int(key_code)
-        key = keyboard.KeyCode(vk=key_code)
+        self._active_key_code = int(key_code)
+        key = keyboard.KeyCode(vk=self._active_key_code)
         self._keyboard_controller.press(key)
         self._keyboard_controller.release(key)
 
@@ -2092,27 +2113,26 @@ class UIController:
         If no hotkey is set for a given action, ignore the hotkey press and
         request the next split image anyway.
         """
-        # Pause split (press pause hotkey)
+        # Get split type
         if self._splitter.pause_split_action:
-            self._splitter.pause_split_action = False
+            flag = "pause_split_action"
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
-            if len(key_code) > 0:
-                self._press_hotkey(key_code)
-            self._splitter.splits.next_split_image()
-
-        # Dummy split (silently advance to next split)
         elif self._splitter.dummy_split_action:
-            self._splitter.dummy_split_action = False
-            self._splitter.splits.next_split_image()
-
-        # Normal split (press split hotkey)
+            flag = None
+            key_code = None
         elif self._splitter.normal_split_action:
-            self._splitter.normal_split_action = False
+            flag = "normal_split_action"
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
-            if len(key_code) > 0:
-                self._press_hotkey(key_code)
-            else:
-                self._splitter.splits.next_split_image()
+        else:
+            return
+    
+        # Do split action
+        if key_code is None or len(key_code) == 0:
+            pass
+        else:
+            self._press_hotkey(key_code)
+        self._request_next_split()
+        setattr(self._splitter, flag, False)
 
     def _update_label_and_button_text(self) -> None:
         """Update label and button text in the UI based on splitter state."""

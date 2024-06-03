@@ -124,10 +124,6 @@ class Splitter:
         self.changing_splits = False
         self.waiting_for_split_change = False
 
-        # _split_thread variables
-        self._split_thread = threading.Thread(target=self._set_normal_split_action)
-        self._split_thread_finished = False
-
     ##################
     #                #
     # Public Methods #
@@ -153,9 +149,6 @@ class Splitter:
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
-        if self._split_thread.is_alive():
-            self._split_thread_finished = True
-            self._split_thread.join()
 
     def start_compare_thread(self) -> None:
         """Safely start _compare_thread.
@@ -170,17 +163,10 @@ class Splitter:
         self.suspended = False
 
     def safe_exit_compare_thread(self) -> None:
-        """Safely kill _compare_thread.
-
-        Also kills _split_thread, since _split_thread should only be active if
-        _compare_thread is active.
-        """
+        """Safely kill _compare_thread."""
         if self._compare_thread.is_alive():
             self._compare_thread_finished = True
             self._compare_thread.join()
-        if self._split_thread.is_alive():
-            self._split_thread_finished = True
-            self._split_thread.join()
         self.suspended = True
 
     def set_next_capture_index(self) -> None:
@@ -560,21 +546,13 @@ class Splitter:
         The various flags set by this method are read by ui_controller, which
         references them to update the UI and send hotkey presses.
         """
-        # Get these values now so that changing splits later doesn't break
-        # anything
-        delay_duration = self.splits.list[
-            self.splits.current_image_index
-        ].delay_duration
-        suspend_duration = self.splits.list[
-            self.splits.current_image_index
-        ].pause_duration
-        pause_flag = self.splits.list[self.splits.current_image_index].pause_flag
-        dummy_flag = self.splits.list[self.splits.current_image_index].dummy_flag
+        # Save now so we can use the old image's delay_duration
+        split_image = self.splits.list[self.splits.current_image_index]
 
         # Handle delay
-        if delay_duration > 0:
+        if split_image.delay_duration > 0:
             self.delaying = True
-            self.delay_remaining = delay_duration
+            self.delay_remaining = split_image.delay_duration
             start_time = time.perf_counter()
 
             # Poll at regular intervals, both to update self.delay_remaining,
@@ -582,10 +560,10 @@ class Splitter:
             # kill the thread. The same thing is done in the suspend_duration
             # block below.
             while (
-                time.perf_counter() - start_time < delay_duration
+                time.perf_counter() - start_time < split_image.delay_duration
                 and not self._compare_thread_finished
             ):
-                self.delay_remaining = delay_duration - (
+                self.delay_remaining = split_image.delay_duration - (
                     time.perf_counter() - start_time
                 )
                 time.sleep(self._interval)
@@ -599,23 +577,23 @@ class Splitter:
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
-        if pause_flag:
+        if split_image.pause_flag:
             self.pause_split_action = True
-        elif dummy_flag:
+        elif split_image.dummy_flag:
             self.dummy_split_action = True
         else:
-            self._start_split_thread()
+            self.normal_split_action = True
 
         # Handle post-split pause
-        if suspend_duration > 0:
+        if split_image.pause_duration > 0:
             self.suspended = True
-            self.suspend_remaining = suspend_duration
+            self.suspend_remaining = split_image.pause_duration
             start_time = time.perf_counter()
             while (
-                time.perf_counter() - start_time < suspend_duration
+                time.perf_counter() - start_time < split_image.pause_duration
                 and not self._compare_thread_finished
             ):
-                self.suspend_remaining = suspend_duration - (
+                self.suspend_remaining = split_image.pause_duration - (
                     time.perf_counter() - start_time
                 )
                 time.sleep(self._interval)
@@ -624,51 +602,3 @@ class Splitter:
 
             if self._compare_thread_finished:
                 return
-
-    def _start_split_thread(self) -> None:
-        """Start _split_thread with target=self._set_normal_split_action."""
-        self._split_thread = threading.Thread(target=self._set_normal_split_action)
-        self._split_thread_finished = False
-        self._split_thread.daemon = True
-        self._split_thread.start()
-
-    def _set_normal_split_action(self) -> None:
-        """Set normal_split_action = True without triggering a "double split".
-
-        Since there is a chance a split image could be matched when global
-        hotkeys are disabled and the program is not in focus, we want to make
-        sure the program can still send the split keypress without failing to
-        split. We do this by calling next_split_image directly from this method
-        and setting a flag in split_dir that prevents next_split_image() from
-        being called again for 1 second.
-
-        If next_split_image() is called within 1 second, ignore_split_request
-        is unset and the loop ends.
-
-        Using this method guarantees that though there might be 2 calls made
-        to next_split_image, there will never be 0, and we will always go
-        forward exactly 1 split image, not 0 or 2.
-
-        A thread is used so that this doesn't block for 1 second in the worst
-        case scenario. Instead, the worse case scenario is that for 1 second,
-        if the user presses the split hotkey after a split already occurs,
-        nothing will happen, which I can live with.
-
-        This is not exactly a clean solution, but I think something like this
-        has to be implemented if we are going to allow disabling global
-        hotkeys.
-        """
-        self.splits.next_split_image()
-        self.splits.ignore_split_request = True
-
-        self.normal_split_action = True
-
-        start_time = time.perf_counter()
-        while (
-            time.perf_counter() - start_time < 1
-            and self.splits.ignore_split_request
-            and not self._split_thread_finished
-        ):
-            time.sleep(0.001)
-
-        self.splits.ignore_split_request = False
