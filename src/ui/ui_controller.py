@@ -2133,7 +2133,10 @@ class UIController:
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
             if len(key_code) > 0:
                 self._press_hotkey(key_code)
-            else:
+            # If key didn't get pressed, OR if it did get pressed but global
+            # hotkeys are off and the app isn't in focus, move the split image
+            # forward, since pressing the key on its own won't do that
+            if len(key_code) == 0 or (self._application.focusWindow() is None and not settings.get_bool("GLOBAL_HOTKEYS_ENABLED")):
                 self._splitter.splits.next_split_image()
 
     def _update_label_and_button_text(self) -> None:
