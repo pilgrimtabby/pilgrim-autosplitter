@@ -126,7 +126,6 @@ class UIController:
         self._skip_hotkey_enabled = False
 
         # React to hotkey presses
-        self._active_key_code = None
         self._settings_window_showing = False
         self._split_hotkey_pressed = False
         self._reset_hotkey_pressed = False
@@ -294,8 +293,10 @@ class UIController:
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0:
+            # This leads to request_previous_split being called
             self._press_hotkey(key_code)
-        self._request_previous_split()
+        else:
+            self._request_previous_split()
 
     def _attempt_skip_hotkey(self) -> None:
         """Try to press the skip split hotkey.
@@ -317,8 +318,10 @@ class UIController:
         """
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
         if len(key_code) > 0:
+            # This leads to request_next_split being called
             self._press_hotkey(key_code)
-        self._request_next_split()
+        else:
+            self._request_next_split()
 
     def _attempt_reset_hotkey(self) -> None:
         """Try to press the reset splits hotkey.
@@ -340,8 +343,10 @@ class UIController:
         """
         key_code = settings.get_str("RESET_HOTKEY_CODE")
         if len(key_code) > 0:
+            # This leads to request_previous_split being called
             self._press_hotkey(key_code)
-        self._request_reset_splits()
+        else:
+            self._request_reset_splits()
 
     def _request_previous_split(self) -> None:
         """Tell `splitter.splits` to call `previous_split_image`, and ask
@@ -1962,10 +1967,6 @@ class UIController:
         except AttributeError:
             key_name, key_code = str(key).replace("Key.", ""), key.value.vk
     
-        if key_code == self._active_key_code:
-            self._active_key_code = None
-            return
-
         # Use #1 (set hotkey settings in settings window)
         for hotkey_line_edit in [
             self._settings_window.split_hotkey_line_edit,
@@ -2101,8 +2102,8 @@ class UIController:
                 value. Passed as a string because I use QSettings, which only
                 handles strings when used cross-platform.
         """
-        self._active_key_code = int(key_code)
-        key = keyboard.KeyCode(vk=self._active_key_code)
+        key_code = int(key_code)
+        key = keyboard.KeyCode(vk=key_code)
         self._keyboard_controller.press(key)
         self._keyboard_controller.release(key)
 
@@ -2113,26 +2114,27 @@ class UIController:
         If no hotkey is set for a given action, ignore the hotkey press and
         request the next split image anyway.
         """
-        # Get split type
+        # Pause split (press pause hotkey)
         if self._splitter.pause_split_action:
-            flag = "pause_split_action"
+            self._splitter.pause_split_action = False
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
+            if len(key_code) > 0:
+                self._press_hotkey(key_code)
+            self._splitter.splits.next_split_image()
+
+        # Dummy split (silently advance to next split)
         elif self._splitter.dummy_split_action:
-            flag = None
-            key_code = None
+            self._splitter.dummy_split_action = False
+            self._splitter.splits.next_split_image()
+
+        # Normal split (press split hotkey)
         elif self._splitter.normal_split_action:
-            flag = "normal_split_action"
+            self._splitter.normal_split_action = False
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
-        else:
-            return
-    
-        # Do split action
-        if key_code is None or len(key_code) == 0:
-            pass
-        else:
-            self._press_hotkey(key_code)
-        self._request_next_split()
-        setattr(self._splitter, flag, False)
+            if len(key_code) > 0:
+                self._press_hotkey(key_code)
+            else:
+                self._splitter.splits.next_split_image()
 
     def _update_label_and_button_text(self) -> None:
         """Update label and button text in the UI based on splitter state."""
