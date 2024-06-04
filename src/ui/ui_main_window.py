@@ -262,6 +262,8 @@ class UIMainWindow(QMainWindow):
         #                       #
         #########################
 
+        left, top = self.LEFT_EDGE_CORRECTION, self.TOP_EDGE_CORRECTION
+
         self.split_name_label = QLabel(self._container)
         self.split_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.split_name_label.setAlignment(Qt.AlignCenter)
@@ -279,13 +281,20 @@ class UIMainWindow(QMainWindow):
         self.split_overlay.setAlignment(Qt.AlignCenter)
         self.split_overlay.setObjectName("split_overlay")
         self.split_overlay.setVisible(False)
+
+        self.min_view_overlay = QLabel(self._container)
+        self.min_view_overlay.setAlignment(Qt.AlignCenter)
+        self.min_view_overlay.setVisible(False)
+        # This label's always in the same spot
+        self.min_view_overlay.setGeometry(QRect(161 + left, 270 + top, 213, 31))
+
         self.overlay_delay_txt = "Splitting in {amount:.1f} s"
         self.overlay_pause_txt = "Paused for {amount:.1f} s"
 
         self.split_info_min_label = QLabel(self._container)
         self.split_info_min_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.split_info_min_label.setAlignment(Qt.AlignCenter)
-        left, top = self.LEFT_EDGE_CORRECTION, self.TOP_EDGE_CORRECTION
+        # This label's always in the same spot
         self.split_info_min_label.setGeometry(QRect(92 + left, 225 + top, 251, 31))
         self.min_video_down_txt = "Video status:   down"
         self.min_video_live_txt = "Video status:   healthy"

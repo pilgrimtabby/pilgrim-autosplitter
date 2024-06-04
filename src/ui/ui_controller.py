@@ -54,7 +54,7 @@ class UIController:
     """Manage the passing of information from the splitter to the UI, and from
     user input to the UI and the splitter.
 
-    Perhaps the most important class method is _update_ui, which is ran once
+    Perhaps the most important class method is _poller, which is ran once
     per frame using a QTimer. This method updates the UI and handles all user
     inputs.
 
@@ -1237,7 +1237,7 @@ class UIController:
         self._update_video_feed()
         self._update_video_title()
         self._update_split_image_labels()
-        self._update_split_overlay()
+        self._update_split_delay_suspend()
         self._update_match_percents()
         self._update_pause_button()
         self._set_buttons_and_hotkeys_enabled()
@@ -1293,12 +1293,13 @@ class UIController:
         splits_min_label = self._main_window.split_info_min_label
 
         # No splits loaded, but UI showing split image
-        if current_index is None and split_display.text() != splits_down_txt:
-            split_display.setText(splits_down_txt)
-            split_label.setText("")
-            loop_label.setText("")
-            splits_min_label.setText(splits_down_txt)
-            splits_min_label.raise_()
+        if current_index is None:
+            if split_display.text() != splits_down_txt:
+                split_display.setText(splits_down_txt)
+                split_label.setText("")
+                loop_label.setText("")
+                splits_min_label.setText(splits_down_txt)
+                splits_min_label.raise_()
 
         # UI showing split but split has been changed, resized, or reset
         elif self._redraw_split_labels:
@@ -1322,9 +1323,18 @@ class UIController:
             else:
                 loop_label.setText(f"Loop {current_loop} of {total_loops}")
 
-    def _update_split_overlay(self) -> None:
-        """Show split overlay with countdown before and after splitting."""
-        overlay = self._main_window.split_overlay
+    def _update_split_delay_suspend(self) -> None:
+        """Display remaining delay or suspend time.
+        
+        Keep track of both overlays, regardless of view, so we can hide the one
+        not currently in use.
+        """
+        if settings.get_bool("SHOW_MIN_VIEW"):
+            overlay = self._main_window.min_view_overlay
+            self._main_window.split_overlay.setVisible(False)
+        else:
+            overlay = self._main_window.split_overlay
+            self._main_window.min_view_overlay.setVisible(False)
         delay_txt = self._main_window.overlay_delay_txt
         pause_txt = self._main_window.overlay_pause_txt
 
@@ -1587,7 +1597,7 @@ class UIController:
         elif self._skip_hotkey_pressed:
             if self._skip_hotkey_enabled:
                 self._request_next_split()
-            self._reset_hotkey_pressed = False
+            self._skip_hotkey_pressed = False
 
         elif self._previous_hotkey_pressed:
             self._main_window.previous_button.click()
