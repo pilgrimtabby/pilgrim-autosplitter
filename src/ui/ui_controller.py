@@ -1377,13 +1377,14 @@ class UIController:
             high_label.setText(format_str.format(high_percent * 100))
 
         # No splits loaded, but UI is showing threshold%
-        if current_index is None and thresh_label.text() != null_str:
-            thresh_label.setText(null_str)
+        if current_index is None:
+            if thresh_label.text() != null_str:
+                thresh_label.setText(null_str)
 
         # Update threshold%
-        elif current_index is not None:
-            thresh_percent = self._splitter.splits.list[current_index].threshold
-            thresh_label.setText(format_str.format(thresh_percent * 100))
+        else:
+            threshold = self._splitter.splits.list[current_index].threshold
+            thresh_label.setText(format_str.format(threshold * 100))
 
     def _update_pause_button(self):
         """Adjust the length and content of the pause button's text according
