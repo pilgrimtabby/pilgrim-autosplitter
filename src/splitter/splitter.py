@@ -65,7 +65,7 @@ class Splitter:
             self.splits to go to a new split image.
         comparison_frame (numpy.ndarray): Numpy array used to generate a
             comparison with a split image.
-        current_match_percent (float): The most recent match percent between a
+        match_percent (float): The most recent match percent between a
             frame and a split image.
         delay_remaining (float): The amount of time left (in seconds) until a
             planned split occurs.
@@ -74,7 +74,7 @@ class Splitter:
         dummy_split_action (bool): When True, tells ui_controller to perform a
             dummy split action.
         frame_pixmap (QPixmap): QPixmap used to show video feed on UI.
-        highest_match_percent (float): The highest match percent so far between
+        highest_percent (float): The highest match percent so far between
             a frame and a split image.
         normal_split_action (bool): When True, tells ui_controller to perform a
             normal split action.
@@ -109,8 +109,8 @@ class Splitter:
 
         # _compare_thread
         self.splits = SplitDir()
-        self.current_match_percent = None
-        self.highest_match_percent = None
+        self.match_percent = None
+        self.highest_percent = None
         self.delaying = False
         self.delay_remaining = None
         self.suspended = True
@@ -379,19 +379,19 @@ class Splitter:
         The following flags are used to determine when to return a value:
             match_found: False until one of two conditions is met--
                 1) The split image's below_flag is False, and
-                    current_match_percent >= threshold_match_percent
-                2) went_above_threshold_flag is True and current_match_percent
-                    < threshold_match_percent
+                    match_percent >= threshold_percent
+                2) went_above_threshold_flag is True and match_percent
+                    < threshold_percent
             went_above_threshold_flag: False until the split image's below_flag
-                is True, and current_match_percent >= threshold_match_percent
+                is True, and match_percent >= threshold_percent
 
         Returns:
             bool: True if one of the two above match_found conditions are met.
                 False if self._compare_thread_finished is called, terminating
                 the thread.
         """
-        self.current_match_percent = 0
-        self.highest_match_percent = 0
+        self.match_percent = 0
+        self.highest_percent = 0
         match_found = False
         went_above_threshold_flag = False
         frames_this_second = 0
@@ -422,12 +422,12 @@ class Splitter:
                 continue
 
             # Check image against template image
-            self.current_match_percent = self._get_match_percent(frame)
-            if self.current_match_percent > self.highest_match_percent:
-                self.highest_match_percent = self.current_match_percent
+            self.match_percent = self._get_match_percent(frame)
+            if self.match_percent > self.highest_percent:
+                self.highest_percent = self.match_percent
 
             if (
-                self.current_match_percent
+                self.match_percent
                 >= self.splits.list[self.splits.current_image_index].threshold
             ):
                 if self.splits.list[self.splits.current_image_index].below_flag:
@@ -441,8 +441,8 @@ class Splitter:
                 break
 
         # Setting these to None tells the ui_controller the splitter is down
-        self.current_match_percent = None
-        self.highest_match_percent = None
+        self.match_percent = None
+        self.highest_percent = None
         return match_found
 
     def _update_fps_factor(

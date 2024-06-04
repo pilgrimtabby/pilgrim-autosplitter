@@ -66,49 +66,49 @@ class UISettingsWindow(QDialog):
     Attributes:
         aspect_ratio_combo_box (QComboBox): Store and allow selection of aspect
             ratio settings.
-        border_helper_frame (QFrame): Draw a border around the edge of the menu
+        border (QFrame): Draw a border around the edge of the menu
             for aesthetic purposes.
         cancel_button (QPushButton): Close the menu without saving. Same as
             clicking the "x button", pressing esc, etc.
         check_for_updates_checkbox (QCheckBox): Enable and disable checking for
             new versions on launch.
         close_window_shortcut (QShortcut): Same as cancel_button.
-        default_delay_double_spinbox (QDoubleSpinBox): Store and allow
+        delay_spinbox (QDoubleSpinBox): Store and allow
             selection of default delay before splitting.
-        default_pause_double_spinbox (QDoubleSpinBox): Store and allow
+        pause_spinbox (QDoubleSpinBox): Store and allow
             selection of default pause after splitting.
-        default_threshold_double_spinbox (QDoubleSpinBox): Store and allow
+        threshold_spinbox (QDoubleSpinBox): Store and allow
             selection of default match percent threshold for triggering a
             split.
         fps_spinbox (QSpinBox): Store and allow selection of default frames per
             second.
         global_hotkeys_checkbox (QCheckBox): Store and allow selection of
             whether global hotkeys are enabled.
-        match_percent_decimals_spinbox (QSpinBox): Store and allow selection of
+        decimals_spinbox (QSpinBox): Store and allow selection of
             amount of decimal places shown when displaying match percents.
-        next_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+        next_hotkey_box (KeyLineEdit): Store and allow selection of
             next split hotkey.
         open_screenshots_checkbox (QCheckBox): Store and allow selection of
             whether screenshots are opened when they are captured.
-        pause_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+        pause_hotkey_box (KeyLineEdit): Store and allow selection of
             pause timer hotkey.
-        previous_split_hotkey_line_edit (KeyLineEdit): Store and allow
+        previous_hotkey_box (KeyLineEdit): Store and allow
             selection of previous split hotkey.
-        reset_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+        reset_hotkey_box (KeyLineEdit): Store and allow selection of
             reset splits hotkey.
         save_button (QPushButton): Save all settings and close the window.
-        screenshot_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+        screenshot_hotkey_box (KeyLineEdit): Store and allow selection of
             screenshot hotkey.
-        skip_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+        skip_hotkey_box (KeyLineEdit): Store and allow selection of
             skip split hotkey.
-        split_hotkey_line_edit (KeyLineEdit): Store and allow selection
+        split_hotkey_box (KeyLineEdit): Store and allow selection
             of split hotkey.
         start_with_video_checkbox (QCheckBox): Store and allow selection of
             whether this program should try to open a video feed on startup.
         theme_combo_box (QComboBox): Store and allow selection of UI theme.
-        toggle_global_hotkeys_hotkey_line_edit (KeyLineEdit): Store and allow
+        toggle_global_hotkeys_hotkey_box (KeyLineEdit): Store and allow
             selection of toggle global hotkeys enabled hotkey.
-        undo_split_hotkey_line_edit (KeyLineEdit): Store and allow selection of
+        undo_hotkey_box (KeyLineEdit): Store and allow selection of
             undo split hotkey.
     """
 
@@ -125,13 +125,9 @@ class UISettingsWindow(QDialog):
         super().__init__()
 
         # Shift all widgets, except the frame, this many pixels right
-        self._LEFT_EDGE_CORRECTION = 0
+        self._LEFT = 0
         # Shift all widgets, except the frame, this many pixels down
-        self._TOP_EDGE_CORRECTION = 3
-        # Shift the frame this many pixels right
-        self._LEFT_EDGE_CORRECTION_FRAME = 0
-        # Shift the frame this many pixels down
-        self._TOP_EDGE_CORRECTION_FRAME = 0
+        self._TOP = 3
         # Left side widgets are, generally, this many pixels wide
         self._LEFT_SIDE_WIDGET_WIDTH = 70
         # Left side widgets are, generally, this many pixels high
@@ -142,11 +138,11 @@ class UISettingsWindow(QDialog):
 
         self.close_window_shortcut = QShortcut("ctrl+w", self)
 
-        #####################
-        #                   #
-        # Left Side Widgets #
-        #                   #
-        #####################
+        ###########
+        #         #
+        # Widgets #
+        #         #
+        ###########
 
         # Checkbox effect
         self._checkbox_shadow = QGraphicsDropShadowEffect()
@@ -155,48 +151,26 @@ class UISettingsWindow(QDialog):
         self._checkbox_shadow.setColor(QColor(0, 0, 0, 1))
 
         # Border
-        self.border_helper_frame = QFrame(self)
-        self.border_helper_frame.setGeometry(
-            QRect(
-                10 + self._LEFT_EDGE_CORRECTION_FRAME,
-                10 + self._TOP_EDGE_CORRECTION_FRAME,
-                590,
-                372,
-            )
-        )
-        self.border_helper_frame.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents
-        )
-        self.border_helper_frame.setObjectName("border")
+        self.border = QFrame(self)
+        self.border.setGeometry(QRect(10, 10, 590, 372))
+        self.border.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.border.setObjectName("border")
 
         # FPS spinbox
         self._fps_label = QLabel("Frames per second:", self)
-        self._fps_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION, 10 + self._TOP_EDGE_CORRECTION, 131, 31
-            )
-        )
+        self._fps_label.setGeometry(QRect(20 + self._LEFT, 10 + self._TOP, 131, 31))
         self._fps_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._fps_label.setToolTip("Read this many frames per second from video source")
 
         self.fps_spinbox = QSpinBox(self)
-        self.fps_spinbox.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                12 + self._TOP_EDGE_CORRECTION,
-                self._LEFT_SIDE_WIDGET_WIDTH,
-                self._LEFT_SIDE_WIDGET_HEIGHT,
-            )
-        )
+        self.fps_spinbox.setGeometry(QRect(160 + self._LEFT, 12 + self._TOP, 70, 27))
         self.fps_spinbox.setMinimum(20)
         self.fps_spinbox.setMaximum(60)
 
         # Screenshots checkbox
         self._open_screenshots_label = QLabel("Open screenshots:", self)
         self._open_screenshots_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION, 40 + self._TOP_EDGE_CORRECTION, 141, 31
-            )
+            QRect(20 + self._LEFT, 40 + self._TOP, 141, 31)
         )
         self._open_screenshots_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._open_screenshots_label.setToolTip(
@@ -205,16 +179,12 @@ class UISettingsWindow(QDialog):
 
         self.open_screenshots_checkbox = QCheckBox(self)
         self.open_screenshots_checkbox.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION, 49 + self._TOP_EDGE_CORRECTION, 13, 13
-            )
+            QRect(161 + self._LEFT, 49 + self._TOP, 13, 13)
         )
 
         self._open_screenshots_checkbox_helper_label = QLabel(self)
         self._open_screenshots_checkbox_helper_label.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION, 48 + self._TOP_EDGE_CORRECTION, 14, 15
-            )
+            QRect(161 + self._LEFT, 48 + self._TOP, 14, 15)
         )
         self._open_screenshots_checkbox_helper_label.setObjectName("checkbox_helper")
         self._open_screenshots_checkbox_helper_label.setAttribute(
@@ -225,131 +195,77 @@ class UISettingsWindow(QDialog):
         )
 
         # Default threshold spinbox
-        self._default_threshold_label = QLabel("Default threshold:", self)
-        self._default_threshold_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION, 70 + self._TOP_EDGE_CORRECTION, 161, 31
-            )
+        self._threshold_label = QLabel("Default threshold:", self)
+        self._threshold_label.setGeometry(
+            QRect(20 + self._LEFT, 70 + self._TOP, 161, 31)
         )
-        self._default_threshold_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self._default_threshold_label.setToolTip(
+        self._threshold_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._threshold_label.setToolTip(
             "Images must match at least this much to trigger a split, pause, etc."
         )
 
-        self.default_threshold_double_spinbox = QDoubleSpinBox(self)
-        self.default_threshold_double_spinbox.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                72 + self._TOP_EDGE_CORRECTION,
-                self._LEFT_SIDE_WIDGET_WIDTH,
-                self._LEFT_SIDE_WIDGET_HEIGHT,
-            )
+        self.threshold_spinbox = QDoubleSpinBox(self)
+        self.threshold_spinbox.setGeometry(
+            QRect(160 + self._LEFT, 72 + self._TOP, 70, 27)
         )
-        self.default_threshold_double_spinbox.setDecimals(2)
-        self.default_threshold_double_spinbox.setMinimum(0.1)
-        self.default_threshold_double_spinbox.setMaximum(100)
-        self.default_threshold_double_spinbox.setSingleStep(0.1)
-        self.default_threshold_double_spinbox.setSuffix("%")
+        self.threshold_spinbox.setDecimals(2)
+        self.threshold_spinbox.setMinimum(0.1)
+        self.threshold_spinbox.setMaximum(100)
+        self.threshold_spinbox.setSingleStep(0.1)
+        self.threshold_spinbox.setSuffix("%")
 
         # Match percent decimals spinbox
-        self._match_percent_decimals_label = QLabel("Similarity decimals:", self)
-        self._match_percent_decimals_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                100 + self._TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._decimals_label = QLabel("Similarity decimals:", self)
+        self._decimals_label.setGeometry(
+            QRect(20 + self._LEFT, 100 + self._TOP, 161, 31)
         )
-        self._match_percent_decimals_label.setTextInteractionFlags(
-            Qt.TextSelectableByMouse
-        )
-        self._match_percent_decimals_label.setToolTip(
+        self._decimals_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._decimals_label.setToolTip(
             "Images must match at least this much to trigger a split, pause, etc."
         )
 
-        self.match_percent_decimals_spinbox = QSpinBox(self)
-        self.match_percent_decimals_spinbox.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                102 + self._TOP_EDGE_CORRECTION,
-                self._LEFT_SIDE_WIDGET_WIDTH,
-                self._LEFT_SIDE_WIDGET_HEIGHT,
-            )
+        self.decimals_spinbox = QSpinBox(self)
+        self.decimals_spinbox.setGeometry(
+            QRect(160 + self._LEFT, 102 + self._TOP, 70, 27)
         )
-        self.match_percent_decimals_spinbox.setMinimum(0)
-        self.match_percent_decimals_spinbox.setMaximum(2)
+        self.decimals_spinbox.setMinimum(0)
+        self.decimals_spinbox.setMaximum(2)
 
         # Default delay spinbox
-        self._default_delay_label = QLabel("Default delay (sec.):", self)
-        self._default_delay_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                130 + self._TOP_EDGE_CORRECTION,
-                201,
-                31,
-            )
-        )
-        self._default_delay_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self._default_delay_label.setToolTip(
+        self._delay_label = QLabel("Default delay (sec.):", self)
+        self._delay_label.setGeometry(QRect(20 + self._LEFT, 130 + self._TOP, 201, 31))
+        self._delay_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._delay_label.setToolTip(
             "The default delay between the split threshold being reached and a split, pause, etc."
         )
 
-        self.default_delay_double_spinbox = QDoubleSpinBox(self)
-        self.default_delay_double_spinbox.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                132 + self._TOP_EDGE_CORRECTION,
-                self._LEFT_SIDE_WIDGET_WIDTH,
-                self._LEFT_SIDE_WIDGET_HEIGHT,
-            )
-        )
-        self.default_delay_double_spinbox.setDecimals(3)
-        self.default_delay_double_spinbox.setMinimum(0)
-        self.default_delay_double_spinbox.setMaximum(99999)
-        self.default_delay_double_spinbox.setSingleStep(0.1)
+        self.delay_spinbox = QDoubleSpinBox(self)
+        self.delay_spinbox.setGeometry(QRect(160 + self._LEFT, 132 + self._TOP, 70, 27))
+        self.delay_spinbox.setDecimals(3)
+        self.delay_spinbox.setMinimum(0)
+        self.delay_spinbox.setMaximum(99999)
+        self.delay_spinbox.setSingleStep(0.1)
 
         # Default pause spinbox
-        self._default_pause_label = QLabel("Default pause (sec.):", self)
-        self._default_pause_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                160 + self._TOP_EDGE_CORRECTION,
-                191,
-                31,
-            )
-        )
-        self._default_pause_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self._default_pause_label.setToolTip(
+        self._pause_label = QLabel("Default pause (sec.):", self)
+        self._pause_label.setGeometry(QRect(20 + self._LEFT, 160 + self._TOP, 191, 31))
+        self._pause_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._pause_label.setToolTip(
             "The default waiting period after a split and before starting to compare the next "
             "image. Set this setting higher to save CPU"
         )
 
-        self.default_pause_double_spinbox = QDoubleSpinBox(self)
-        self.default_pause_double_spinbox.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                162 + self._TOP_EDGE_CORRECTION,
-                self._LEFT_SIDE_WIDGET_WIDTH,
-                self._LEFT_SIDE_WIDGET_HEIGHT,
-            )
-        )
-        self.default_pause_double_spinbox.setDecimals(0)
-        # Use a 1 second minimum pause because no pause can cause problems, and
-        # is likely not desireable from a user standpoint anyway
-        self.default_pause_double_spinbox.setMinimum(1)
-        self.default_pause_double_spinbox.setMaximum(99999)
-        self.default_pause_double_spinbox.setSingleStep(1.0)
+        self.pause_spinbox = QDoubleSpinBox(self)
+        self.pause_spinbox.setGeometry(QRect(160 + self._LEFT, 162 + self._TOP, 70, 27))
+        self.pause_spinbox.setDecimals(0)
+        self.pause_spinbox.setMinimum(1)
+        self.pause_spinbox.setMaximum(99999)
+        self.pause_spinbox.setSingleStep(1.0)
 
         # Aspect ratio combobox
         self._aspect_ratio_label = QLabel("GUI aspect ratio:", self)
         self._aspect_ratio_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                190 + self._TOP_EDGE_CORRECTION,
-                191,
-                31,
-            )
+            QRect(20 + self._LEFT, 190 + self._TOP, 191, 31)
         )
         self._aspect_ratio_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._aspect_ratio_label.setToolTip(
@@ -359,49 +275,28 @@ class UISettingsWindow(QDialog):
 
         self.aspect_ratio_combo_box = QComboBox(self)
         self.aspect_ratio_combo_box.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                194 + self._TOP_EDGE_CORRECTION,
-                130,
-                self._LEFT_SIDE_WIDGET_HEIGHT - 4,
-            )
+            QRect(160 + self._LEFT, 194 + self._TOP, 130, 23)
         )
         self.aspect_ratio_combo_box.addItems(
             ["4:3 (480x360)", "4:3 (320x240)", "16:9 (512x288)", "16:9 (432x243)"]
         )
+
         # Theme combobox
         self._theme_label = QLabel("Theme:", self)
-        self._theme_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                220 + self._TOP_EDGE_CORRECTION,
-                191,
-                31,
-            )
-        )
+        self._theme_label.setGeometry(QRect(20 + self._LEFT, 220 + self._TOP, 191, 31))
         self._theme_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._theme_label.setToolTip("Does anyone actually use light mode?")
 
         self.theme_combo_box = QComboBox(self)
         self.theme_combo_box.setGeometry(
-            QRect(
-                160 + self._LEFT_EDGE_CORRECTION,
-                224 + self._TOP_EDGE_CORRECTION,
-                self._LEFT_SIDE_WIDGET_WIDTH,
-                self._LEFT_SIDE_WIDGET_HEIGHT - 4,
-            )
+            QRect(160 + self._LEFT, 224 + self._TOP, 70, 23)
         )
         self.theme_combo_box.addItems(["dark", "light"])
 
         # Start with video checkbox
         self._start_with_video_label = QLabel("Start with video:", self)
         self._start_with_video_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                250 + self._TOP_EDGE_CORRECTION,
-                191,
-                31,
-            )
+            QRect(20 + self._LEFT, 250 + self._TOP, 191, 31)
         )
         self._start_with_video_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._start_with_video_label.setToolTip(
@@ -411,22 +306,12 @@ class UISettingsWindow(QDialog):
 
         self.start_with_video_checkbox = QCheckBox(self)
         self.start_with_video_checkbox.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION,
-                259 + self._TOP_EDGE_CORRECTION,
-                13,
-                13,
-            )
+            QRect(161 + self._LEFT, 259 + self._TOP, 13, 13)
         )
 
         self._start_with_video_checkbox_helper_label = QLabel(self)
         self._start_with_video_checkbox_helper_label.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION,
-                258 + self._TOP_EDGE_CORRECTION,
-                14,
-                15,
-            )
+            QRect(161 + self._LEFT, 258 + self._TOP, 14, 15)
         )
         self._start_with_video_checkbox_helper_label.setObjectName("checkbox_helper")
         self._start_with_video_checkbox_helper_label.setAttribute(
@@ -439,12 +324,7 @@ class UISettingsWindow(QDialog):
         # Enable global hotkeys checkbox
         self._global_hotkeys_label = QLabel("Global hotkeys:", self)
         self._global_hotkeys_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                280 + self._TOP_EDGE_CORRECTION,
-                191,
-                31,
-            )
+            QRect(20 + self._LEFT, 280 + self._TOP, 191, 31)
         )
         self._global_hotkeys_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._global_hotkeys_label.setToolTip(
@@ -453,22 +333,12 @@ class UISettingsWindow(QDialog):
 
         self.global_hotkeys_checkbox = QCheckBox(self)
         self.global_hotkeys_checkbox.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION,
-                289 + self._TOP_EDGE_CORRECTION,
-                13,
-                13,
-            )
+            QRect(161 + self._LEFT, 289 + self._TOP, 13, 13)
         )
 
         self._global_hotkeys_checkbox_helper_label = QLabel(self)
         self._global_hotkeys_checkbox_helper_label.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION,
-                288 + self._TOP_EDGE_CORRECTION,
-                14,
-                15,
-            )
+            QRect(161 + self._LEFT, 288 + self._TOP, 14, 15)
         )
         self._global_hotkeys_checkbox_helper_label.setObjectName("checkbox_helper")
         self._global_hotkeys_checkbox_helper_label.setAttribute(
@@ -481,12 +351,7 @@ class UISettingsWindow(QDialog):
         # Check for updates checkbox
         self._check_for_updates_label = QLabel("Check for updates:", self)
         self._check_for_updates_label.setGeometry(
-            QRect(
-                20 + self._LEFT_EDGE_CORRECTION,
-                310 + self._TOP_EDGE_CORRECTION,
-                191,
-                31,
-            )
+            QRect(20 + self._LEFT, 310 + self._TOP, 191, 31)
         )
         self._check_for_updates_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._check_for_updates_label.setToolTip(
@@ -495,22 +360,12 @@ class UISettingsWindow(QDialog):
 
         self.check_for_updates_checkbox = QCheckBox(self)
         self.check_for_updates_checkbox.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION,
-                319 + self._TOP_EDGE_CORRECTION,
-                13,
-                13,
-            )
+            QRect(161 + self._LEFT, 319 + self._TOP, 13, 13)
         )
 
         self._check_for_updates_checkbox_helper_label = QLabel(self)
         self._check_for_updates_checkbox_helper_label.setGeometry(
-            QRect(
-                161 + self._LEFT_EDGE_CORRECTION,
-                318 + self._TOP_EDGE_CORRECTION,
-                14,
-                15,
-            )
+            QRect(161 + self._LEFT, 318 + self._TOP, 14, 15)
         )
         self._check_for_updates_checkbox_helper_label.setObjectName("checkbox_helper")
         self._check_for_updates_checkbox_helper_label.setAttribute(
@@ -529,345 +384,220 @@ class UISettingsWindow(QDialog):
         # Hotkey header
         self._hotkey_settings_label = QLabel("Hotkeys (click + type to change):", self)
         self._hotkey_settings_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                10 + self._TOP_EDGE_CORRECTION,
-                216,
-                31,
-            )
+            QRect(300 + self._LEFT, 10 + self._TOP, 216, 31)
         )
         self._hotkey_settings_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         # Split hotkey
-        self.split_hotkey_line_edit = KeyLineEdit(self)
-        self.split_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                42 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.split_hotkey_box = KeyLineEdit(self)
+        self.split_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 42 + self._TOP, 121, 25)
         )
-        self.split_hotkey_line_edit.setReadOnly(True)
+        self.split_hotkey_box.setReadOnly(True)
 
         self._split_hotkey_label = QLabel("Split", self)
         self._split_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION, 40 + self._TOP_EDGE_CORRECTION, 81, 31
-            )
+            QRect(300 + self._LEFT, 40 + self._TOP, 81, 31)
         )
         self._split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         self._split_hotkey_clear_button = QPushButton("clear", self)
         self._split_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION, 45 + self._TOP_EDGE_CORRECTION, 39, 20
-            )
+            QRect(545 + self._LEFT, 45 + self._TOP, 39, 20)
         )
         self._split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self._split_hotkey_clear_button.clicked.connect(
-            lambda: self.split_hotkey_line_edit.setText("")
+            lambda: self.split_hotkey_box.setText("")
         )
         self._split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.split_hotkey_line_edit, "key_code", "")
+            lambda: setattr(self.split_hotkey_box, "key_code", "")
         )
 
         # Reset splits hotkey
-        self.reset_hotkey_line_edit = KeyLineEdit(self)
-        self.reset_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                72 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.reset_hotkey_box = KeyLineEdit(self)
+        self.reset_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 72 + self._TOP, 121, 25)
         )
-        self.reset_hotkey_line_edit.setReadOnly(True)
+        self.reset_hotkey_box.setReadOnly(True)
 
         self._reset_hotkey_label = QLabel("Reset splits", self)
         self._reset_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION, 70 + self._TOP_EDGE_CORRECTION, 91, 31
-            )
+            QRect(300 + self._LEFT, 70 + self._TOP, 91, 31)
         )
         self._reset_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         self._reset_hotkey_clear_button = QPushButton("clear", self)
         self._reset_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION, 75 + self._TOP_EDGE_CORRECTION, 39, 20
-            )
+            QRect(545 + self._LEFT, 75 + self._TOP, 39, 20)
         )
         self._reset_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self._reset_hotkey_clear_button.clicked.connect(
-            lambda: self.reset_hotkey_line_edit.setText("")
+            lambda: self.reset_hotkey_box.setText("")
         )
         self._reset_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.reset_hotkey_line_edit, "key_code", "")
+            lambda: setattr(self.reset_hotkey_box, "key_code", "")
         )
 
         # Pause hotkey
-        self.pause_hotkey_line_edit = KeyLineEdit(self)
-        self.pause_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                102 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.pause_hotkey_box = KeyLineEdit(self)
+        self.pause_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 102 + self._TOP, 121, 25)
         )
-        self.pause_hotkey_line_edit.setReadOnly(True)
+        self.pause_hotkey_box.setReadOnly(True)
 
         self._pause_hotkey_label = QLabel("Pause timer", self)
         self._pause_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                100 + self._TOP_EDGE_CORRECTION,
-                91,
-                31,
-            )
+            QRect(300 + self._LEFT, 100 + self._TOP, 91, 31)
         )
         self._pause_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         self._pause_hotkey_clear_button = QPushButton("clear", self)
         self._pause_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                105 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+            QRect(545 + self._LEFT, 105 + self._TOP, 39, 20)
         )
         self._pause_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self._pause_hotkey_clear_button.clicked.connect(
-            lambda: self.pause_hotkey_line_edit.setText("")
+            lambda: self.pause_hotkey_box.setText("")
         )
         self._pause_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.pause_hotkey_line_edit, "key_code", "")
+            lambda: setattr(self.pause_hotkey_box, "key_code", "")
         )
 
         # Undo split hotkey
-        self.undo_split_hotkey_line_edit = KeyLineEdit(self)
-        self.undo_split_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                132 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.undo_hotkey_box = KeyLineEdit(self)
+        self.undo_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 132 + self._TOP, 121, 25)
         )
-        self.undo_split_hotkey_line_edit.setReadOnly(True)
+        self.undo_hotkey_box.setReadOnly(True)
 
-        self._undo_split_hotkey_label = QLabel("Undo split", self)
-        self._undo_split_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                130 + self._TOP_EDGE_CORRECTION,
-                81,
-                31,
-            )
+        self._undo_hotkey_label = QLabel("Undo split", self)
+        self._undo_hotkey_label.setGeometry(
+            QRect(300 + self._LEFT, 130 + self._TOP, 81, 31)
         )
-        self._undo_split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._undo_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        self._undo_split_hotkey_clear_button = QPushButton("clear", self)
-        self._undo_split_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                135 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+        self._undo_hotkey_clear_button = QPushButton("clear", self)
+        self._undo_hotkey_clear_button.setGeometry(
+            QRect(545 + self._LEFT, 135 + self._TOP, 39, 20)
         )
-        self._undo_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
-        self._undo_split_hotkey_clear_button.clicked.connect(
-            lambda: self.undo_split_hotkey_line_edit.setText("")
+        self._undo_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._undo_hotkey_clear_button.clicked.connect(
+            lambda: self.undo_hotkey_box.setText("")
         )
-        self._undo_split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.undo_split_hotkey_line_edit, "key_code", "")
+        self._undo_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.undo_hotkey_box, "key_code", "")
         )
 
         # Skip split hotkey
-        self.skip_split_hotkey_line_edit = KeyLineEdit(self)
-        self.skip_split_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                162 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.skip_hotkey_box = KeyLineEdit(self)
+        self.skip_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 162 + self._TOP, 121, 25)
         )
-        self.skip_split_hotkey_line_edit.setReadOnly(True)
+        self.skip_hotkey_box.setReadOnly(True)
 
-        self._skip_split_hotkey_label = QLabel("Skip split", self)
-        self._skip_split_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                160 + self._TOP_EDGE_CORRECTION,
-                71,
-                31,
-            )
+        self._skip_hotkey_label = QLabel("Skip split", self)
+        self._skip_hotkey_label.setGeometry(
+            QRect(300 + self._LEFT, 160 + self._TOP, 71, 31)
         )
-        self._skip_split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._skip_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        self._skip_split_hotkey_clear_button = QPushButton("clear", self)
-        self._skip_split_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                165 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+        self._skip_hotkey_clear_button = QPushButton("clear", self)
+        self._skip_hotkey_clear_button.setGeometry(
+            QRect(545 + self._LEFT, 165 + self._TOP, 39, 20)
         )
-        self._skip_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
-        self._skip_split_hotkey_clear_button.clicked.connect(
-            lambda: self.skip_split_hotkey_line_edit.setText("")
+        self._skip_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._skip_hotkey_clear_button.clicked.connect(
+            lambda: self.skip_hotkey_box.setText("")
         )
-        self._skip_split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.skip_split_hotkey_line_edit, "key_code", "")
+        self._skip_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.skip_hotkey_box, "key_code", "")
         )
 
         # Previous split hotkey
-        self.previous_split_hotkey_line_edit = KeyLineEdit(self)
-        self.previous_split_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                192 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.previous_hotkey_box = KeyLineEdit(self)
+        self.previous_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 192 + self._TOP, 121, 25)
         )
-        self.previous_split_hotkey_line_edit.setReadOnly(True)
+        self.previous_hotkey_box.setReadOnly(True)
 
-        self._previous_split_hotkey_label = QLabel("Previous split", self)
-        self._previous_split_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                190 + self._TOP_EDGE_CORRECTION,
-                101,
-                31,
-            )
+        self._previous_hotkey_label = QLabel("Previous split", self)
+        self._previous_hotkey_label.setGeometry(
+            QRect(300 + self._LEFT, 190 + self._TOP, 101, 31)
         )
-        self._previous_split_hotkey_label.setTextInteractionFlags(
-            Qt.TextSelectableByMouse
-        )
+        self._previous_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        self._previous_split_hotkey_clear_button = QPushButton("clear", self)
-        self._previous_split_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                195 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+        self._previous_hotkey_clear_button = QPushButton("clear", self)
+        self._previous_hotkey_clear_button.setGeometry(
+            QRect(545 + self._LEFT, 195 + self._TOP, 39, 20)
         )
-        self._previous_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
-        self._previous_split_hotkey_clear_button.clicked.connect(
-            lambda: self.previous_split_hotkey_line_edit.setText("")
+        self._previous_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._previous_hotkey_clear_button.clicked.connect(
+            lambda: self.previous_hotkey_box.setText("")
         )
-        self._previous_split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.previous_split_hotkey_line_edit, "key_code", "")
+        self._previous_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.previous_hotkey_box, "key_code", "")
         )
 
         # Next split hotkey
-        self.next_split_hotkey_line_edit = KeyLineEdit(self)
-        self.next_split_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                222 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.next_hotkey_box = KeyLineEdit(self)
+        self.next_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 222 + self._TOP, 121, 25)
         )
-        self.next_split_hotkey_line_edit.setReadOnly(True)
+        self.next_hotkey_box.setReadOnly(True)
 
-        self._next_split_hotkey_label = QLabel("Next split", self)
-        self._next_split_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                220 + self._TOP_EDGE_CORRECTION,
-                71,
-                31,
-            )
+        self._next_hotkey_label = QLabel("Next split", self)
+        self._next_hotkey_label.setGeometry(
+            QRect(300 + self._LEFT, 220 + self._TOP, 71, 31)
         )
-        self._next_split_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._next_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
-        self._next_split_hotkey_clear_button = QPushButton("clear", self)
-        self._next_split_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                225 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+        self._next_hotkey_clear_button = QPushButton("clear", self)
+        self._next_hotkey_clear_button.setGeometry(
+            QRect(545 + self._LEFT, 225 + self._TOP, 39, 20)
         )
-        self._next_split_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
-        self._next_split_hotkey_clear_button.clicked.connect(
-            lambda: self.next_split_hotkey_line_edit.setText("")
+        self._next_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._next_hotkey_clear_button.clicked.connect(
+            lambda: self.next_hotkey_box.setText("")
         )
-        self._next_split_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.next_split_hotkey_line_edit, "key_code", "")
+        self._next_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.next_hotkey_box, "key_code", "")
         )
 
         # Screenshot hotkey
-        self.screenshot_hotkey_line_edit = KeyLineEdit(self)
-        self.screenshot_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                252 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.screenshot_hotkey_box = KeyLineEdit(self)
+        self.screenshot_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 252 + self._TOP, 121, 25)
         )
-        self.screenshot_hotkey_line_edit.setReadOnly(True)
+        self.screenshot_hotkey_box.setReadOnly(True)
 
         self._screenshot_hotkey_label = QLabel("Screenshot", self)
         self._screenshot_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                250 + self._TOP_EDGE_CORRECTION,
-                71,
-                31,
-            )
+            QRect(300 + self._LEFT, 250 + self._TOP, 71, 31)
         )
         self._screenshot_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
 
         self._screenshot_hotkey_clear_button = QPushButton("clear", self)
         self._screenshot_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                255 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+            QRect(545 + self._LEFT, 255 + self._TOP, 39, 20)
         )
         self._screenshot_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self._screenshot_hotkey_clear_button.clicked.connect(
-            lambda: self.screenshot_hotkey_line_edit.setText("")
+            lambda: self.screenshot_hotkey_box.setText("")
         )
         self._screenshot_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.screenshot_hotkey_line_edit, "key_code", "")
+            lambda: setattr(self.screenshot_hotkey_box, "key_code", "")
         )
 
         # Toggle global hotkeys hotkey
-        self.toggle_global_hotkeys_hotkey_line_edit = KeyLineEdit(self)
-        self.toggle_global_hotkeys_hotkey_line_edit.setGeometry(
-            QRect(
-                410 + self._LEFT_EDGE_CORRECTION,
-                282 + self._TOP_EDGE_CORRECTION,
-                121,
-                25,
-            )
+        self.toggle_global_hotkeys_hotkey_box = KeyLineEdit(self)
+        self.toggle_global_hotkeys_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 282 + self._TOP, 121, 25)
         )
-        self.toggle_global_hotkeys_hotkey_line_edit.setReadOnly(True)
+        self.toggle_global_hotkeys_hotkey_box.setReadOnly(True)
 
         self._toggle_global_hotkeys_hotkey_label = QLabel("Toggle global", self)
         self._toggle_global_hotkeys_hotkey_label.setGeometry(
-            QRect(
-                300 + self._LEFT_EDGE_CORRECTION,
-                280 + self._TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+            QRect(300 + self._LEFT, 280 + self._TOP, 100, 31)
         )
         self._toggle_global_hotkeys_hotkey_label.setTextInteractionFlags(
             Qt.TextSelectableByMouse
@@ -875,43 +605,26 @@ class UISettingsWindow(QDialog):
 
         self._toggle_global_hotkeys_hotkey_clear_button = QPushButton("clear", self)
         self._toggle_global_hotkeys_hotkey_clear_button.setGeometry(
-            QRect(
-                545 + self._LEFT_EDGE_CORRECTION,
-                285 + self._TOP_EDGE_CORRECTION,
-                39,
-                20,
-            )
+            QRect(545 + self._LEFT, 285 + self._TOP, 39, 20)
         )
         self._toggle_global_hotkeys_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self._toggle_global_hotkeys_hotkey_clear_button.clicked.connect(
-            lambda: self.toggle_global_hotkeys_hotkey_line_edit.setText("")
+            lambda: self.toggle_global_hotkeys_hotkey_box.setText("")
         )
         self._toggle_global_hotkeys_hotkey_clear_button.clicked.connect(
-            lambda: setattr(self.toggle_global_hotkeys_hotkey_line_edit, "key_code", "")
+            lambda: setattr(self.toggle_global_hotkeys_hotkey_box, "key_code", "")
         )
 
         # Cancel button
         self.cancel_button = QPushButton("Cancel", self)
         self.cancel_button.setGeometry(
-            QRect(
-                319 + self._LEFT_EDGE_CORRECTION,
-                326 + self._TOP_EDGE_CORRECTION,
-                111,
-                31,
-            )
+            QRect(319 + self._LEFT, 326 + self._TOP, 111, 31)
         )
         self.cancel_button.setFocusPolicy(Qt.NoFocus)
 
         # Save button
         self.save_button = QPushButton("Save", self)
-        self.save_button.setGeometry(
-            QRect(
-                459 + self._LEFT_EDGE_CORRECTION,
-                326 + self._TOP_EDGE_CORRECTION,
-                111,
-                31,
-            )
-        )
+        self.save_button.setGeometry(QRect(459 + self._LEFT, 326 + self._TOP, 111, 31))
         self.save_button.setFocusPolicy(Qt.NoFocus)
 
     def event(self, event) -> Union[bool, QWidget.event]:

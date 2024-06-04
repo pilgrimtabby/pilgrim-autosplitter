@@ -133,7 +133,7 @@ style_sheet_dark = Template(
         background: #555555;
         border: 1px solid $text_and_borders;
     }
-    QLabel#split_image_overlay {
+    QLabel#split_overlay {
         background-color: rgba(134, 134, 134, 0.7);
         border: 1px solid $text_and_borders;
     }
@@ -247,7 +247,7 @@ style_sheet_light = Template(
         background: #bbbbbb;
         border: 1px solid $text_and_borders;
     }
-    QLabel#split_image_overlay {
+    QLabel#split_overlay {
         background-color: rgba(134, 134, 134, 0.7);
         border: 1px solid $text_and_borders;
     }
