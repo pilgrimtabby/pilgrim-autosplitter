@@ -482,7 +482,9 @@ class UIController:
             self._settings_window.threshold_spinbox: str(
                 float(settings.get_float("DEFAULT_THRESHOLD") * 100)
             ),
-            self._settings_window.decimals_spinbox: settings.get_int("MATCH_PERCENT_DECIMALS"),
+            self._settings_window.decimals_spinbox: settings.get_int(
+                "MATCH_PERCENT_DECIMALS"
+            ),
             self._settings_window.delay_spinbox: settings.get_float("DEFAULT_DELAY"),
             self._settings_window.pause_spinbox: settings.get_float("DEFAULT_PAUSE"),
         }.items():
@@ -1325,7 +1327,7 @@ class UIController:
 
     def _update_split_delay_suspend(self) -> None:
         """Display remaining delay or suspend time.
-        
+
         Keep track of both overlays, regardless of view, so we can hide the one
         not currently in use.
         """
