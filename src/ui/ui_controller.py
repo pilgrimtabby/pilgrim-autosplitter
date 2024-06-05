@@ -221,7 +221,7 @@ class UIController:
 
         # Start poller
         self._poller = QTimer()
-        self._poller.setInterval(1000 // settings.get_int("FPS"))
+        self._poller.setInterval(self._get_interval())
         self._poller.timeout.connect(self._poll)
         self._poller.start()
 
@@ -592,7 +592,7 @@ class UIController:
 
             # Send new FPS value to controller and splitter
             if spinbox == self._settings_window.fps_spinbox:
-                self._poller.setInterval(1000 // value)
+                self._poller.setInterval(self._get_interval())
                 self._splitter.target_fps = value
 
             settings.set_value(setting_string, value)
@@ -1492,6 +1492,19 @@ class UIController:
                 match_percent_string += "-"
                 decimals -= 1
         return match_percent_string
+
+    def _get_interval(self) -> int:
+        """Calculate the rate at which _poller should poll.
+
+        The minimum is 20 Hz (represented by the 50 ms value below). Any
+        slower than 20 Hz and the UI starts to look pretty bad.
+
+        1000 is used because that is the number of ms in a second.
+
+        Returns:
+            int: The amount of time in ms the poller waits between calls.
+        """
+        return min(1000 // settings.get_int("FPS"), 50)
 
     ###########################
     #                         #

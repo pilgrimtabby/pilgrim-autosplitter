@@ -164,7 +164,7 @@ class UISettingsWindow(QDialog):
 
         self.fps_spinbox = QSpinBox(self)
         self.fps_spinbox.setGeometry(QRect(160 + self._LEFT, 12 + self._TOP, 70, 27))
-        self.fps_spinbox.setMinimum(20)
+        self.fps_spinbox.setMinimum(10)
         self.fps_spinbox.setMaximum(60)
 
         # Screenshots checkbox

@@ -222,23 +222,26 @@ class Splitter:
     def _open_capture(self) -> cv2.VideoCapture:
         """Open and configure a cv2 VideoCapture.
 
-        Sets CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
-        Sets CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to their respective
-        values because these appear to be the smallest available values. The
-        smaller the capture's width and height, the fast images can be
-        downscaled, and the less CPU is required to do so.
-        Sets self._capture_max_fps to the capture's maximum FPS on platforms
+        Set CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
+
+        Set CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to our target value.
+        I can't imagine any capture cards actually support this, but this
+        forces the capture source to choose the next-closest value, which in
+        some cases is quite a lot smaller than the default. This saves CPU.
+
+        Set self._capture_max_fps to the capture's maximum FPS on platforms
         where this is supported. This is done to prevent unnecessary
         comparisons from being generated in _compare due to a mismatch between
         the user's selected framerate and a capture-imposed cap which is lower.
+        This also saves CPU.
 
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
         """
         cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, COMPARISON_FRAME_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, COMPARISON_FRAME_HEIGHT)
         try:
             self._capture_max_fps = cap.get(cv2.CAP_PROP_FPS)
         except cv2.error:
