@@ -103,7 +103,6 @@ class Splitter:
         self.comparison_frame = None
         self.frame_pixmap = None
         self.capture_thread = threading.Thread(target=self._capture)
-        self._ui_frame = None
         self._cap = None
         self._capture_thread_finished = False
 
@@ -298,9 +297,9 @@ class Splitter:
                 # Don't need to generate a separate ui_frame -- the
                 # comparison_frame is already the right size
                 if settings.get_bool("SHOW_MIN_VIEW"):
-                    self._ui_frame = None
+                    ui_frame = None
                 else:
-                    self._ui_frame = self.comparison_frame
+                    ui_frame = self.comparison_frame
 
             else:
                 self.comparison_frame = cv2.resize(
@@ -309,9 +308,9 @@ class Splitter:
                     interpolation=cv2.INTER_LINEAR,
                 )
                 if settings.get_bool("SHOW_MIN_VIEW"):
-                    self._ui_frame = None
+                    ui_frame = None
                 else:
-                    self._ui_frame = cv2.resize(
+                    ui_frame = cv2.resize(
                         frame,
                         (
                             settings.get_int("FRAME_WIDTH"),
@@ -320,12 +319,11 @@ class Splitter:
                         interpolation=cv2.INTER_NEAREST,
                     )
 
-            self.frame_pixmap = self._frame_to_pixmap(self._ui_frame)
+            self.frame_pixmap = self._frame_to_pixmap(ui_frame)
 
         self._cap.release()
 
         # Setting these to None tells ui_controller the capture isn't active
-        self._ui_frame = None
         self.comparison_frame = None
         self.frame_pixmap = None
 
