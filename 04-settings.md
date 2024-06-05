@@ -22,20 +22,30 @@ This is the settings menu:
 
 ## Frames per second
 
-The amount of frames per second Pilgrim Autosplitter captures and processes. The lower the FPS, the less energy used, but you might miss frames if you lower the FPS below your capture card's limit or your game's framerate.
+{: .important }
+LOWERING THIS SETTING CAN DRAMATICALLY REDUCE CPU USAGE!
 
-Minimum: `20`  
+The amount of frames per second Pilgrim Autosplitter captures and processes.
+
+A good rule of thumb is to use half your game's FPS. If you play Super Mario 64, then you would use 15 (Super Mario 64 is 30 FPS). You might be able to use an even lower FPS if your split images use elements that stay on the screen for a long time.
+
+If your split images contain elements that are only onscreen for one frame, use your game's FPS.
+
+Framerates higher than 60 FPS are not supported.
+
+Minimum: `10`  
+Default: `30`  
 Maximum: `60`
 
 ## Open screenshots
 
-When selected, Pilgrim Autosplitter will open automatically open screenshots for you in your computer's default image viewer.
+When selected, Pilgrim Autosplitter will open automatically open screenshots in your default image viewer.
 
 ## Default threshold
 
 The current video feed and the current split image must match this much for Pilgrim Autosplitter to split.
 
-If splits are happening too often, try increasing this value. 
+If splits are happening too easily, try increasing this value. 
 
 This value [can be adjusted]({% link 03-customize-splits.md %}#threshold) for individual splits.
 
