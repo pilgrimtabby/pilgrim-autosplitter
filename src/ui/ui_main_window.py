@@ -286,8 +286,8 @@ class UIMainWindow(QMainWindow):
         self.split_overlay.setObjectName("split_overlay")
         self.split_overlay.setVisible(False)
 
-        self.overlay_delay_txt = "Splitting in {amount:.1f} s"
-        self.overlay_pause_txt = "Paused for {amount:.1f} s"
+        self.overlay_delay_txt = "Splitting in {:.1f} s"
+        self.overlay_pause_txt = "Paused for {:.1f} s"
 
         self.split_info_min_label = QLabel(self._container)
         self.split_info_min_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
