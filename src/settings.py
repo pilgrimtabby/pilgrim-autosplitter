@@ -164,7 +164,7 @@ def set_defaults() -> None:
         set_value("DEFAULT_PAUSE", 1.0)
 
         # The FPS used by splitter and ui_controller
-        set_value("FPS", 60)
+        set_value("FPS", 30)
 
         # The location of split images
         set_value("LAST_IMAGE_DIR", "")

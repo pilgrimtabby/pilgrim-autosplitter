@@ -1254,15 +1254,16 @@ class UIController:
         if settings.get_bool("SHOW_MIN_VIEW"):
             return
 
-        video_alive = self._splitter.capture_thread.is_alive()
+        frame = self._splitter.frame_pixmap
         video = self._main_window.video_display
 
         # Video not connected, but video frame on UI
-        if video.text() == "" and not video_alive:
-            video.setText(self._main_window.video_display_txt)
-        # Video is connected, but is not showing on UI
-        elif self._splitter.frame_pixmap is not None:
-            video.setPixmap(self._splitter.frame_pixmap)
+        if frame is None:
+            if video.text() == "":
+                video.setText(self._main_window.video_display_txt)
+        # Video is connected, update it
+        else:
+            video.setPixmap(frame)
 
     def _update_video_title(self) -> None:
         """Adjust video title depending on whether video is alive."""
