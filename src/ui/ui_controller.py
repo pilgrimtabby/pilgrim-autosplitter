@@ -219,7 +219,7 @@ class UIController:
         )
         self._keyboard_listener.start()
 
-        # Start timer
+        # Start poller
         self._poller = QTimer()
         self._poller.setInterval(1000 // settings.get_int("FPS"))
         self._poller.timeout.connect(self._poll)
@@ -1322,7 +1322,7 @@ class UIController:
             if not settings.get_bool("SHOW_MIN_VIEW"):
                 split_display.setPixmap(current_split_image.pixmap)
             split_label.setText(elided_name)
-            if total_loops == 0:
+            if total_loops == 1:
                 loop_txt = self._main_window.split_loop_label_empty_txt
                 loop_label.setText(loop_txt)
             else:
@@ -1458,7 +1458,7 @@ class UIController:
                 self._main_window.pause_button.setEnabled(False)
 
             # Enable undo and previous if this isn't the first split
-            if current_split_index == 0 and loop == 0:
+            if current_split_index == 0 and loop == 1:
                 self._undo_hotkey_enabled = False
                 self._main_window.undo_button.setEnabled(False)
                 self._main_window.previous_button.setEnabled(False)

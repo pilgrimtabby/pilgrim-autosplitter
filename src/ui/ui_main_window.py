@@ -408,7 +408,7 @@ class UIMainWindow(QMainWindow):
         self.screenshot_button.setEnabled(False)
         self.screenshot_button.setFocusPolicy(Qt.NoFocus)
         self.screenshot_button_short_txt = "Screenshot"
-        self.screenshot_button_long_txt = "Take Screenshot"
+        self.screenshot_button_long_txt = "Take screenshot"
 
         # Screenshot success message box
         self.screenshot_ok_msg = QMessageBox(self)

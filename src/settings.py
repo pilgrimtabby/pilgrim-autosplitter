@@ -54,6 +54,9 @@ USER_MANUAL_URL = "https://pilgrimtabby.github.io/pilgrim-autosplitter/"
 # Create or access the QSettings file that persists user settings
 settings = QSettings("pilgrim_tabby", "Pilgrim Autosplitter")
 
+# The default number of loops per split
+DEFAULT_LOOP_COUNT = 1
+
 # The max amount of loops and wait time (in seconds) permitted for split images
 MAX_LOOPS_AND_WAIT = 99999
 
@@ -156,9 +159,6 @@ def set_defaults() -> None:
 
         # The default delay (seconds) before a split
         set_value("DEFAULT_DELAY", 0.0)
-
-        # The default number of loops per split
-        set_value("DEFAULT_LOOP_COUNT", 0)
 
         # The default pause (seconds) after a split
         set_value("DEFAULT_PAUSE", 1.0)
