@@ -1338,24 +1338,22 @@ class UIController:
         Keep track of both overlays, regardless of view, so we can hide the one
         not currently in use.
         """
-        if settings.get_bool("SHOW_MIN_VIEW"):
-            overlay = self._main_window.min_view_overlay
-            self._main_window.split_overlay.setVisible(False)
-        else:
-            overlay = self._main_window.split_overlay
-            self._main_window.min_view_overlay.setVisible(False)
+        overlay = self._main_window.split_overlay
         delay_txt = self._main_window.overlay_delay_txt
         pause_txt = self._main_window.overlay_pause_txt
+        min_view = settings.get_bool("SHOW_MIN_VIEW")
 
         # Splitter is delaying pre-split
         if self._splitter.delaying and self._splitter.delay_remaining is not None:
-            overlay.setVisible(True)
-            overlay.setText(delay_txt.format(amount=self._splitter.delay_remaining))
+            if not min_view:
+                overlay.setVisible(True)
+                overlay.setText(delay_txt.format(self._splitter.delay_remaining))
 
         # Splitter is pausing post-split
         elif self._splitter.suspended and self._splitter.suspend_remaining is not None:
-            overlay.setVisible(True)
-            overlay.setText(pause_txt.format(amount=self._splitter.suspend_remaining))
+            if not min_view:
+                overlay.setVisible(True)
+                overlay.setText(pause_txt.format(self._splitter.suspend_remaining))
 
         # Splitter isn't pausing or delaying, but the overlay is showing
         elif overlay.text() != "":

@@ -286,12 +286,6 @@ class UIMainWindow(QMainWindow):
         self.split_overlay.setObjectName("split_overlay")
         self.split_overlay.setVisible(False)
 
-        self.min_view_overlay = QLabel(self._container)
-        self.min_view_overlay.setAlignment(Qt.AlignCenter)
-        self.min_view_overlay.setVisible(False)
-        # This label's always in the same spot
-        self.min_view_overlay.setGeometry(QRect(161 + left, 270 + top, 213, 31))
-
         self.overlay_delay_txt = "Splitting in {amount:.1f} s"
         self.overlay_pause_txt = "Paused for {amount:.1f} s"
 
