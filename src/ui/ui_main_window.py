@@ -90,7 +90,7 @@ class UIMainWindow(QMainWindow):
             highest image match percent.
         highest_percent_sign (QLabel): Displays a percent sign after the
             highest image match percent.
-        minimal_view_button (QPushButton): Allows the user to show or hide
+        min_view_button (QPushButton): Allows the user to show or hide
             minimal view.
         split_info_min_label (QLabel): In minimal view, displays text
             saying no splits are active.
@@ -263,6 +263,7 @@ class UIMainWindow(QMainWindow):
         #########################
 
         left, top = self.LEFT_EDGE_CORRECTION, self.TOP_EDGE_CORRECTION
+        self.split_labels_empty_txt = ""
 
         self.split_name_label = QLabel(self._container)
         self.split_name_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -271,6 +272,9 @@ class UIMainWindow(QMainWindow):
         self.split_loop_label = QLabel(self._container)
         self.split_loop_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.split_loop_label.setAlignment(Qt.AlignCenter)
+        self.split_loop_label_empty_txt = "Split does not loop"
+        # Include placeholders for current and total loops
+        self.split_loop_label_txt = "Loop {} of {}"
 
         self.split_display = QLabel(self._container)
         self.split_display.setAlignment(Qt.AlignCenter)
@@ -310,6 +314,8 @@ class UIMainWindow(QMainWindow):
         self.match_percent_label.setAlignment(
             Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
         )
+        self.match_percent_short_txt = "Sim:"
+        self.match_percent_long_txt = "Similarity to split image:"
 
         self.match_percent = QLabel(self._container)
         self.match_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -328,6 +334,8 @@ class UIMainWindow(QMainWindow):
         self.highest_percent_label.setAlignment(
             Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
         )
+        self.highest_percent_short_txt = "High:"
+        self.highest_percent_long_txt = "Highest similarity so far:"
 
         self.highest_percent = QLabel(self._container)
         self.highest_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -346,6 +354,8 @@ class UIMainWindow(QMainWindow):
         self.threshold_percent_label.setAlignment(
             Qt.AlignRight | Qt.AlignTrailing | Qt.AlignVCenter
         )
+        self.threshold_percent_short_txt = "Thr:"
+        self.threshold_percent_long_txt = "Threshold similarity:"
 
         self.threshold_percent = QLabel(self._container)
         self.threshold_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -384,8 +394,10 @@ class UIMainWindow(QMainWindow):
         ###############################
 
         # Minimal view button
-        self.minimal_view_button = QPushButton(self._container)
-        self.minimal_view_button.setFocusPolicy(Qt.NoFocus)
+        self.min_view_button = QPushButton(self._container)
+        self.min_view_button.setFocusPolicy(Qt.NoFocus)
+        self.min_view_min_txt = "Minimal view"
+        self.min_view_full_txt = "Full view"
 
         # Next source button
         self.next_source_button = QPushButton("Next source", self._container)
@@ -395,6 +407,8 @@ class UIMainWindow(QMainWindow):
         self.screenshot_button = QPushButton(self._container)
         self.screenshot_button.setEnabled(False)
         self.screenshot_button.setFocusPolicy(Qt.NoFocus)
+        self.screenshot_button_short_txt = "Screenshot"
+        self.screenshot_button_long_txt = "Take Screenshot"
 
         # Screenshot success message box
         self.screenshot_ok_msg = QMessageBox(self)
@@ -436,21 +450,24 @@ class UIMainWindow(QMainWindow):
         self.next_button.setEnabled(False)
         self.next_button.setFocusPolicy(Qt.NoFocus)
 
-        # Skip split button
-        self.skip_button = QPushButton(self._container)
-        self.skip_button.setEnabled(False)
-        self.skip_button.setFocusPolicy(Qt.NoFocus)
-
         # Undo split button
         self.undo_button = QPushButton(self._container)
         self.undo_button.setEnabled(False)
         self.undo_button.setFocusPolicy(Qt.NoFocus)
+        self.undo_button_short_txt = "Undo"
+        self.undo_button_long_txt = "Undo split"
+
+        # Skip split button
+        self.skip_button = QPushButton(self._container)
+        self.skip_button.setEnabled(False)
+        self.skip_button.setFocusPolicy(Qt.NoFocus)
+        self.skip_button_short_txt = "Skip"
+        self.skip_button_long_txt = "Skip split"
 
         # Pause comparison / unpause comparison button
         self.pause_button = QPushButton(self._container)
         self.pause_button.setEnabled(False)
         self.pause_button.setFocusPolicy(Qt.NoFocus)
-
         self.pause_short_txt = "Pause comp"
         self.pause_long_txt = "Pause comparison"
         self.unpause_short_txt = "Unpause comp"
@@ -459,6 +476,8 @@ class UIMainWindow(QMainWindow):
         # Reset splits button
         self.reset_button = QPushButton(self._container)
         self.reset_button.setFocusPolicy(Qt.NoFocus)
+        self.reset_button_short_txt = "Reset"
+        self.reset_button_long_txt = "Reset splits"
 
         ##################################
         #                                #

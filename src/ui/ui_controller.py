@@ -125,7 +125,7 @@ class UIController:
 
         # "Update available" message box
         self._main_window.update_available_msg.buttonClicked.connect(
-            self._update_message_box_action
+            self.update_available_msg_action
         )
 
         # Split directory line edit
@@ -137,14 +137,12 @@ class UIController:
         self._main_window.split_dir_button.clicked.connect(self.set_split_dir_path)
 
         # Minimal view / full view button
-        self._main_window.minimal_view_button.clicked.connect(
+        self._main_window.min_view_button.clicked.connect(
             lambda: settings.set_value(
                 "SHOW_MIN_VIEW", not settings.get_bool("SHOW_MIN_VIEW")
             )
         )
-        self._main_window.minimal_view_button.clicked.connect(
-            self._set_main_window_layout
-        )
+        self._main_window.min_view_button.clicked.connect(self._set_main_window_layout)
 
         # Next source button
         self._main_window.next_source_button.clicked.connect(
@@ -230,6 +228,11 @@ class UIController:
         self._main_window.show()
 
     def _poll(self) -> None:
+        """Use information from UI, splitter, and keyboard to update the UI
+        and splitter.
+
+        Should be called each frame.
+        """
         self._update_from_splitter()
         self._update_from_keyboard()
 
@@ -450,7 +453,7 @@ class UIController:
         )
         self._main_window.split_directory_box.setText(elided_path)
 
-    def _update_message_box_action(self, button: QAbstractButton):
+    def update_available_msg_action(self, button: QAbstractButton):
         """React to button press in _main_window.update_available_msg.
 
         Args:
@@ -693,10 +696,10 @@ class UIController:
         """
         frame = self._splitter.comparison_frame
         if frame is None:
-            message = self._main_window.screenshot_err_no_video
-            message.show()
+            msg = self._main_window.screenshot_err_no_video
+            msg.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda: message.done(0))
+            QTimer.singleShot(10000, lambda: msg.done(0))
             return
 
         image_dir = settings.get_str("LAST_IMAGE_DIR")
@@ -712,23 +715,18 @@ class UIController:
             if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
                 self._open_file_or_dir(screenshot_path)
             else:
-                self._main_window.screenshot_ok_msg.setInformativeText(
-                    f"Screenshot saved to:\n{screenshot_path}"
-                )
-                self._main_window.screenshot_ok_msg.setIconPixmap(
-                    QPixmap(screenshot_path).scaledToWidth(150)
-                )
-
-                message = self._main_window.screenshot_ok_msg
-                message.show()
+                msg = self._main_window.screenshot_ok_msg
+                msg.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
+                msg.setIconPixmap(QPixmap(screenshot_path).scaledToWidth(150))
+                msg.show()
                 # Close message box after 10 seconds
-                QTimer.singleShot(10000, lambda: message.done(0))
+                QTimer.singleShot(10000, lambda: msg.done(0))
 
         else:  # File couldn't be written to the split image directory
-            message = self._main_window.screenshot_error_no_file_message_box
-            message.show()
+            msg = self._main_window.screenshot_error_no_file_message_box
+            msg.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda: message.done(0))
+            QTimer.singleShot(10000, lambda: msg.done(0))
 
     def get_file_number(self, dir: str) -> str:
         """Return the lowest three-digit number that will allow a unique
@@ -769,10 +767,10 @@ class UIController:
             path (str): The file to open.
         """
         if not Path(path).exists():
-            message = self._main_window.err_not_found_msg
-            message.show()
+            msg = self._main_window.err_not_found_msg
+            msg.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda: message.done(0))
+            QTimer.singleShot(10000, lambda: msg.done(0))
             return
 
         if platform.system() == "Windows":
@@ -818,7 +816,7 @@ class UIController:
             QRect(92 + left, 239 + top, 251, 31)
         )
         self._main_window.next_button.setGeometry(QRect(344 + left, 224 + top, 31, 31))
-        self._main_window.minimal_view_button.setGeometry(
+        self._main_window.min_view_button.setGeometry(
             QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.video_title.setGeometry(QRect(161 + left, 270 + top, 213, 31))
@@ -902,7 +900,7 @@ class UIController:
         self._main_window.split_dir_button.setGeometry(
             QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
+        self._main_window.min_view_button.setGeometry(
             QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
@@ -982,7 +980,7 @@ class UIController:
         self._main_window.split_dir_button.setGeometry(
             QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
+        self._main_window.min_view_button.setGeometry(
             QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
@@ -1062,7 +1060,7 @@ class UIController:
         self._main_window.split_dir_button.setGeometry(
             QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
+        self._main_window.min_view_button.setGeometry(
             QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
@@ -1142,7 +1140,7 @@ class UIController:
         self._main_window.split_dir_button.setGeometry(
             QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
+        self._main_window.min_view_button.setGeometry(
             QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
@@ -1179,37 +1177,44 @@ class UIController:
         self._main_window.setFixedSize(904, 452 + self._main_window.HEIGHT_CORRECTION)
 
     def _set_button_and_label_text(self, truncate: bool) -> None:
-        """Adjust button and label text according to aspect ratio and minimal
-        view status.
+        """Set button and label text according to aspect ratio and min view.
 
         Args:
             truncate (bool): If True, each widget's short text is used;
                 otherwise, each widget's default (long) text is used.
         """
+        # Min view button
         if settings.get_bool("SHOW_MIN_VIEW"):
-            self._main_window.minimal_view_button.setText("Full view")
+            min_view_txt = self._main_window.min_view_full_txt
         else:
-            self._main_window.minimal_view_button.setText("Minimal view")
+            min_view_txt = self._main_window.min_view_min_txt
 
+        # Other buttons
         if truncate:
-            self._main_window.screenshot_button.setText("Screenshot")
-            self._main_window.match_percent_label.setText("Sim:")
-            self._main_window.highest_percent_label.setText("High:")
-            self._main_window.threshold_percent_label.setText("Thr:")
-            self._main_window.undo_button.setText("Undo")
-            self._main_window.skip_button.setText("Skip")
-            self._main_window.reset_button.setText("Reset")
-
+            screenshot_txt = self._main_window.screenshot_button_short_txt
+            match_txt = self._main_window.match_percent_short_txt
+            highest_txt = self._main_window.highest_percent_short_txt
+            threshold_txt = self._main_window.threshold_percent_short_txt
+            undo_txt = self._main_window.undo_button_short_txt
+            skip_txt = self._main_window.skip_button_short_txt
+            reset_txt = self._main_window.reset_button_short_txt
         else:
-            self._main_window.screenshot_button.setText("Take screenshot")
-            self._main_window.match_percent_label.setText("Similarity to split image:")
-            self._main_window.highest_percent_label.setText(
-                "Highest similarity so far:"
-            )
-            self._main_window.threshold_percent_label.setText("Threshold similarity:")
-            self._main_window.undo_button.setText("Undo split")
-            self._main_window.skip_button.setText("Skip split")
-            self._main_window.reset_button.setText("Reset splits")
+            screenshot_txt = self._main_window.screenshot_button_long_txt
+            match_txt = self._main_window.match_percent_long_txt
+            highest_txt = self._main_window.highest_percent_long_txt
+            threshold_txt = self._main_window.threshold_percent_long_txt
+            undo_txt = self._main_window.undo_button_long_txt
+            skip_txt = self._main_window.skip_button_long_txt
+            reset_txt = self._main_window.reset_button_long_txt
+
+        self._main_window.min_view_button.setText(min_view_txt)
+        self._main_window.screenshot_button.setText(screenshot_txt)
+        self._main_window.match_percent_label.setText(match_txt)
+        self._main_window.highest_percent_label.setText(highest_txt)
+        self._main_window.threshold_percent_label.setText(threshold_txt)
+        self._main_window.undo_button.setText(undo_txt)
+        self._main_window.skip_button.setText(skip_txt)
+        self._main_window.reset_button.setText(reset_txt)
 
     def _set_nonessential_widgets_visible(self, visible: bool) -> None:
         """Set widget visibility according to minimal view status.
@@ -1301,29 +1306,30 @@ class UIController:
                 split_label.setText("")
                 loop_label.setText("")
                 splits_min_label.setText(splits_down_txt)
-                splits_min_label.raise_()
+                splits_min_label.raise_()  # Make sure it's not being covered
 
         # UI showing split but split has been changed, resized, or reset
         elif self._redraw_split_labels:
             self._redraw_split_labels = False
+
             current_split_image = self._splitter.splits.list[current_index]
-
-            if not settings.get_bool("SHOW_MIN_VIEW"):
-                split_display.setPixmap(current_split_image.pixmap)
-
             elided_name = split_label.fontMetrics().elidedText(
                 current_split_image.name, Qt.ElideRight, split_label.width()
             )
-            split_label.setText(elided_name)
-
-            splits_min_label.setText("")
-            splits_min_label.lower()
-
             total_loops = current_split_image.loops
+            loop_txt = self._main_window.split_loop_label_empty_txt
+
+            if not settings.get_bool("SHOW_MIN_VIEW"):
+                split_display.setPixmap(current_split_image.pixmap)
+            split_label.setText(elided_name)
             if total_loops == 0:
-                loop_label.setText("Split does not loop")
+                loop_txt = self._main_window.split_loop_label_empty_txt
+                loop_label.setText(loop_txt)
             else:
-                loop_label.setText(f"Loop {current_loop} of {total_loops}")
+                loop_txt = self._main_window.split_loop_label_txt
+                loop_label.setText(loop_txt.format(current_loop, total_loops))
+            splits_min_label.setText("")
+            splits_min_label.lower()  # Make sure it's not covering others
 
     def _update_split_delay_suspend(self) -> None:
         """Display remaining delay or suspend time.
