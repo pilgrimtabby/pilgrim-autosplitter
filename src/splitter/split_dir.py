@@ -26,8 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Store and manipulate split images.
-"""
+"""Store and manipulate split images."""
 
 
 import glob
@@ -47,6 +46,7 @@ import settings
 from settings import (
     COMPARISON_FRAME_HEIGHT,
     COMPARISON_FRAME_WIDTH,
+    DEFAULT_LOOP_COUNT,
     MAX_LOOPS_AND_WAIT,
     MAX_THRESHOLD,
 )
@@ -64,21 +64,16 @@ class SplitDir:
             exists.
         current_loop (int): The current split image's current loop, if it
             exists.
-        ignore_split_request (bool): A flag that is set exclusively by splitter
-            in the event of a normal split. See splitter's documentation for
-            details, but the idea is to stop splitter and ui_controller from
-            both calling next_split_image for the same split.
-        list (list[_SplitImage]): A list of all split images in
+        list (list[_SplitImage]): A list of all split images in the directory
             settings.get_str("LAST_IMAGE_DIR").
     """
 
     def __init__(self):
         """Initialize a list of SplitImage objects and set flags accordingly."""
         self.list = self._get_split_images()
-        self.ignore_split_request = False
         if len(self.list) > 0:
             self.current_image_index = 0
-            self.current_loop = 0
+            self.current_loop = 1
         else:
             self.current_image_index = None
             self.current_loop = None
@@ -90,29 +85,20 @@ class SplitDir:
     ##################
 
     def next_split_image(self) -> None:
-        """Go to the next split image or next loop (whichever is next).
-
-        If splitter has set ignore_split_request to True, unset the flag and
-        return without doing anything. This is to prevent a double split (see
-        splitter._set_normal_split_action).
-        """
-        if self.ignore_split_request:
-            self.ignore_split_request = False
-            return
-
+        """Go to the next split image or next loop (whichever is next)."""
         if self.current_loop == self.list[self.current_image_index].loops:
             if self.current_image_index < len(self.list) - 1:
                 self.current_image_index += 1
-                self.current_loop = 0
+                self.current_loop = 1
 
         else:
             self.current_loop += 1
 
     def previous_split_image(self) -> None:
-        """Go to the previous split image or, if current_loop > 0, to the
+        """Go to the previous split image or, if current_loop > 1, to the
         previous loop.
         """
-        if self.current_loop == 0:
+        if self.current_loop == 1:
             if self.current_image_index > 0:
                 self.current_image_index -= 1
                 self.current_loop = self.list[self.current_image_index].loops
@@ -130,7 +116,7 @@ class SplitDir:
         else:
             self.list = new_list
             self.current_image_index = 0
-            self.current_loop = 0
+            self.current_loop = 1
 
     def set_default_threshold(self) -> None:
         """Update threshold in each SplitImage whose threshold is default."""
@@ -545,7 +531,9 @@ class SplitDir:
             delay = re.search(r"_\#(.+?)\#", self.name)
             if delay is None or not str(delay[1]).replace(".", "", 1).isdigit():
                 return settings.get_float("DEFAULT_DELAY"), True
-            return min(float(delay[1]), MAX_LOOPS_AND_WAIT), False
+
+            delay = float(delay[1])
+            return min(delay, MAX_LOOPS_AND_WAIT), False
 
         def _get_pause_from_name(self) -> float:
             """Set split image's pause duration after split by reading filename
@@ -569,7 +557,9 @@ class SplitDir:
             pause = re.search(r"_\[(.+?)\]", self.name)
             if pause is None or not str(pause[1]).replace(".", "", 1).isdigit():
                 return settings.get_float("DEFAULT_PAUSE"), True
-            return max(min(float(pause[1]), MAX_LOOPS_AND_WAIT), 1), False
+
+            pause = float(pause[1])
+            return max(min(pause, MAX_LOOPS_AND_WAIT), 1), False
 
         def _get_threshold_from_name(self) -> float:
             """Set split image's threshold match percent by reading filename
@@ -589,16 +579,22 @@ class SplitDir:
             threshold = re.search(r"_\((.+?)\)", self.name)
             if threshold is None or not str(threshold[1]).replace(".", "", 1).isdigit():
                 return settings.get_float("DEFAULT_THRESHOLD"), True
-            return min(float(threshold[1]) / 100, MAX_THRESHOLD), False
+
+            threshold = float(threshold[1])
+            return min(threshold / 100, MAX_THRESHOLD), False
 
         def _get_loops_from_name(self) -> int:
             """Set split image's loop count by reading filename flags.
 
             Loop amount is set in the filename by placing an integer between
-            two @s, like this: _@4@_ (the image loops 4 extra times)
+            two @s, like this: _@4@_ (the image is used 4 times instead of 1)
 
             Using is_digit guarantees that this method will not return negative
             numbers, which is what we want.
+
+            The loops can never be fewer than 1, which is the reason for the
+            complicated last line of this method. The semantic meaning is: make
+            sure the loops are below MAX_LOOPS_AND_WAIT and not less than 1.
 
             Returns:
                 int: The number of loops indicated in the filename, or the
@@ -606,5 +602,7 @@ class SplitDir:
             """
             loops = re.search(r"_\@(.+?)\@", self.name)
             if loops is None or not loops[1].isdigit():
-                return settings.get_int("DEFAULT_LOOP_COUNT"), True
-            return min(int(loops[1]), MAX_LOOPS_AND_WAIT), False
+                return DEFAULT_LOOP_COUNT, True
+
+            loops = int(loops[1])
+            return max(min(loops, MAX_LOOPS_AND_WAIT), 1), False

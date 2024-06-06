@@ -30,7 +30,6 @@
 input to the UI and the splitter.
 """
 
-
 import os
 import platform
 import subprocess
@@ -55,7 +54,7 @@ class UIController:
     """Manage the passing of information from the splitter to the UI, and from
     user input to the UI and the splitter.
 
-    Perhaps the most important class method is _update_ui, which is ran once
+    Perhaps the most important class method is _poller, which is ran once
     per frame using a QTimer. This method updates the UI and handles all user
     inputs.
 
@@ -69,10 +68,10 @@ class UIController:
 
         Creates each UI window and then shows the main window.
         Connects pyqtSignals from each UI window to their respective slots.
-        Sets initial flags and values used by _update_ui.
+        Sets initial flags and values used by _poller.
         Starts the keyboard listener.
-        Starts _update_ui_timer, which checks for user input and splitter
-        output at regular intervals.
+        Starts _poller, which checks for user input and splitter outputs at
+        regular intervals.
 
         Args:
             application (QApplication): The QApplication that the program is
@@ -90,44 +89,22 @@ class UIController:
         style_sheet.set_style(self._main_window, theme)
         style_sheet.set_style(self._settings_window, theme)
 
-        ############################
-        #                          #
-        # _update_ui Values, Flags #
-        #                          #
-        ############################
-
-        # Store most recent values based on splitter state
-        self._most_recent_split_index = None
-        self._most_recent_loop = None
-        self._most_recent_match_percent_decimals = settings.get_int(
-            "MATCH_PERCENT_DECIMALS"
-        )
-        self._most_recent_match_percent_format_string = (
-            f"{{:.{self._most_recent_match_percent_decimals}f}}"
-        )
-        self._most_recent_match_percent_null_string = self._null_match_percent_string()
+        #########################
+        #                       #
+        # _poller Values, Flags #
+        #                       #
+        #########################
 
         # Tell _update_ui to update split labels
+        # Should be set whenever the split image is modified
         self._redraw_split_labels = True
 
-        # Determine appropriate pause button text. This should ONLY be used
-        # from within the context of update_ui to check whether the splitter's
-        # suspended status has changed recently. Other methods should read the
-        # value directly from self._splitter.suspended, since that value is
-        # always 100% up-to-date.
-        self._splitter_suspended = None
-
-        # Enable buttons and hotkeys
-        self._video_active = None
-        self._splits_active = None
-        self._first_split_active = None
-        self._last_split_active = None
+        # Flags to disable hotkeys
         self._split_hotkey_enabled = False
         self._undo_hotkey_enabled = False
         self._skip_hotkey_enabled = False
 
-        # React to hotkey presses
-        self._settings_window_showing = False
+        # Flags for detecting hotkey presses
         self._split_hotkey_pressed = False
         self._reset_hotkey_pressed = False
         self._undo_hotkey_pressed = False
@@ -147,29 +124,25 @@ class UIController:
         self._set_main_window_layout()
 
         # "Update available" message box
-        self._main_window.update_available_message_box.buttonClicked.connect(
-            self._update_message_box_action
+        self._main_window.update_available_msg.buttonClicked.connect(
+            self.update_available_msg_action
         )
 
         # Split directory line edit
-        self._main_window.split_directory_line_edit.clicked.connect(
+        self._main_window.split_directory_box.clicked.connect(
             lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR"))
         )
 
         # Split directory button
-        self._main_window.split_directory_button.clicked.connect(
-            self._set_image_directory_path
-        )
+        self._main_window.split_dir_button.clicked.connect(self.set_split_dir_path)
 
         # Minimal view / full view button
-        self._main_window.minimal_view_button.clicked.connect(
+        self._main_window.min_view_button.clicked.connect(
             lambda: settings.set_value(
                 "SHOW_MIN_VIEW", not settings.get_bool("SHOW_MIN_VIEW")
             )
         )
-        self._main_window.minimal_view_button.clicked.connect(
-            self._set_main_window_layout
-        )
+        self._main_window.min_view_button.clicked.connect(self._set_main_window_layout)
 
         # Next source button
         self._main_window.next_source_button.clicked.connect(
@@ -184,45 +157,35 @@ class UIController:
         self._main_window.screenshot_button.clicked.connect(self._take_screenshot)
 
         # Reload video button
-        self._main_window.reload_video_button.clicked.connect(
+        self._main_window.reconnect_button.clicked.connect(
             self._splitter.safe_exit_all_threads
         )
-        self._main_window.reload_video_button.clicked.connect(self._splitter.start)
+        self._main_window.reconnect_button.clicked.connect(self._splitter.start)
 
         # Pause comparison / unpause comparison button
-        self._main_window.pause_comparison_button.clicked.connect(
-            self._splitter.toggle_suspended
-        )
+        self._main_window.pause_button.clicked.connect(self._splitter.toggle_suspended)
 
         # Reset button
-        self._main_window.reset_splits_button.clicked.connect(
-            self._attempt_reset_hotkey
-        )
+        self._main_window.reset_button.clicked.connect(self._attempt_reset_hotkey)
 
         # Undo split button
-        self._main_window.undo_split_button.clicked.connect(self._attempt_undo_hotkey)
+        self._main_window.undo_button.clicked.connect(self._attempt_undo_hotkey)
 
         # Skip split button
-        self._main_window.skip_split_button.clicked.connect(self._attempt_skip_hotkey)
+        self._main_window.skip_button.clicked.connect(self._attempt_skip_hotkey)
 
         # Previous split button
-        self._main_window.previous_split_button.clicked.connect(
-            self._request_previous_split
-        )
+        self._main_window.previous_button.clicked.connect(self._request_previous_split)
 
         # Next split button
-        self._main_window.next_split_button.clicked.connect(self._request_next_split)
+        self._main_window.next_button.clicked.connect(self._request_next_split)
 
         # Settings window action
         self._main_window.settings_action.triggered.connect(self._exec_settings_window)
 
         # Help action
         self._main_window.help_action.triggered.connect(
-            lambda: webbrowser.open(
-                settings.USER_MANUAL_URL,
-                new=0,
-                autoraise=True,
-            )
+            lambda: webbrowser.open(settings.USER_MANUAL_URL, new=0, autoraise=True)
         )
 
         ##########################
@@ -231,27 +194,23 @@ class UIController:
         #                        #
         ##########################
 
+        close_settings = lambda: self._settings_window.done(0)
+
         # Close window convenience shortcut
-        self._settings_window.close_window_shortcut.activated.connect(
-            lambda: self._settings_window.done(0)
-        )
+        self._settings_window.close_window_shortcut.activated.connect(close_settings)
 
         # Cancel button
-        self._settings_window.cancel_button.clicked.connect(
-            lambda: self._settings_window.done(0)
-        )
+        self._settings_window.cancel_button.clicked.connect(close_settings)
 
         # Save button
         self._settings_window.save_button.clicked.connect(self._save_settings)
-        self._settings_window.save_button.clicked.connect(
-            lambda: self._settings_window.done(0)
-        )
+        self._settings_window.save_button.clicked.connect(close_settings)
 
-        #################
-        #               #
-        # Begin Polling #
-        #               #
-        #################
+        #######################################
+        #                                     #
+        # Start Polling Keyboard and Splitter #
+        #                                     #
+        #######################################
 
         # Start keyboard listener
         self._keyboard_controller = keyboard.Controller()
@@ -260,17 +219,26 @@ class UIController:
         )
         self._keyboard_listener.start()
 
-        # Start timer
-        self._update_ui_timer = QTimer()
-        self._update_ui_timer.setInterval(1000 // settings.get_int("FPS"))
-        self._update_ui_timer.timeout.connect(self._update_ui)
-        self._update_ui_timer.start()
+        # Start poller
+        self._poller = QTimer()
+        self._poller.setInterval(self._get_interval())
+        self._poller.timeout.connect(self._poll)
+        self._poller.start()
 
         self._main_window.show()
 
+    def _poll(self) -> None:
+        """Use information from UI, splitter, and keyboard to update the UI
+        and splitter.
+
+        Should be called each frame.
+        """
+        self._update_from_splitter()
+        self._update_from_keyboard()
+
     ###########################
     #                         #
-    # React to UI Interaction #
+    # Manage User Interaction #
     #                         #
     ###########################
 
@@ -285,7 +253,7 @@ class UIController:
         a button in the UI, so the program MUST be in focus, so hotkeys
         will always work. Similarly, it is impossible for the settings window
         to be opened when this method is called, so we don't need to worry
-        about whether _settings_window_showing will block the hotkey flag
+        about whether the settings window will block the hotkey flag
         from being set.
 
         If this method is ever used to accomplish something
@@ -309,7 +277,7 @@ class UIController:
         a button in the UI, so the program MUST be in focus, so hotkeys
         will always work. Similarly, it is impossible for the settings window
         to be opened when this method is called, so we don't need to worry
-        about whether _settings_window_showing will block the hotkey flag
+        about whether the settings window will block the hotkey flag
         from being set.
 
         If this method is ever used to accomplish something
@@ -333,7 +301,7 @@ class UIController:
         a button in the UI, so the program MUST be in focus, so hotkeys
         will always work. Similarly, it is impossible for the settings window
         to be opened when this method is called, so we don't need to worry
-        about whether _settings_window_showing will block the hotkey flag
+        about whether the settings window will block the hotkey flag
         from being set.
 
         If this method is ever used to accomplish something
@@ -348,15 +316,27 @@ class UIController:
 
     def _request_previous_split(self) -> None:
         """Tell `splitter.splits` to call `previous_split_image`, and ask
-        splitter._look_for_match to reset its flags.
+        splitter._look_for_match to reset its flags if needed.
 
-        If splitter is delaying or suspended, call
-        `split_dir.previous_split_image`, since it is safe to do so. Otherwise,
-        attempt for 1 second to pause the splitter (by setting
-        `splitter.changing_splits` to True) before calling.
+        If self._splitter.match_percent is None, this means that
+        splitter.look_for_match isn't active, and we can move to the next split
+        image without causing a segmentation error or breaking splitter flags.
+
+        Otherwise, we know look_for_match is active, and we need to (1) pause
+        it while we change split images for thread safety, then (2) reset its
+        flags. We do this (or at least try to for 1 second) by by setting the
+        splitter.changing_splits flag, waiting for splitter to confirm it's
+        paused (splitter sets its waiting_for_split_change flag). We change
+        the split image, then unset changing_splits, which signals to splitter
+        it can reset its flags.
         """
-        if self._splitter.delaying or self._splitter.suspended:
+        self._redraw_split_labels = True  # Make sure UI image is updated
+
+        # Go to next split, no need to worry about flags / thread safety
+        if self._splitter.match_percent is None:
             self._splitter.splits.previous_split_image()
+
+        # Pause splitter._look_for_match before getting next split
         else:
             start_time = time.perf_counter()
             self._splitter.changing_splits = True
@@ -370,15 +350,50 @@ class UIController:
 
     def _request_next_split(self) -> None:
         """Tell `splitter.splits` to call `next_split_image`, and ask
-        splitter._look_for_match to reset its flags.
+        splitter._look_for_match to reset its flags if needed.
 
-        If splitter is delaying or suspended, call
-        `split_dir.next_split_image`, since it is safe to do so. Otherwise,
-        attempt for 1 second to pause the splitter (by setting
-        `splitter.changing_splits` to True) before calling.
+        If self._splitter.match_percent is None, this means that
+        splitter.look_for_match isn't active, and we can move to the next split
+        image without causing a segmentation error or breaking splitter flags.
+
+        Otherwise, we know look_for_match is active, and we need to (1) pause
+        it while we change split images for thread safety, then (2) reset its
+        flags. We do this (or at least try to for 1 second) by by setting the
+        splitter.changing_splits flag, waiting for splitter to confirm it's
+        paused (splitter sets its waiting_for_split_change flag). We change
+        the split image, then unset changing_splits, which signals to splitter
+        it can reset its flags.
+
+        This method also kills compare_thread if we're on the last loop of the
+        last split when this method is called. The idea is that when the run is
+        over, the comparer stops until the user presses reset or unpauses.
+        However, this only should happen if the last split is accessed by
+        pressing the split hotkey or if the program found a match, so that
+        users can still scroll back and forth between splits without shutting
+        the thread down on accident, so we also check if this method is being
+        called as the result of a hotkey press.
         """
-        if self._splitter.delaying or self._splitter.suspended:
+        # Kill compare_thread instead if we're on the last split
+        # (This call must be the result of a split key hotpress)
+        # (See docstring)
+        split_index = self._splitter.splits.current_image_index
+        total_splits = len(self._splitter.splits.list) - 1
+        loop = self._splitter.splits.current_loop
+        total_loops = self._splitter.splits.list[split_index].loops
+        if (
+            split_index == total_splits
+            and loop == total_loops
+            and self._split_hotkey_pressed
+        ):
+            self._splitter.safe_exit_compare_thread()
+            return
+
+        self._redraw_split_labels = True  # Make sure UI image is updated
+        # Go to next split, no need to worry about flags / thread safety
+        if self._splitter.match_percent is None:
             self._splitter.splits.next_split_image()
+
+        # Pause splitter._look_for_match before getting next split
         else:
             start_time = time.perf_counter()
             self._splitter.changing_splits = True
@@ -392,7 +407,7 @@ class UIController:
 
     def _request_reset_splits(self) -> None:
         """Tell `splitter.splits` to call `reset_split_images`, and ask
-        splitter._look_for_match to reset its flags.
+        splitter._look_for_match to reset its flags if necessary.
 
         Kills `splitter.compare_thread` (this allows the splitter to exit
         gracefully if the split image directory has changed to an empty
@@ -408,7 +423,7 @@ class UIController:
         ):
             self._splitter.start_compare_thread()
 
-    def _set_image_directory_path(self) -> None:
+    def set_split_dir_path(self) -> None:
         """Prompt the user to select a split image directory, then open the new
         directory in a threadsafe manner.
 
@@ -423,50 +438,42 @@ class UIController:
         )
         if len(path) > 1 and path != settings.get_str("LAST_IMAGE_DIR"):
             settings.set_value("LAST_IMAGE_DIR", path)
-            self._set_split_directory_line_edit_text()
+            self._set_split_directory_box_text()
             self._request_reset_splits()
 
-    def _set_split_directory_line_edit_text(self) -> None:
+    def _set_split_directory_box_text(self) -> None:
         """Convert the split image directory path to an elided string,
         based on the current size of main window's split directory line edit.
         """
         path = settings.get_str("LAST_IMAGE_DIR")
-        elided_path = (
-            self._main_window.split_directory_line_edit.fontMetrics().elidedText(
-                f" {path} ",
-                Qt.ElideMiddle,
-                self._main_window.split_directory_line_edit.width(),
-            )
+        elided_path = self._main_window.split_directory_box.fontMetrics().elidedText(
+            f" {path} ",
+            Qt.ElideMiddle,
+            self._main_window.split_directory_box.width(),
         )
-        self._main_window.split_directory_line_edit.setText(elided_path)
+        self._main_window.split_directory_box.setText(elided_path)
 
-    def _update_message_box_action(self, button: QAbstractButton):
-        """React to button press in _main_window.update_available_message_box.
+    def update_available_msg_action(self, button: QAbstractButton):
+        """React to button press in _main_window.update_available_msg.
 
         Args:
             button (QAbstractButton): The button that was pressed.
         """
         # "Don't ask again" was clicked -- stop checking for updates
-        if button.text() == self._main_window.update_available_never_button_text:
+        if button.text() == self._main_window.never_button_txt:
             settings.set_value("CHECK_FOR_UPDATES", False)
 
         # "Open" was clicked -- open the GitHub releases page
-        elif button.text() == self._main_window.update_available_open_button_text:
+        elif button.text() == self._main_window.open_button_txt:
             webbrowser.open(
                 f"{settings.REPO_URL}releases/latest", new=0, autoraise=True
             )
 
     def _exec_settings_window(self) -> None:
-        """Set up and open the settings window UI.
-
-        Because exec() blocks, _settings_window_showing isn't set to false
-        until the user closes the settings window.
-        """
+        """Set up and open the settings window UI."""
         self._settings_window.setFocus(True)  # Make sure no widgets have focus
         self._reset_settings()
-        self._settings_window_showing = True
         self._settings_window.exec()
-        self._settings_window_showing = False
 
     def _reset_settings(self) -> None:
         """Read settings from `settings.py` and write them into the settings
@@ -475,18 +482,14 @@ class UIController:
         # Spinboxes
         for spinbox, value in {
             self._settings_window.fps_spinbox: settings.get_int("FPS"),
-            self._settings_window.default_threshold_double_spinbox: str(
+            self._settings_window.threshold_spinbox: str(
                 float(settings.get_float("DEFAULT_THRESHOLD") * 100)
             ),
-            self._settings_window.match_percent_decimals_spinbox: settings.get_int(
+            self._settings_window.decimals_spinbox: settings.get_int(
                 "MATCH_PERCENT_DECIMALS"
             ),
-            self._settings_window.default_delay_double_spinbox: settings.get_float(
-                "DEFAULT_DELAY"
-            ),
-            self._settings_window.default_pause_double_spinbox: settings.get_float(
-                "DEFAULT_PAUSE"
-            ),
+            self._settings_window.delay_spinbox: settings.get_float("DEFAULT_DELAY"),
+            self._settings_window.pause_spinbox: settings.get_float("DEFAULT_PAUSE"),
         }.items():
             spinbox.setProperty("value", value)
 
@@ -511,47 +514,47 @@ class UIController:
                 checkbox.setCheckState(Qt.Unchecked)
 
         # Hotkeys
-        for hotkey_line_edit, values in {
-            self._settings_window.split_hotkey_line_edit: (
+        for hotkey_box, values in {
+            self._settings_window.split_hotkey_box: (
                 settings.get_str("SPLIT_HOTKEY_NAME"),
                 settings.get_str("SPLIT_HOTKEY_CODE"),
             ),
-            self._settings_window.reset_hotkey_line_edit: (
+            self._settings_window.reset_hotkey_box: (
                 settings.get_str("RESET_HOTKEY_NAME"),
                 settings.get_str("RESET_HOTKEY_CODE"),
             ),
-            self._settings_window.pause_hotkey_line_edit: (
+            self._settings_window.pause_hotkey_box: (
                 settings.get_str("PAUSE_HOTKEY_NAME"),
                 settings.get_str("PAUSE_HOTKEY_CODE"),
             ),
-            self._settings_window.undo_split_hotkey_line_edit: (
+            self._settings_window.undo_hotkey_box: (
                 settings.get_str("UNDO_HOTKEY_NAME"),
                 settings.get_str("UNDO_HOTKEY_CODE"),
             ),
-            self._settings_window.skip_split_hotkey_line_edit: (
+            self._settings_window.skip_hotkey_box: (
                 settings.get_str("SKIP_HOTKEY_NAME"),
                 settings.get_str("SKIP_HOTKEY_CODE"),
             ),
-            self._settings_window.previous_split_hotkey_line_edit: (
+            self._settings_window.previous_hotkey_box: (
                 settings.get_str("PREVIOUS_HOTKEY_NAME"),
                 settings.get_str("PREVIOUS_HOTKEY_CODE"),
             ),
-            self._settings_window.next_split_hotkey_line_edit: (
+            self._settings_window.next_hotkey_box: (
                 settings.get_str("NEXT_HOTKEY_NAME"),
                 settings.get_str("NEXT_HOTKEY_CODE"),
             ),
-            self._settings_window.screenshot_hotkey_line_edit: (
+            self._settings_window.screenshot_hotkey_box: (
                 settings.get_str("SCREENSHOT_HOTKEY_NAME"),
                 settings.get_str("SCREENSHOT_HOTKEY_CODE"),
             ),
-            self._settings_window.toggle_global_hotkeys_hotkey_line_edit: (
+            self._settings_window.toggle_global_hotkeys_hotkey_box: (
                 settings.get_str("TOGGLE_HOTKEYS_HOTKEY_NAME"),
                 settings.get_str("TOGGLE_HOTKEYS_HOTKEY_CODE"),
             ),
         }.items():
-            hotkey_line_edit.setText(values[0])
-            hotkey_line_edit.key_name = values[0]
-            hotkey_line_edit.key_code = values[1]
+            hotkey_box.setText(values[0])
+            hotkey_box.key_name = values[0]
+            hotkey_box.key_code = values[1]
 
         # Comboboxes
         aspect_ratio = settings.get_str("ASPECT_RATIO")
@@ -577,19 +580,19 @@ class UIController:
         # Spinboxes
         for spinbox, setting_string in {
             self._settings_window.fps_spinbox: "FPS",
-            self._settings_window.default_threshold_double_spinbox: "DEFAULT_THRESHOLD",
-            self._settings_window.match_percent_decimals_spinbox: "MATCH_PERCENT_DECIMALS",
-            self._settings_window.default_delay_double_spinbox: "DEFAULT_DELAY",
-            self._settings_window.default_pause_double_spinbox: "DEFAULT_PAUSE",
+            self._settings_window.threshold_spinbox: "DEFAULT_THRESHOLD",
+            self._settings_window.decimals_spinbox: "MATCH_PERCENT_DECIMALS",
+            self._settings_window.delay_spinbox: "DEFAULT_DELAY",
+            self._settings_window.pause_spinbox: "DEFAULT_PAUSE",
         }.items():
-            if spinbox == self._settings_window.default_threshold_double_spinbox:
+            if spinbox == self._settings_window.threshold_spinbox:
                 value = float(spinbox.value()) / 100
             else:
                 value = spinbox.value()
 
             # Send new FPS value to controller and splitter
             if spinbox == self._settings_window.fps_spinbox:
-                self._update_ui_timer.setInterval(1000 // value)
+                self._poller.setInterval(self._get_interval())
                 self._splitter.target_fps = value
 
             settings.set_value(setting_string, value)
@@ -613,39 +616,39 @@ class UIController:
 
         # Hotkeys
         for hotkey, setting_strings in {
-            self._settings_window.split_hotkey_line_edit: (
+            self._settings_window.split_hotkey_box: (
                 "SPLIT_HOTKEY_NAME",
                 "SPLIT_HOTKEY_CODE",
             ),
-            self._settings_window.reset_hotkey_line_edit: (
+            self._settings_window.reset_hotkey_box: (
                 "RESET_HOTKEY_NAME",
                 "RESET_HOTKEY_CODE",
             ),
-            self._settings_window.pause_hotkey_line_edit: (
+            self._settings_window.pause_hotkey_box: (
                 "PAUSE_HOTKEY_NAME",
                 "PAUSE_HOTKEY_CODE",
             ),
-            self._settings_window.undo_split_hotkey_line_edit: (
+            self._settings_window.undo_hotkey_box: (
                 "UNDO_HOTKEY_NAME",
                 "UNDO_HOTKEY_CODE",
             ),
-            self._settings_window.skip_split_hotkey_line_edit: (
+            self._settings_window.skip_hotkey_box: (
                 "SKIP_HOTKEY_NAME",
                 "SKIP_HOTKEY_CODE",
             ),
-            self._settings_window.previous_split_hotkey_line_edit: (
+            self._settings_window.previous_hotkey_box: (
                 "PREVIOUS_HOTKEY_NAME",
                 "PREVIOUS_HOTKEY_CODE",
             ),
-            self._settings_window.next_split_hotkey_line_edit: (
+            self._settings_window.next_hotkey_box: (
                 "NEXT_HOTKEY_NAME",
                 "NEXT_HOTKEY_CODE",
             ),
-            self._settings_window.screenshot_hotkey_line_edit: (
+            self._settings_window.screenshot_hotkey_box: (
                 "SCREENSHOT_HOTKEY_NAME",
                 "SCREENSHOT_HOTKEY_CODE",
             ),
-            self._settings_window.toggle_global_hotkeys_hotkey_line_edit: (
+            self._settings_window.toggle_global_hotkeys_hotkey_box: (
                 "TOGGLE_HOTKEYS_HOTKEY_NAME",
                 "TOGGLE_HOTKEYS_HOTKEY_CODE",
             ),
@@ -693,10 +696,10 @@ class UIController:
         """
         frame = self._splitter.comparison_frame
         if frame is None:
-            message = self._main_window.screenshot_error_no_video_message_box
-            message.show()
+            msg = self._main_window.screenshot_err_no_video
+            msg.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda: message.done(0))
+            QTimer.singleShot(10000, lambda: msg.done(0))
             return
 
         image_dir = settings.get_str("LAST_IMAGE_DIR")
@@ -704,7 +707,7 @@ class UIController:
             image_dir = os.path.expanduser("~")  # Home directory is default
 
         screenshot_path = (
-            f"{image_dir}/{self._get_unique_filename_number(image_dir)}_screenshot.png"
+            f"{image_dir}/{self.get_file_number(image_dir)}_screenshot.png"
         )
         cv2.imwrite(screenshot_path, frame)
 
@@ -712,25 +715,20 @@ class UIController:
             if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
                 self._open_file_or_dir(screenshot_path)
             else:
-                self._main_window.screenshot_success_message_box.setInformativeText(
-                    f"Screenshot saved to:\n{screenshot_path}"
-                )
-                self._main_window.screenshot_success_message_box.setIconPixmap(
-                    QPixmap(screenshot_path).scaledToWidth(150)
-                )
-
-                message = self._main_window.screenshot_success_message_box
-                message.show()
+                msg = self._main_window.screenshot_ok_msg
+                msg.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
+                msg.setIconPixmap(QPixmap(screenshot_path).scaledToWidth(150))
+                msg.show()
                 # Close message box after 10 seconds
-                QTimer.singleShot(10000, lambda: message.done(0))
+                QTimer.singleShot(10000, lambda: msg.done(0))
 
         else:  # File couldn't be written to the split image directory
-            message = self._main_window.screenshot_error_no_file_message_box
-            message.show()
+            msg = self._main_window.screenshot_error_no_file_message_box
+            msg.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda: message.done(0))
+            QTimer.singleShot(10000, lambda: msg.done(0))
 
-    def _get_unique_filename_number(self, dir: str) -> str:
+    def get_file_number(self, dir: str) -> str:
         """Return the lowest three-digit number that will allow a unique
         filename in this format: "xxx_screenshot.png"
 
@@ -769,10 +767,10 @@ class UIController:
             path (str): The file to open.
         """
         if not Path(path).exists():
-            message = self._main_window.file_not_found_message_box
-            message.show()
+            msg = self._main_window.err_not_found_msg
+            msg.show()
             # Close message box after 10 seconds
-            QTimer.singleShot(10000, lambda: message.done(0))
+            QTimer.singleShot(10000, lambda: msg.done(0))
             return
 
         if platform.system() == "Windows":
@@ -802,161 +800,56 @@ class UIController:
         # Split labels will be refreshed after this call finishes
         self._redraw_split_labels = True
         # Refresh the split directory text so it elides correctly
-        self._set_split_directory_line_edit_text()
+        self._set_split_directory_box_text()
 
     def _set_minimal_view(self) -> None:
         """Resize and show widgets so that minimal view is displayed."""
-        self._main_window.previous_split_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                224 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        left = self._main_window.LEFT_EDGE_CORRECTION
+        top = self._main_window.TOP_EDGE_CORRECTION
+        self._main_window.previous_button.setGeometry(
+            QRect(60 + left, 224 + top, 31, 31)
         )
         self._main_window.split_name_label.setGeometry(
-            QRect(
-                92 + self._main_window.LEFT_EDGE_CORRECTION,
-                214 + self._main_window.TOP_EDGE_CORRECTION,
-                251,
-                31,
-            )
+            QRect(92 + left, 214 + top, 251, 31)
         )
-        self._main_window.split_image_loop_label.setGeometry(
-            QRect(
-                92 + self._main_window.LEFT_EDGE_CORRECTION,
-                239 + self._main_window.TOP_EDGE_CORRECTION,
-                251,
-                31,
-            )
+        self._main_window.split_loop_label.setGeometry(
+            QRect(92 + left, 239 + top, 251, 31)
         )
-        self._main_window.next_split_button.setGeometry(
-            QRect(
-                344 + self._main_window.LEFT_EDGE_CORRECTION,
-                224 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.next_button.setGeometry(QRect(344 + left, 224 + top, 31, 31))
+        self._main_window.min_view_button.setGeometry(
+            QRect(60 + left, 270 + top, 100, 31)
         )
-        self._main_window.minimal_view_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+        self._main_window.video_title.setGeometry(QRect(161 + left, 270 + top, 213, 31))
+        self._main_window.pause_button.setGeometry(QRect(60 + left, 310 + top, 121, 31))
+        self._main_window.skip_button.setGeometry(QRect(125 + left, 350 + top, 56, 31))
+        self._main_window.undo_button.setGeometry(QRect(60 + left, 350 + top, 56, 31))
+        self._main_window.reset_button.setGeometry(QRect(304 + left, 310 + top, 71, 71))
+        self._main_window.match_percent_label.setGeometry(
+            QRect(62 + left, 304 + top, 161, 31)
         )
-        self._main_window.video_feed_label.setGeometry(
-            QRect(
-                161 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                213,
-                31,
-            )
+        self._main_window.highest_percent_label.setGeometry(
+            QRect(62 + left, 331 + top, 161, 31)
         )
-        self._main_window.pause_comparison_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                310 + self._main_window.TOP_EDGE_CORRECTION,
-                121,
-                31,
-            )
+        self._main_window.threshold_percent_label.setGeometry(
+            QRect(62 + left, 358 + top, 161, 31)
         )
-        self._main_window.skip_split_button.setGeometry(
-            QRect(
-                125 + self._main_window.LEFT_EDGE_CORRECTION,
-                350 + self._main_window.TOP_EDGE_CORRECTION,
-                56,
-                31,
-            )
+        self._main_window.match_percent.setGeometry(
+            QRect(227 + left, 304 + top, 46, 31)
         )
-        self._main_window.undo_split_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                350 + self._main_window.TOP_EDGE_CORRECTION,
-                56,
-                31,
-            )
+        self._main_window.highest_percent.setGeometry(
+            QRect(227 + left, 331 + top, 46, 31)
         )
-        self._main_window.reset_splits_button.setGeometry(
-            QRect(
-                304 + self._main_window.LEFT_EDGE_CORRECTION,
-                310 + self._main_window.TOP_EDGE_CORRECTION,
-                71,
-                71,
-            )
+        self._main_window.threshold_percent.setGeometry(
+            QRect(227 + left, 358 + top, 46, 31)
         )
-        self._main_window.current_match_percent_label.setGeometry(
-            QRect(
-                62 + self._main_window.LEFT_EDGE_CORRECTION,
-                304 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.percent_sign_1.setGeometry(
+            QRect(282 + left, 304 + top, 21, 31)
         )
-        self._main_window.highest_match_percent_label.setGeometry(
-            QRect(
-                62 + self._main_window.LEFT_EDGE_CORRECTION,
-                331 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.percent_sign_2.setGeometry(
+            QRect(282 + left, 331 + top, 21, 31)
         )
-        self._main_window.threshold_match_percent_label.setGeometry(
-            QRect(
-                62 + self._main_window.LEFT_EDGE_CORRECTION,
-                358 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
-        )
-        self._main_window.current_match_percent.setGeometry(
-            QRect(
-                227 + self._main_window.LEFT_EDGE_CORRECTION,
-                304 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
-        )
-        self._main_window.highest_match_percent.setGeometry(
-            QRect(
-                227 + self._main_window.LEFT_EDGE_CORRECTION,
-                331 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
-        )
-        self._main_window.threshold_match_percent.setGeometry(
-            QRect(
-                227 + self._main_window.LEFT_EDGE_CORRECTION,
-                358 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
-        )
-        self._main_window.current_match_percent_sign.setGeometry(
-            QRect(
-                282 + self._main_window.LEFT_EDGE_CORRECTION,
-                304 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
-        )
-        self._main_window.highest_match_percent_sign.setGeometry(
-            QRect(
-                282 + self._main_window.LEFT_EDGE_CORRECTION,
-                331 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
-        )
-        self._main_window.threshold_match_percent_sign.setGeometry(
-            QRect(
-                282 + self._main_window.LEFT_EDGE_CORRECTION,
-                358 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_3.setGeometry(
+            QRect(282 + left, 358 + top, 21, 31)
         )
 
         self._set_nonessential_widgets_visible(False)
@@ -965,215 +858,79 @@ class UIController:
 
     def _set_480x360_view(self) -> None:
         """Resize and show widgets so the 480x360 display is shown."""
-        self._main_window.split_directory_line_edit.setGeometry(
-            QRect(
-                247 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                785,
-                30,
-            )
+        left = self._main_window.LEFT_EDGE_CORRECTION
+        top = self._main_window.TOP_EDGE_CORRECTION
+        self._main_window.split_directory_box.setGeometry(
+            QRect(247 + left, 225 + top, 785, 30)
         )
-        self._main_window.video_feed_label.setGeometry(
-            QRect(
-                260 + self._main_window.LEFT_EDGE_CORRECTION,
-                272 + self._main_window.TOP_EDGE_CORRECTION,
-                80,
-                31,
-            )
-        )
+        self._main_window.video_title.setGeometry(QRect(260 + left, 272 + top, 80, 31))
         self._main_window.split_name_label.setGeometry(
-            QRect(
-                584 + self._main_window.LEFT_EDGE_CORRECTION,
-                255 + self._main_window.TOP_EDGE_CORRECTION,
-                415,
-                31,
-            )
+            QRect(584 + left, 255 + top, 415, 31)
         )
-        self._main_window.split_image_loop_label.setGeometry(
-            QRect(
-                584 + self._main_window.LEFT_EDGE_CORRECTION,
-                280 + self._main_window.TOP_EDGE_CORRECTION,
-                415,
-                31,
-            )
+        self._main_window.split_loop_label.setGeometry(
+            QRect(584 + left, 280 + top, 415, 31)
         )
-        self._main_window.current_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                680 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.match_percent_label.setGeometry(
+            QRect(80 + left, 680 + top, 161, 31)
         )
-        self._main_window.highest_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                710 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.highest_percent_label.setGeometry(
+            QRect(80 + left, 710 + top, 161, 31)
         )
-        self._main_window.threshold_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                740 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.threshold_percent_label.setGeometry(
+            QRect(80 + left, 740 + top, 161, 31)
         )
-        self._main_window.current_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                680 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.match_percent.setGeometry(
+            QRect(245 + left, 680 + top, 46, 31)
         )
-        self._main_window.highest_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                710 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.highest_percent.setGeometry(
+            QRect(245 + left, 710 + top, 46, 31)
         )
-        self._main_window.threshold_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                740 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.threshold_percent.setGeometry(
+            QRect(245 + left, 740 + top, 46, 31)
         )
-        self._main_window.current_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                680 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_1.setGeometry(
+            QRect(300 + left, 680 + top, 21, 31)
         )
-        self._main_window.highest_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                710 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_2.setGeometry(
+            QRect(300 + left, 710 + top, 21, 31)
         )
-        self._main_window.threshold_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                740 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_3.setGeometry(
+            QRect(300 + left, 740 + top, 21, 31)
         )
-        self._main_window.split_directory_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                180,
-                30,
-            )
+        self._main_window.split_dir_button.setGeometry(
+            QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+        self._main_window.min_view_button.setGeometry(
+            QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
-            QRect(
-                440 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+            QRect(440 + left, 270 + top, 100, 31)
         )
         self._main_window.screenshot_button.setGeometry(
-            QRect(
-                340 + self._main_window.LEFT_EDGE_CORRECTION,
-                680 + self._main_window.TOP_EDGE_CORRECTION,
-                171,
-                41,
-            )
+            QRect(340 + left, 680 + top, 171, 41)
         )
-        self._main_window.reload_video_button.setGeometry(
-            QRect(
-                340 + self._main_window.LEFT_EDGE_CORRECTION,
-                730 + self._main_window.TOP_EDGE_CORRECTION,
-                171,
-                41,
-            )
+        self._main_window.reconnect_button.setGeometry(
+            QRect(340 + left, 730 + top, 171, 41)
         )
-        self._main_window.previous_split_button.setGeometry(
-            QRect(
-                550 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.previous_button.setGeometry(
+            QRect(550 + left, 270 + top, 31, 31)
         )
-        self._main_window.next_split_button.setGeometry(
-            QRect(
-                1000 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.next_button.setGeometry(QRect(1000 + left, 270 + top, 31, 31))
+        self._main_window.pause_button.setGeometry(
+            QRect(580 + left, 680 + top, 191, 41)
         )
-        self._main_window.pause_comparison_button.setGeometry(
-            QRect(
-                580 + self._main_window.LEFT_EDGE_CORRECTION,
-                680 + self._main_window.TOP_EDGE_CORRECTION,
-                191,
-                41,
-            )
+        self._main_window.skip_button.setGeometry(QRect(680 + left, 730 + top, 91, 41))
+        self._main_window.undo_button.setGeometry(QRect(580 + left, 730 + top, 91, 41))
+        self._main_window.reset_button.setGeometry(
+            QRect(810 + left, 680 + top, 191, 91)
         )
-        self._main_window.skip_split_button.setGeometry(
-            QRect(
-                680 + self._main_window.LEFT_EDGE_CORRECTION,
-                730 + self._main_window.TOP_EDGE_CORRECTION,
-                91,
-                41,
-            )
-        )
-        self._main_window.undo_split_button.setGeometry(
-            QRect(
-                580 + self._main_window.LEFT_EDGE_CORRECTION,
-                730 + self._main_window.TOP_EDGE_CORRECTION,
-                91,
-                41,
-            )
-        )
-        self._main_window.reset_splits_button.setGeometry(
-            QRect(
-                810 + self._main_window.LEFT_EDGE_CORRECTION,
-                680 + self._main_window.TOP_EDGE_CORRECTION,
-                191,
-                91,
-            )
-        )
-        self._main_window.video_feed_display.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                310 + self._main_window.TOP_EDGE_CORRECTION,
-                480,
-                360,
-            )
+        self._main_window.video_display.setGeometry(
+            QRect(60 + left, 310 + top, 480, 360)
         )
 
-        split_image_geometry = QRect(
-            550 + self._main_window.LEFT_EDGE_CORRECTION,
-            310 + self._main_window.TOP_EDGE_CORRECTION,
-            480,
-            360,
-        )
-        self._main_window.split_image_display.setGeometry(split_image_geometry)
-        self._main_window.split_image_overlay.setGeometry(split_image_geometry)
+        split_image_geometry = QRect(550 + left, 310 + top, 480, 360)
+        self._main_window.split_display.setGeometry(split_image_geometry)
+        self._main_window.split_overlay.setGeometry(split_image_geometry)
 
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False)
@@ -1181,215 +938,79 @@ class UIController:
 
     def _set_320x240_view(self) -> None:
         """Resize and show widgets so the 320x240 display is shown."""
-        self._main_window.split_directory_line_edit.setGeometry(
-            QRect(
-                247 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                464,
-                30,
-            )
+        left = self._main_window.LEFT_EDGE_CORRECTION
+        top = self._main_window.TOP_EDGE_CORRECTION
+        self._main_window.split_directory_box.setGeometry(
+            QRect(247 + left, 225 + top, 464, 30)
         )
-        self._main_window.video_feed_label.setGeometry(
-            QRect(
-                180 + self._main_window.LEFT_EDGE_CORRECTION,
-                272 + self._main_window.TOP_EDGE_CORRECTION,
-                80,
-                31,
-            )
-        )
+        self._main_window.video_title.setGeometry(QRect(180 + left, 272 + top, 80, 31))
         self._main_window.split_name_label.setGeometry(
-            QRect(
-                424 + self._main_window.LEFT_EDGE_CORRECTION,
-                255 + self._main_window.TOP_EDGE_CORRECTION,
-                254,
-                31,
-            )
+            QRect(424 + left, 255 + top, 254, 31)
         )
-        self._main_window.split_image_loop_label.setGeometry(
-            QRect(
-                424 + self._main_window.LEFT_EDGE_CORRECTION,
-                280 + self._main_window.TOP_EDGE_CORRECTION,
-                254,
-                31,
-            )
+        self._main_window.split_loop_label.setGeometry(
+            QRect(424 + left, 280 + top, 254, 31)
         )
-        self._main_window.current_match_percent_label.setGeometry(
-            QRect(
-                -50 + self._main_window.LEFT_EDGE_CORRECTION,
-                560 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.match_percent_label.setGeometry(
+            QRect(-50 + left, 560 + top, 161, 31)
         )
-        self._main_window.highest_match_percent_label.setGeometry(
-            QRect(
-                -50 + self._main_window.LEFT_EDGE_CORRECTION,
-                590 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.highest_percent_label.setGeometry(
+            QRect(-50 + left, 590 + top, 161, 31)
         )
-        self._main_window.threshold_match_percent_label.setGeometry(
-            QRect(
-                -50 + self._main_window.LEFT_EDGE_CORRECTION,
-                620 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.threshold_percent_label.setGeometry(
+            QRect(-50 + left, 620 + top, 161, 31)
         )
-        self._main_window.current_match_percent.setGeometry(
-            QRect(
-                115 + self._main_window.LEFT_EDGE_CORRECTION,
-                560 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.match_percent.setGeometry(
+            QRect(115 + left, 560 + top, 46, 31)
         )
-        self._main_window.highest_match_percent.setGeometry(
-            QRect(
-                115 + self._main_window.LEFT_EDGE_CORRECTION,
-                590 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.highest_percent.setGeometry(
+            QRect(115 + left, 590 + top, 46, 31)
         )
-        self._main_window.threshold_match_percent.setGeometry(
-            QRect(
-                115 + self._main_window.LEFT_EDGE_CORRECTION,
-                620 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.threshold_percent.setGeometry(
+            QRect(115 + left, 620 + top, 46, 31)
         )
-        self._main_window.current_match_percent_sign.setGeometry(
-            QRect(
-                170 + self._main_window.LEFT_EDGE_CORRECTION,
-                560 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_1.setGeometry(
+            QRect(170 + left, 560 + top, 21, 31)
         )
-        self._main_window.highest_match_percent_sign.setGeometry(
-            QRect(
-                170 + self._main_window.LEFT_EDGE_CORRECTION,
-                590 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_2.setGeometry(
+            QRect(170 + left, 590 + top, 21, 31)
         )
-        self._main_window.threshold_match_percent_sign.setGeometry(
-            QRect(
-                170 + self._main_window.LEFT_EDGE_CORRECTION,
-                620 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_3.setGeometry(
+            QRect(170 + left, 620 + top, 21, 31)
         )
-        self._main_window.split_directory_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                180,
-                30,
-            )
+        self._main_window.split_dir_button.setGeometry(
+            QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+        self._main_window.min_view_button.setGeometry(
+            QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
-            QRect(
-                280 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+            QRect(280 + left, 270 + top, 100, 31)
         )
         self._main_window.screenshot_button.setGeometry(
-            QRect(
-                220 + self._main_window.LEFT_EDGE_CORRECTION,
-                560 + self._main_window.TOP_EDGE_CORRECTION,
-                131,
-                41,
-            )
+            QRect(220 + left, 560 + top, 131, 41)
         )
-        self._main_window.reload_video_button.setGeometry(
-            QRect(
-                220 + self._main_window.LEFT_EDGE_CORRECTION,
-                610 + self._main_window.TOP_EDGE_CORRECTION,
-                131,
-                41,
-            )
+        self._main_window.reconnect_button.setGeometry(
+            QRect(220 + left, 610 + top, 131, 41)
         )
-        self._main_window.previous_split_button.setGeometry(
-            QRect(
-                390 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.previous_button.setGeometry(
+            QRect(390 + left, 270 + top, 31, 31)
         )
-        self._main_window.next_split_button.setGeometry(
-            QRect(
-                680 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.next_button.setGeometry(QRect(680 + left, 270 + top, 31, 31))
+        self._main_window.pause_button.setGeometry(
+            QRect(420 + left, 560 + top, 121, 41)
         )
-        self._main_window.pause_comparison_button.setGeometry(
-            QRect(
-                420 + self._main_window.LEFT_EDGE_CORRECTION,
-                560 + self._main_window.TOP_EDGE_CORRECTION,
-                121,
-                41,
-            )
+        self._main_window.skip_button.setGeometry(QRect(485 + left, 610 + top, 56, 41))
+        self._main_window.undo_button.setGeometry(QRect(420 + left, 610 + top, 56, 41))
+        self._main_window.reset_button.setGeometry(
+            QRect(560 + left, 560 + top, 121, 91)
         )
-        self._main_window.skip_split_button.setGeometry(
-            QRect(
-                485 + self._main_window.LEFT_EDGE_CORRECTION,
-                610 + self._main_window.TOP_EDGE_CORRECTION,
-                56,
-                41,
-            )
-        )
-        self._main_window.undo_split_button.setGeometry(
-            QRect(
-                420 + self._main_window.LEFT_EDGE_CORRECTION,
-                610 + self._main_window.TOP_EDGE_CORRECTION,
-                56,
-                41,
-            )
-        )
-        self._main_window.reset_splits_button.setGeometry(
-            QRect(
-                560 + self._main_window.LEFT_EDGE_CORRECTION,
-                560 + self._main_window.TOP_EDGE_CORRECTION,
-                121,
-                91,
-            )
-        )
-        self._main_window.video_feed_display.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                310 + self._main_window.TOP_EDGE_CORRECTION,
-                320,
-                240,
-            )
+        self._main_window.video_display.setGeometry(
+            QRect(60 + left, 310 + top, 320, 240)
         )
 
-        split_image_geometry = QRect(
-            390 + self._main_window.LEFT_EDGE_CORRECTION,
-            310 + self._main_window.TOP_EDGE_CORRECTION,
-            320,
-            240,
-        )
-        self._main_window.split_image_display.setGeometry(split_image_geometry)
-        self._main_window.split_image_overlay.setGeometry(split_image_geometry)
+        split_image_geometry = QRect(390 + left, 310 + top, 320, 240)
+        self._main_window.split_display.setGeometry(split_image_geometry)
+        self._main_window.split_overlay.setGeometry(split_image_geometry)
 
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=True)
@@ -1397,215 +1018,79 @@ class UIController:
 
     def _set_512x288_view(self) -> None:
         """Resize and show widgets so the 512x288 display is shown."""
-        self._main_window.split_directory_line_edit.setGeometry(
-            QRect(
-                247 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                848,
-                30,
-            )
+        left = self._main_window.LEFT_EDGE_CORRECTION
+        top = self._main_window.TOP_EDGE_CORRECTION
+        self._main_window.split_directory_box.setGeometry(
+            QRect(247 + left, 225 + top, 848, 30)
         )
-        self._main_window.video_feed_label.setGeometry(
-            QRect(
-                276 + self._main_window.LEFT_EDGE_CORRECTION,
-                272 + self._main_window.TOP_EDGE_CORRECTION,
-                80,
-                31,
-            )
-        )
+        self._main_window.video_title.setGeometry(QRect(276 + left, 272 + top, 80, 31))
         self._main_window.split_name_label.setGeometry(
-            QRect(
-                613 + self._main_window.LEFT_EDGE_CORRECTION,
-                255 + self._main_window.TOP_EDGE_CORRECTION,
-                450,
-                31,
-            )
+            QRect(613 + left, 255 + top, 450, 31)
         )
-        self._main_window.split_image_loop_label.setGeometry(
-            QRect(
-                613 + self._main_window.LEFT_EDGE_CORRECTION,
-                280 + self._main_window.TOP_EDGE_CORRECTION,
-                450,
-                31,
-            )
+        self._main_window.split_loop_label.setGeometry(
+            QRect(613 + left, 280 + top, 450, 31)
         )
-        self._main_window.current_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                608 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.match_percent_label.setGeometry(
+            QRect(80 + left, 608 + top, 161, 31)
         )
-        self._main_window.highest_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                638 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.highest_percent_label.setGeometry(
+            QRect(80 + left, 638 + top, 161, 31)
         )
-        self._main_window.threshold_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                668 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.threshold_percent_label.setGeometry(
+            QRect(80 + left, 668 + top, 161, 31)
         )
-        self._main_window.current_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                608 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.match_percent.setGeometry(
+            QRect(245 + left, 608 + top, 46, 31)
         )
-        self._main_window.highest_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                638 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.highest_percent.setGeometry(
+            QRect(245 + left, 638 + top, 46, 31)
         )
-        self._main_window.threshold_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                668 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.threshold_percent.setGeometry(
+            QRect(245 + left, 668 + top, 46, 31)
         )
-        self._main_window.current_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                608 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_1.setGeometry(
+            QRect(300 + left, 608 + top, 21, 31)
         )
-        self._main_window.highest_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                638 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_2.setGeometry(
+            QRect(300 + left, 638 + top, 21, 31)
         )
-        self._main_window.threshold_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                668 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_3.setGeometry(
+            QRect(300 + left, 668 + top, 21, 31)
         )
-        self._main_window.split_directory_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                180,
-                30,
-            )
+        self._main_window.split_dir_button.setGeometry(
+            QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+        self._main_window.min_view_button.setGeometry(
+            QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
-            QRect(
-                472 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+            QRect(472 + left, 270 + top, 100, 31)
         )
         self._main_window.screenshot_button.setGeometry(
-            QRect(
-                372 + self._main_window.LEFT_EDGE_CORRECTION,
-                608 + self._main_window.TOP_EDGE_CORRECTION,
-                171,
-                41,
-            )
+            QRect(372 + left, 608 + top, 171, 41)
         )
-        self._main_window.reload_video_button.setGeometry(
-            QRect(
-                372 + self._main_window.LEFT_EDGE_CORRECTION,
-                658 + self._main_window.TOP_EDGE_CORRECTION,
-                171,
-                41,
-            )
+        self._main_window.reconnect_button.setGeometry(
+            QRect(372 + left, 658 + top, 171, 41)
         )
-        self._main_window.previous_split_button.setGeometry(
-            QRect(
-                582 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.previous_button.setGeometry(
+            QRect(582 + left, 270 + top, 31, 31)
         )
-        self._main_window.next_split_button.setGeometry(
-            QRect(
-                1064 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.next_button.setGeometry(QRect(1064 + left, 270 + top, 31, 31))
+        self._main_window.pause_button.setGeometry(
+            QRect(612 + left, 608 + top, 191, 41)
         )
-        self._main_window.pause_comparison_button.setGeometry(
-            QRect(
-                612 + self._main_window.LEFT_EDGE_CORRECTION,
-                608 + self._main_window.TOP_EDGE_CORRECTION,
-                191,
-                41,
-            )
+        self._main_window.skip_button.setGeometry(QRect(712 + left, 658 + top, 91, 41))
+        self._main_window.undo_button.setGeometry(QRect(612 + left, 658 + top, 91, 41))
+        self._main_window.reset_button.setGeometry(
+            QRect(874 + left, 608 + top, 191, 91)
         )
-        self._main_window.skip_split_button.setGeometry(
-            QRect(
-                712 + self._main_window.LEFT_EDGE_CORRECTION,
-                658 + self._main_window.TOP_EDGE_CORRECTION,
-                91,
-                41,
-            )
-        )
-        self._main_window.undo_split_button.setGeometry(
-            QRect(
-                612 + self._main_window.LEFT_EDGE_CORRECTION,
-                658 + self._main_window.TOP_EDGE_CORRECTION,
-                91,
-                41,
-            )
-        )
-        self._main_window.reset_splits_button.setGeometry(
-            QRect(
-                874 + self._main_window.LEFT_EDGE_CORRECTION,
-                608 + self._main_window.TOP_EDGE_CORRECTION,
-                191,
-                91,
-            )
-        )
-        self._main_window.video_feed_display.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                310 + self._main_window.TOP_EDGE_CORRECTION,
-                512,
-                288,
-            )
+        self._main_window.video_display.setGeometry(
+            QRect(60 + left, 310 + top, 512, 288)
         )
 
-        split_image_geometry = QRect(
-            582 + self._main_window.LEFT_EDGE_CORRECTION,
-            310 + self._main_window.TOP_EDGE_CORRECTION,
-            512,
-            288,
-        )
-        self._main_window.split_image_display.setGeometry(split_image_geometry)
-        self._main_window.split_image_overlay.setGeometry(split_image_geometry)
+        split_image_geometry = QRect(582 + left, 310 + top, 512, 288)
+        self._main_window.split_display.setGeometry(split_image_geometry)
+        self._main_window.split_overlay.setGeometry(split_image_geometry)
 
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False)
@@ -1613,272 +1098,123 @@ class UIController:
 
     def _set_432x243_view(self) -> None:
         """Resize and show widgets so the 432x243 display is shown."""
-        self._main_window.split_directory_line_edit.setGeometry(
-            QRect(
-                247 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                688,
-                30,
-            )
+        left = self._main_window.LEFT_EDGE_CORRECTION
+        top = self._main_window.TOP_EDGE_CORRECTION
+        self._main_window.split_directory_box.setGeometry(
+            QRect(247 + left, 225 + top, 688, 30)
         )
-        self._main_window.video_feed_label.setGeometry(
-            QRect(
-                161 + self._main_window.LEFT_EDGE_CORRECTION,
-                272 + self._main_window.TOP_EDGE_CORRECTION,
-                231,
-                31,
-            )
-        )
+        self._main_window.video_title.setGeometry(QRect(161 + left, 272 + top, 231, 31))
         self._main_window.split_name_label.setGeometry(
-            QRect(
-                534 + self._main_window.LEFT_EDGE_CORRECTION,
-                255 + self._main_window.TOP_EDGE_CORRECTION,
-                371,
-                31,
-            )
+            QRect(534 + left, 255 + top, 371, 31)
         )
-        self._main_window.split_image_loop_label.setGeometry(
-            QRect(
-                534 + self._main_window.LEFT_EDGE_CORRECTION,
-                280 + self._main_window.TOP_EDGE_CORRECTION,
-                371,
-                31,
-            )
+        self._main_window.split_loop_label.setGeometry(
+            QRect(534 + left, 280 + top, 371, 31)
         )
-        self._main_window.current_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                563 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.match_percent_label.setGeometry(
+            QRect(80 + left, 563 + top, 161, 31)
         )
-        self._main_window.highest_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                593 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.highest_percent_label.setGeometry(
+            QRect(80 + left, 593 + top, 161, 31)
         )
-        self._main_window.threshold_match_percent_label.setGeometry(
-            QRect(
-                80 + self._main_window.LEFT_EDGE_CORRECTION,
-                623 + self._main_window.TOP_EDGE_CORRECTION,
-                161,
-                31,
-            )
+        self._main_window.threshold_percent_label.setGeometry(
+            QRect(80 + left, 623 + top, 161, 31)
         )
-        self._main_window.current_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                563 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.match_percent.setGeometry(
+            QRect(245 + left, 563 + top, 46, 31)
         )
-        self._main_window.highest_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                593 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.highest_percent.setGeometry(
+            QRect(245 + left, 593 + top, 46, 31)
         )
-        self._main_window.threshold_match_percent.setGeometry(
-            QRect(
-                245 + self._main_window.LEFT_EDGE_CORRECTION,
-                623 + self._main_window.TOP_EDGE_CORRECTION,
-                46,
-                31,
-            )
+        self._main_window.threshold_percent.setGeometry(
+            QRect(245 + left, 623 + top, 46, 31)
         )
-        self._main_window.current_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                563 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_1.setGeometry(
+            QRect(300 + left, 563 + top, 21, 31)
         )
-        self._main_window.highest_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                593 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_2.setGeometry(
+            QRect(300 + left, 593 + top, 21, 31)
         )
-        self._main_window.threshold_match_percent_sign.setGeometry(
-            QRect(
-                300 + self._main_window.LEFT_EDGE_CORRECTION,
-                623 + self._main_window.TOP_EDGE_CORRECTION,
-                21,
-                31,
-            )
+        self._main_window.percent_sign_3.setGeometry(
+            QRect(300 + left, 623 + top, 21, 31)
         )
-        self._main_window.split_directory_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                225 + self._main_window.TOP_EDGE_CORRECTION,
-                180,
-                30,
-            )
+        self._main_window.split_dir_button.setGeometry(
+            QRect(60 + left, 225 + top, 180, 30)
         )
-        self._main_window.minimal_view_button.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+        self._main_window.min_view_button.setGeometry(
+            QRect(60 + left, 270 + top, 100, 31)
         )
         self._main_window.next_source_button.setGeometry(
-            QRect(
-                392 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                100,
-                31,
-            )
+            QRect(392 + left, 270 + top, 100, 31)
         )
         self._main_window.screenshot_button.setGeometry(
-            QRect(
-                332 + self._main_window.LEFT_EDGE_CORRECTION,
-                563 + self._main_window.TOP_EDGE_CORRECTION,
-                131,
-                41,
-            )
+            QRect(332 + left, 563 + top, 131, 41)
         )
-        self._main_window.reload_video_button.setGeometry(
-            QRect(
-                332 + self._main_window.LEFT_EDGE_CORRECTION,
-                613 + self._main_window.TOP_EDGE_CORRECTION,
-                131,
-                41,
-            )
+        self._main_window.reconnect_button.setGeometry(
+            QRect(332 + left, 613 + top, 131, 41)
         )
-        self._main_window.previous_split_button.setGeometry(
-            QRect(
-                502 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.previous_button.setGeometry(
+            QRect(502 + left, 270 + top, 31, 31)
         )
-        self._main_window.next_split_button.setGeometry(
-            QRect(
-                904 + self._main_window.LEFT_EDGE_CORRECTION,
-                270 + self._main_window.TOP_EDGE_CORRECTION,
-                31,
-                31,
-            )
+        self._main_window.next_button.setGeometry(QRect(904 + left, 270 + top, 31, 31))
+        self._main_window.pause_button.setGeometry(
+            QRect(532 + left, 563 + top, 181, 41)
         )
-        self._main_window.pause_comparison_button.setGeometry(
-            QRect(
-                532 + self._main_window.LEFT_EDGE_CORRECTION,
-                563 + self._main_window.TOP_EDGE_CORRECTION,
-                181,
-                41,
-            )
+        self._main_window.skip_button.setGeometry(QRect(627 + left, 613 + top, 86, 41))
+        self._main_window.undo_button.setGeometry(QRect(532 + left, 613 + top, 86, 41))
+        self._main_window.reset_button.setGeometry(
+            QRect(724 + left, 563 + top, 181, 91)
         )
-        self._main_window.skip_split_button.setGeometry(
-            QRect(
-                627 + self._main_window.LEFT_EDGE_CORRECTION,
-                613 + self._main_window.TOP_EDGE_CORRECTION,
-                86,
-                41,
-            )
-        )
-        self._main_window.undo_split_button.setGeometry(
-            QRect(
-                532 + self._main_window.LEFT_EDGE_CORRECTION,
-                613 + self._main_window.TOP_EDGE_CORRECTION,
-                86,
-                41,
-            )
-        )
-        self._main_window.reset_splits_button.setGeometry(
-            QRect(
-                724 + self._main_window.LEFT_EDGE_CORRECTION,
-                563 + self._main_window.TOP_EDGE_CORRECTION,
-                181,
-                91,
-            )
-        )
-        self._main_window.video_feed_display.setGeometry(
-            QRect(
-                60 + self._main_window.LEFT_EDGE_CORRECTION,
-                310 + self._main_window.TOP_EDGE_CORRECTION,
-                432,
-                243,
-            )
+        self._main_window.video_display.setGeometry(
+            QRect(60 + left, 310 + top, 432, 243)
         )
 
-        split_image_geometry = QRect(
-            502 + self._main_window.LEFT_EDGE_CORRECTION,
-            310 + self._main_window.TOP_EDGE_CORRECTION,
-            432,
-            243,
-        )
-        self._main_window.split_image_display.setGeometry(split_image_geometry)
-        self._main_window.split_image_overlay.setGeometry(split_image_geometry)
+        split_image_geometry = QRect(502 + left, 310 + top, 432, 243)
+        self._main_window.split_display.setGeometry(split_image_geometry)
+        self._main_window.split_overlay.setGeometry(split_image_geometry)
 
         self._set_nonessential_widgets_visible(True)
         self._set_button_and_label_text(truncate=False)
         self._main_window.setFixedSize(904, 452 + self._main_window.HEIGHT_CORRECTION)
 
     def _set_button_and_label_text(self, truncate: bool) -> None:
-        """Adjust button and label text according to aspect ratio and minimal
-        view status.
+        """Set button and label text according to aspect ratio and min view.
 
         Args:
             truncate (bool): If True, each widget's short text is used;
                 otherwise, each widget's default (long) text is used.
         """
+        # Min view button
         if settings.get_bool("SHOW_MIN_VIEW"):
-            self._main_window.minimal_view_button.setText("Full view")
+            min_view_txt = self._main_window.min_view_full_txt
         else:
-            self._main_window.minimal_view_button.setText("Minimal view")
+            min_view_txt = self._main_window.min_view_min_txt
 
+        # Other buttons
         if truncate:
-            self._main_window.screenshot_button.setText("Screenshot")
-            self._main_window.current_match_percent_label.setText("Sim:")
-            self._main_window.highest_match_percent_label.setText("High:")
-            self._main_window.threshold_match_percent_label.setText("Thr:")
-            if self._splitter.suspended:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_unpause_text_truncated
-                )
-            else:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_pause_text_truncated
-                )
-            self._main_window.undo_split_button.setText("Undo")
-            self._main_window.skip_split_button.setText("Skip")
-            self._main_window.reset_splits_button.setText("Reset")
-
+            screenshot_txt = self._main_window.screenshot_button_short_txt
+            match_txt = self._main_window.match_percent_short_txt
+            highest_txt = self._main_window.highest_percent_short_txt
+            threshold_txt = self._main_window.threshold_percent_short_txt
+            undo_txt = self._main_window.undo_button_short_txt
+            skip_txt = self._main_window.skip_button_short_txt
+            reset_txt = self._main_window.reset_button_short_txt
         else:
-            self._main_window.screenshot_button.setText("Take screenshot")
-            self._main_window.current_match_percent_label.setText(
-                "Similarity to split image:"
-            )
-            self._main_window.highest_match_percent_label.setText(
-                "Highest similarity so far:"
-            )
-            self._main_window.threshold_match_percent_label.setText(
-                "Threshold similarity:"
-            )
-            if self._splitter.suspended:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_unpause_text_default
-                )
-            else:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_pause_text_default
-                )
-            self._main_window.undo_split_button.setText("Undo split")
-            self._main_window.skip_split_button.setText("Skip split")
-            self._main_window.reset_splits_button.setText("Reset splits")
+            screenshot_txt = self._main_window.screenshot_button_long_txt
+            match_txt = self._main_window.match_percent_long_txt
+            highest_txt = self._main_window.highest_percent_long_txt
+            threshold_txt = self._main_window.threshold_percent_long_txt
+            undo_txt = self._main_window.undo_button_long_txt
+            skip_txt = self._main_window.skip_button_long_txt
+            reset_txt = self._main_window.reset_button_long_txt
+
+        self._main_window.min_view_button.setText(min_view_txt)
+        self._main_window.screenshot_button.setText(screenshot_txt)
+        self._main_window.match_percent_label.setText(match_txt)
+        self._main_window.highest_percent_label.setText(highest_txt)
+        self._main_window.threshold_percent_label.setText(threshold_txt)
+        self._main_window.undo_button.setText(undo_txt)
+        self._main_window.skip_button.setText(skip_txt)
+        self._main_window.reset_button.setText(reset_txt)
 
     def _set_nonessential_widgets_visible(self, visible: bool) -> None:
         """Set widget visibility according to minimal view status.
@@ -1887,39 +1223,298 @@ class UIController:
             visible (bool): If True, show all non-minimal-view widgets. If
                 False, hide all non-minimal-view widgets.
         """
-        self._main_window.split_directory_line_edit.setVisible(visible)
-        self._main_window.split_directory_button.setVisible(visible)
+        self._main_window.split_directory_box.setVisible(visible)
+        self._main_window.split_dir_button.setVisible(visible)
         self._main_window.next_source_button.setVisible(visible)
         self._main_window.screenshot_button.setVisible(visible)
-        self._main_window.reload_video_button.setVisible(visible)
-        self._main_window.video_feed_display.setVisible(visible)
-        self._main_window.split_image_display.setVisible(visible)
+        self._main_window.reconnect_button.setVisible(visible)
+        self._main_window.video_display.setVisible(visible)
+        self._main_window.split_display.setVisible(visible)
         # Only display this when the other widgets are hidden
-        self._main_window.minimal_view_no_splits_label.setVisible(not visible)
+        self._main_window.split_info_min_label.setVisible(not visible)
 
-    #################################
-    #                               #
-    # Update UI, Handle Key Presses #
-    #                               #
-    #################################
+    ###########################
+    #                         #
+    # Update UI from Splitter #
+    #                         #
+    ###########################
 
-    def _update_ui(self) -> None:
-        """Read values from the splitter and use them to update the UI; also
-        read inputs from the user and use them to update the UI and the
-        splitter.
+    def _update_from_splitter(self) -> None:
+        """Read values from the splitter and use them to update the UI."""
+        self._update_video_feed()
+        self._update_video_title()
+        self._update_split_image_labels()
+        self._update_split_delay_suspend()
+        self._update_match_percents()
+        self._update_pause_button()
+        self._set_buttons_and_hotkeys_enabled()
 
-        Since this method is called many times per second, most of its method
-        calls are wrapped in if statements. This diminishes readability
-        significantly, but also cuts down so much on CPU usage that I thought
-        it was worth it.
+    def _update_video_feed(self) -> None:
+        """Clear video if video is down; update video if video is alive."""
+        if settings.get_bool("SHOW_MIN_VIEW"):
+            return
+
+        frame = self._splitter.frame_pixmap
+        video = self._main_window.video_display
+
+        # Video not connected, but video frame on UI
+        if frame is None:
+            if video.text() == "":
+                video.setText(self._main_window.video_display_txt)
+        # Video is connected, update it
+        else:
+            video.setPixmap(frame)
+
+    def _update_video_title(self) -> None:
+        """Adjust video title depending on whether video is alive."""
+        video_alive = self._splitter.capture_thread.is_alive()
+        norm_live_txt = self._main_window.video_live_txt
+        norm_down_txt = self._main_window.video_down_txt
+        min_down_txt = self._main_window.min_video_down_txt
+        min_live_txt = self._main_window.min_video_live_txt
+        label = self._main_window.video_title
+
+        if settings.get_bool("SHOW_MIN_VIEW"):
+            # Video is connected, but label says it's not
+            if video_alive and label.text() != min_live_txt:
+                label.setText(min_live_txt)
+            # Video isn't conected, but label says it is
+            elif not video_alive and label.text() != min_down_txt:
+                label.setText(min_down_txt)
+
+        else:
+            # Video is connected, but label says it's not
+            if video_alive and label.text() != norm_live_txt:
+                label.setText(norm_live_txt)
+            # Video isn't connected, but label says it is
+            elif not video_alive and label.text() != norm_down_txt:
+                label.setText(norm_down_txt)
+
+    def _update_split_image_labels(self) -> None:
+        """Update split name, loops, and image."""
+        current_index = self._splitter.splits.current_image_index
+        current_loop = self._splitter.splits.current_loop
+        split_display = self._main_window.split_display
+        split_label = self._main_window.split_name_label
+        loop_label = self._main_window.split_loop_label
+        splits_down_txt = self._main_window.split_display_txt
+        splits_min_label = self._main_window.split_info_min_label
+
+        # No splits loaded, but UI showing split image
+        if current_index is None:
+            if split_display.text() != splits_down_txt:
+                split_display.setText(splits_down_txt)
+                split_label.setText("")
+                loop_label.setText("")
+                splits_min_label.setText(splits_down_txt)
+                splits_min_label.raise_()  # Make sure it's not being covered
+
+        # UI showing split but split has been changed, resized, or reset
+        elif self._redraw_split_labels:
+            self._redraw_split_labels = False
+
+            current_split_image = self._splitter.splits.list[current_index]
+            elided_name = split_label.fontMetrics().elidedText(
+                current_split_image.name, Qt.ElideRight, split_label.width()
+            )
+            total_loops = current_split_image.loops
+            loop_txt = self._main_window.split_loop_label_empty_txt
+
+            if not settings.get_bool("SHOW_MIN_VIEW"):
+                split_display.setPixmap(current_split_image.pixmap)
+            split_label.setText(elided_name)
+            if total_loops == 1:
+                loop_txt = self._main_window.split_loop_label_empty_txt
+                loop_label.setText(loop_txt)
+            else:
+                loop_txt = self._main_window.split_loop_label_txt
+                loop_label.setText(loop_txt.format(current_loop, total_loops))
+            splits_min_label.setText("")
+            splits_min_label.lower()  # Make sure it's not covering others
+
+    def _update_split_delay_suspend(self) -> None:
+        """Display remaining delay or suspend time.
+
+        Keep track of both overlays, regardless of view, so we can hide the one
+        not currently in use.
         """
-        self._update_label_and_button_text()
+        overlay = self._main_window.split_overlay
+        delay_txt = self._main_window.overlay_delay_txt
+        pause_txt = self._main_window.overlay_pause_txt
+        min_view = settings.get_bool("SHOW_MIN_VIEW")
+
+        # Splitter is delaying pre-split
+        if self._splitter.delaying and self._splitter.delay_remaining is not None:
+            if not min_view:
+                overlay.setVisible(True)
+                overlay.setText(delay_txt.format(self._splitter.delay_remaining))
+
+        # Splitter is pausing post-split
+        elif self._splitter.suspended and self._splitter.suspend_remaining is not None:
+            if not min_view:
+                overlay.setVisible(True)
+                overlay.setText(pause_txt.format(self._splitter.suspend_remaining))
+
+        # Splitter isn't pausing or delaying, but the overlay is showing
+        elif overlay.text() != "":
+            overlay.setVisible(False)
+            overlay.setText("")
+
+    def _update_match_percents(self):
+        """Update match percents or set them to blank."""
+        decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
+        format_str = f"{{:.{decimals}f}}"
+        null_str = self._null_match_percent_string(decimals)
+        match_percent = self._splitter.match_percent
+        match_label = self._main_window.match_percent
+        high_percent = self._splitter.highest_percent
+        high_label = self._main_window.highest_percent
+        current_index = self._splitter.splits.current_image_index
+        thresh_label = self._main_window.threshold_percent
+
+        # Splitter isn't comparing images, but UI is showing current%, highest%
+        if match_percent is None or high_percent is None:
+            if match_label.text() != null_str or high_label != null_str:
+                match_label.setText(null_str)
+                high_label.setText(null_str)
+
+        # Update current match%, highest%
+        else:
+            match_label.setText(format_str.format(match_percent * 100))
+            high_label.setText(format_str.format(high_percent * 100))
+
+        # No splits loaded, but UI is showing threshold%
+        if current_index is None:
+            if thresh_label.text() != null_str:
+                thresh_label.setText(null_str)
+
+        # Update threshold%
+        else:
+            threshold = self._splitter.splits.list[current_index].threshold
+            thresh_label.setText(format_str.format(threshold * 100))
+
+    def _update_pause_button(self):
+        """Adjust the length and content of the pause button's text according
+        to aspect ratio and splitter status.
+        """
+        suspended = self._splitter.suspended
+        pause_button = self._main_window.pause_button
+        show_short_text = (
+            settings.get_bool("SHOW_MIN_VIEW")
+            or settings.get_str("ASPECT_RATIO") == "4:3 (320x240)"
+        )
+
+        if show_short_text:
+            if suspended:
+                pause_button.setText(self._main_window.unpause_short_txt)
+            else:
+                pause_button.setText(self._main_window.pause_short_txt)
+
+        else:
+            if suspended:
+                pause_button.setText(self._main_window.unpause_long_txt)
+            else:
+                pause_button.setText(self._main_window.pause_long_txt)
+
+    def _set_buttons_and_hotkeys_enabled(self) -> bool:
+        """Enable and disable hotkeys and buttons depending on whether splits
+        are alive, the video is alive, and the current split is the first or
+        last split."""
+        current_split_index = self._splitter.splits.current_image_index
+        video_alive = self._splitter.capture_thread.is_alive()
+
+        if current_split_index is None:
+            # Enable screenshots if video is on
+            if video_alive:
+                self._main_window.screenshot_button.setEnabled(True)
+            else:
+                self._main_window.screenshot_button.setEnabled(False)
+
+            # Disable split, undo, skip, previous, next split, pause
+            self._split_hotkey_enabled = False
+            self._undo_hotkey_enabled = False
+            self._skip_hotkey_enabled = False
+            self._main_window.undo_button.setEnabled(False)
+            self._main_window.skip_button.setEnabled(False)
+            self._main_window.previous_button.setEnabled(False)
+            self._main_window.next_button.setEnabled(False)
+            self._main_window.pause_button.setEnabled(False)
+
+        else:
+            loop = self._splitter.splits.current_loop
+            total_loops = self._splitter.splits.list[current_split_index].loops
+            total_splits = len(self._splitter.splits.list) - 1
+
+            # Enable split hotkey
+            self._split_hotkey_enabled = True
+
+            # Enable screenshots if video is on
+            if video_alive:
+                self._main_window.screenshot_button.setEnabled(True)
+                self._main_window.pause_button.setEnabled(True)
+            else:
+                self._main_window.screenshot_button.setEnabled(False)
+                self._main_window.pause_button.setEnabled(False)
+
+            # Enable undo and previous if this isn't the first split
+            if current_split_index == 0 and loop == 1:
+                self._undo_hotkey_enabled = False
+                self._main_window.undo_button.setEnabled(False)
+                self._main_window.previous_button.setEnabled(False)
+            else:
+                self._undo_hotkey_enabled = True
+                self._main_window.undo_button.setEnabled(True)
+                self._main_window.previous_button.setEnabled(True)
+
+            # Enable skip and next if this isn't the last split
+            if current_split_index == total_splits and loop == total_loops:
+                self._skip_hotkey_enabled = False
+                self._main_window.skip_button.setEnabled(False)
+                self._main_window.next_button.setEnabled(False)
+            else:
+                self._skip_hotkey_enabled = True
+                self._main_window.skip_button.setEnabled(True)
+                self._main_window.next_button.setEnabled(True)
+
+    def _null_match_percent_string(self, decimals: int) -> None:
+        """Return a string representing a blank match percent with the number
+        of decimal places the user chooses in settings.
+
+        Returns:
+            str: The null match percent string. Possible return values are
+            "--", "--.-", and "--.--".
+        """
+        match_percent_string = "--"
+        if decimals > 0:
+            match_percent_string += "."
+            while decimals > 0:
+                match_percent_string += "-"
+                decimals -= 1
+        return match_percent_string
+
+    def _get_interval(self) -> int:
+        """Calculate the rate at which _poller should poll.
+
+        The minimum is 20 Hz (represented by the 50 ms value below). Any
+        slower than 20 Hz and the UI starts to look pretty bad.
+
+        1000 is used because that is the number of ms in a second.
+
+        Returns:
+            int: The amount of time in ms the poller waits between calls.
+        """
+        return min(1000 // settings.get_int("FPS"), 50)
+
+    ###########################
+    #                         #
+    # Update UI from Keyboard #
+    #                         #
+    ###########################
+
+    def _update_from_keyboard(self) -> None:
+        """Use flags set in _handle_key_press to split and do other actions."""
         self._handle_hotkey_press()
         self._execute_split_action()
-
-        splitter_flags_changed = self._update_flags()
-        if splitter_flags_changed:
-            self._set_buttons_and_hotkeys_enabled()
 
     def _handle_key_press(self, key: keyboard.Key) -> None:
         """Process key presses, setting flags if the key is a hotkey.
@@ -1946,25 +1541,25 @@ class UIController:
             key_name, key_code = str(key).replace("Key.", ""), key.value.vk
 
         # Use #1 (set hotkey settings in settings window)
-        for hotkey_line_edit in [
-            self._settings_window.split_hotkey_line_edit,
-            self._settings_window.reset_hotkey_line_edit,
-            self._settings_window.pause_hotkey_line_edit,
-            self._settings_window.undo_split_hotkey_line_edit,
-            self._settings_window.skip_split_hotkey_line_edit,
-            self._settings_window.previous_split_hotkey_line_edit,
-            self._settings_window.next_split_hotkey_line_edit,
-            self._settings_window.screenshot_hotkey_line_edit,
-            self._settings_window.toggle_global_hotkeys_hotkey_line_edit,
+        for hotkey_box in [
+            self._settings_window.split_hotkey_box,
+            self._settings_window.reset_hotkey_box,
+            self._settings_window.pause_hotkey_box,
+            self._settings_window.undo_hotkey_box,
+            self._settings_window.skip_hotkey_box,
+            self._settings_window.previous_hotkey_box,
+            self._settings_window.next_hotkey_box,
+            self._settings_window.screenshot_hotkey_box,
+            self._settings_window.toggle_global_hotkeys_hotkey_box,
         ]:
-            if hotkey_line_edit.hasFocus():
-                hotkey_line_edit.setText(key_name)
-                hotkey_line_edit.key_code = key_code
+            if hotkey_box.hasFocus():
+                hotkey_box.setText(key_name)
+                hotkey_box.key_code = key_code
                 return
 
         # Use #2 (set "hotkey pressed" flag for _handle_hotkey_press)
-        if not self._settings_window_showing:
-            for hotkey_flag, settings_string in {
+        if not self._settings_window.isVisible():
+            for hotkey_pressed, settings_string in {
                 "_split_hotkey_pressed": "SPLIT_HOTKEY_CODE",
                 "_reset_hotkey_pressed": "RESET_HOTKEY_CODE",
                 "_undo_hotkey_pressed": "UNDO_HOTKEY_CODE",
@@ -1976,7 +1571,7 @@ class UIController:
             }.items():
                 if str(key_code) == settings.get_str(settings_string):
                     # Use setattr because that allows us to use this dict format
-                    setattr(self, hotkey_flag, True)
+                    setattr(self, hotkey_pressed, True)
 
     def _handle_hotkey_press(self) -> None:
         """React to the flags set in _handle_key_press.
@@ -1994,83 +1589,48 @@ class UIController:
         feel that the alternative of having everything laid out in if-blocks
         was worse.
         """
-        # This value is used frequently, so I define it once here for simplicity
         global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
+        if self._toggle_hotkeys_hotkey_pressed:
+            self._toggle_hotkeys_hotkey_pressed = False
+            settings.set_value("GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled)
+            return
 
-        # Call the hotkey's action if it's set
-        for flags, action in {
-            # Split hotkey
-            (
-                self._split_hotkey_pressed,
-                "_split_hotkey_pressed",
-                self._split_hotkey_enabled,
-            ): self._request_next_split,
-            # Reset hotkey
-            (
-                self._reset_hotkey_pressed,
-                "_reset_hotkey_pressed",
-                True,
-            ): self._request_reset_splits,
-            # Undo hotkey
-            (
-                self._undo_hotkey_pressed,
-                "_undo_hotkey_pressed",
-                self._undo_hotkey_enabled,
-            ): self._request_previous_split,
-            # Skip hotkey
-            (
-                self._skip_hotkey_pressed,
-                "_skip_hotkey_pressed",
-                self._skip_hotkey_enabled,
-            ): self._request_next_split,
-            # Previous split hotkey
-            (
-                self._previous_hotkey_pressed,
-                "_previous_hotkey_pressed",
-                True,
-            ): self._main_window.previous_split_button.click,
-            # Next split hotkey
-            (
-                self._next_hotkey_pressed,
-                "_next_hotkey_pressed",
-                True,
-            ): self._main_window.next_split_button.click,
-            # Screenshot hotkey
-            (
-                self._screenshot_hotkey_pressed,
-                "_screenshot_hotkey_pressed",
-                True,
-            ): self._main_window.screenshot_button.click,
-            # Toggle globals hotkey
-            (
-                self._toggle_hotkeys_hotkey_pressed,
-                "_toggle_hotkeys_hotkey_pressed",
-                True,
-            ): lambda: settings.set_value(
-                "GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled
-            ),
-        }.items():
+        hotkey_press_allowed = (
+            global_hotkeys_enabled or self._application.focusWindow() is not None
+        )
+        if not hotkey_press_allowed:
+            return
 
-            # If "hotkey is pressed" flag is True
-            if flags[0]:
-                # Set "hotkey is pressed" flag to False
-                setattr(self, flags[1], False)
+        if self._split_hotkey_pressed:
+            if self._split_hotkey_enabled:
+                self._request_next_split()
+            self._split_hotkey_pressed = False
 
-                # If the hotkey is allowed to be pressed
-                # (see _set_buttons_and_hotkeys_enabled)
-                if flags[2] and (
-                    # Global hotkeys enabled, OR the program is in focus
-                    # Also allow an exception for the toggle global hotkeys
-                    # key, which should be toggleable whether the app is in
-                    # focus or not.
-                    global_hotkeys_enabled
-                    or self._application.focusWindow() is not None
-                    or flags[1] == "_toggle_hotkeys_hotkey_pressed"
-                ):
+        elif self._reset_hotkey_pressed:
+            self._request_reset_splits()
+            self._reset_hotkey_pressed = False
 
-                    # Do the hotkey's associated action
-                    action()
-                    return
+        elif self._undo_hotkey_pressed:
+            if self._undo_hotkey_enabled:
+                self._request_previous_split()
+            self._undo_hotkey_pressed = False
+
+        elif self._skip_hotkey_pressed:
+            if self._skip_hotkey_enabled:
+                self._request_next_split()
+            self._skip_hotkey_pressed = False
+
+        elif self._previous_hotkey_pressed:
+            self._main_window.previous_button.click()
+            self._previous_hotkey_pressed = False
+
+        elif self._next_hotkey_pressed:
+            self._main_window.next_button.click()
+            self._next_hotkey_pressed = False
+
+        elif self._screenshot_hotkey_pressed:
+            self._main_window.screenshot_button.click()
+            self._screenshot_hotkey_pressed = False
 
     def _press_hotkey(self, key_code: str) -> None:
         """Press and release a hotkey.
@@ -2098,12 +1658,12 @@ class UIController:
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
             if len(key_code) > 0:
                 self._press_hotkey(key_code)
-            self._splitter.splits.next_split_image()
+            self._request_next_split()
 
         # Dummy split (silently advance to next split)
         elif self._splitter.dummy_split_action:
             self._splitter.dummy_split_action = False
-            self._splitter.splits.next_split_image()
+            self._request_next_split()
 
         # Normal split (press split hotkey)
         elif self._splitter.normal_split_action:
@@ -2111,403 +1671,12 @@ class UIController:
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
             if len(key_code) > 0:
                 self._press_hotkey(key_code)
-            else:
-                self._splitter.splits.next_split_image()
-
-    def _update_label_and_button_text(self) -> None:
-        """Update label and button text in the UI based on splitter state."""
-        # This value is used frequently, so I define it once for readability
-        min_view_showing = settings.get_bool("SHOW_MIN_VIEW")
-
-        # Video feed
-        if min_view_showing:
-            pass
-        else:
-            # Video is down but looks up
-            if (
-                self._main_window.video_feed_display.text() == ""
-                and not self._splitter.capture_thread.is_alive()
-            ):
-                self._main_window.video_feed_display.setText(
-                    self._main_window.video_feed_display_default_text
-                )
-            # Video is up but looks down
-            elif self._splitter.frame_pixmap is not None:
-                self._main_window.video_feed_display.setPixmap(
-                    self._splitter.frame_pixmap
-                )
-
-        # Video label
-        if min_view_showing:
-            # Video feed is live, but says it is down / is blank
-            if (
-                self._splitter.capture_thread.is_alive()
-                and self._main_window.video_feed_label.text()
-                != self._main_window.video_feed_label_live_text_min
-            ):
-                self._main_window.video_feed_label.setText(
-                    self._main_window.video_feed_label_live_text_min
-                )
-            # Video feed is down, but says it is live / is blank
-            elif (
-                not self._splitter.capture_thread.is_alive()
-                and self._main_window.video_feed_label.text()
-                != self._main_window.video_feed_label_down_text_min
-            ):
-                self._main_window.video_feed_label.setText(
-                    self._main_window.video_feed_label_down_text_min
-                )
-        else:
-            # Video feed is live, but the label is wrong / blank
-            if (
-                self._splitter.capture_thread.is_alive()
-                and self._main_window.video_feed_label.text()
-                != self._main_window.video_feed_label_live_text
-            ):
-                self._main_window.video_feed_label.setText(
-                    self._main_window.video_feed_label_live_text
-                )
-            # Video feed is down, but label is filled
-            elif (
-                not self._splitter.capture_thread.is_alive()
-                and self._main_window.video_feed_label.text() != ""
-            ):
-                self._main_window.video_feed_label.setText("")
-
-        # Split image, name, and loop count
-        current_image_index = self._splitter.splits.current_image_index
-        # No split image loaded, but split image still being displayed
-        if (
-            current_image_index is None
-            and self._main_window.split_name_label.text()
-            != self._main_window.split_image_default_text
-        ):
-            self._most_recent_split_index = None
-            self._most_recent_loop = None
-
-            self._main_window.split_image_display.setText(
-                self._main_window.split_image_default_text
+            # If key didn't get pressed, OR if it did get pressed but global
+            # hotkeys are off and the app isn't in focus, move the split image
+            # forward, since pressing the key on its own won't do that
+            hotkey_not_caught = (
+                self._application.focusWindow() is None
+                and not settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
             )
-            self._main_window.split_name_label.setText("")
-            self._main_window.split_image_loop_label.setText("")
-            self._main_window.minimal_view_no_splits_label.setText(
-                self._main_window.split_image_default_text
-            )
-            # Make sure this label shows over other split image labels
-            self._main_window.minimal_view_no_splits_label.raise_()
-        # Split image loaded that is either different from most recent one or on a different loop
-        elif (
-            current_image_index is not None
-            and (
-                current_image_index != self._most_recent_split_index
-                or self._splitter.splits.current_loop != self._most_recent_loop
-            )
-            or self._redraw_split_labels  # Set by various methods
-        ):
-            self._most_recent_split_index = current_image_index
-            self._most_recent_loop = self._splitter.splits.current_loop
-
-            self._redraw_split_labels = False
-
-            if min_view_showing:
-                pass
-            else:
-                self._main_window.split_image_display.setPixmap(
-                    self._splitter.splits.list[self._most_recent_split_index].pixmap
-                )
-
-            split_name = self._splitter.splits.list[self._most_recent_split_index].name
-            elided_name = self._main_window.split_name_label.fontMetrics().elidedText(
-                split_name, Qt.ElideRight, self._main_window.split_name_label.width()
-            )
-            self._main_window.split_name_label.setText(elided_name)
-            self._main_window.minimal_view_no_splits_label.setText("")
-            # Make sure this label doesn't block other labels
-            self._main_window.minimal_view_no_splits_label.lower()
-
-            current_total_loops = self._splitter.splits.list[
-                self._most_recent_split_index
-            ].loops
-            if current_total_loops == 0:
-                self._main_window.split_image_loop_label.setText("Split does not loop")
-            else:
-                self._main_window.split_image_loop_label.setText(
-                    f"Loop {self._splitter.splits.current_loop} of {current_total_loops}"
-                )
-
-        # Split image overlay
-        if self._splitter.delaying and self._splitter.delay_remaining is not None:
-            self._main_window.split_image_overlay.setVisible(True)
-            self._main_window.split_image_overlay.setText(
-                "Splitting in {amount:.1f} s".format(
-                    amount=self._splitter.delay_remaining
-                )
-            )
-        elif self._splitter.suspended and self._splitter.suspend_remaining is not None:
-            self._main_window.split_image_overlay.setVisible(True)
-            self._main_window.split_image_overlay.setText(
-                "Paused for next {amount:.1f} s".format(
-                    amount=self._splitter.suspend_remaining
-                )
-            )
-        elif self._main_window.split_image_overlay.text() != "":
-            self._main_window.split_image_overlay.setVisible(False)
-            self._main_window.split_image_overlay.setText("")
-
-        # This value is frequently used below, so I declare it here.
-        decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
-        if self._most_recent_match_percent_decimals != decimals:
-            self._most_recent_match_percent_decimals = decimals
-            self._most_recent_match_percent_format_string = (
-                f"{{:.{self._most_recent_match_percent_decimals}f}}"
-            )
-            self._most_recent_match_percent_null_string = (
-                self._null_match_percent_string()
-            )
-
-        # Current match percent
-        if self._splitter.current_match_percent is None:
-            # Match percent is None, but UI is still showing a number
-            if (
-                self._main_window.current_match_percent.text()
-                != self._most_recent_match_percent_null_string
-            ):
-                self._main_window.current_match_percent.setText(
-                    self._most_recent_match_percent_null_string
-                )
-        else:
-            self._main_window.current_match_percent.setText(
-                self._most_recent_match_percent_format_string.format(
-                    self._splitter.current_match_percent * 100
-                )
-            )
-
-        # Highest match percent
-        if self._splitter.highest_match_percent is None:
-            # Match percent is None, but UI is still showing a number
-            if (
-                self._main_window.highest_match_percent.text()
-                != self._most_recent_match_percent_null_string
-            ):
-                self._main_window.highest_match_percent.setText(
-                    self._most_recent_match_percent_null_string
-                )
-        else:
-            self._main_window.highest_match_percent.setText(
-                self._most_recent_match_percent_format_string.format(
-                    self._splitter.highest_match_percent * 100
-                )
-            )
-
-        # Threshold match percent
-        # Make sure the splits list isn't empty before trying to access it
-        if self._most_recent_split_index is None:
-            # Match percent is blank, but UI is still showing a number
-            if (
-                self._main_window.threshold_match_percent.text()
-                != self._most_recent_match_percent_null_string
-            ):
-                self._main_window.threshold_match_percent.setText(
-                    self._most_recent_match_percent_null_string
-                )
-        else:
-            threshold_match_percent = self._splitter.splits.list[
-                self._most_recent_split_index
-            ].threshold
-            self._main_window.threshold_match_percent.setText(
-                self._most_recent_match_percent_format_string.format(
-                    threshold_match_percent * 100
-                )
-            )
-
-        # Pause / unpause button text
-        if self._splitter_suspended != self._splitter.suspended:
-            self._splitter_suspended = self._splitter.suspended
-            self._toggle_pause_comparison_button_text()
-
-    def _toggle_pause_comparison_button_text(self) -> None:
-        """Adjust the length and content of the pause button's text according
-        to aspect ratio and splitter status.
-        """
-        if (
-            settings.get_bool("SHOW_MIN_VIEW")
-            or settings.get_str("ASPECT_RATIO") == "4:3 (320x240)"
-        ):
-            if self._splitter_suspended:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_unpause_text_truncated
-                )
-            else:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_pause_text_truncated
-                )
-
-        else:
-            if self._splitter_suspended:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_unpause_text_default
-                )
-            else:
-                self._main_window.pause_comparison_button.setText(
-                    self._main_window.pause_comparison_button_pause_text_default
-                )
-
-    def _update_flags(self) -> bool:
-        """Check the splitter to see if certain states have changed since the
-        last check.
-
-        The following states are checked:
-            video_active: Whether `splitter.capture_thread` is alive.
-            splits_active: Whether `self.most_recent_split_index` is None. That
-                value is set by _update_label_and_button_text, which is called
-                just before this method.
-            first_split_active: Whether the current split is the first split
-                (if there is a current split). This means a split image is
-                active, it's the first split image, and it's the first loop of
-                the image.
-            last_split_active: Whether the current split is the last split (if
-                there is a current split). This means a split image is active,
-                it's the last split image, and it's the last loop of the image.
-
-        Returns:
-            flag_changed (bool): True if any of the above flags were set or
-                unset, False otherwise.
-        """
-        flag_changed = False
-
-        # video_active
-        if self._video_active != self._splitter.capture_thread.is_alive():
-            self._video_active = self._splitter.capture_thread.is_alive()
-            flag_changed = True
-
-        # splits_active
-        # Explicitly say "is not True", "is not False" on these last three
-        # flags to catch None values from __init__()
-        if self._most_recent_split_index is None:
-            if self._splits_active is not False:
-                self._splits_active = False
-                flag_changed = True
-        else:
-            if self._splits_active is not True:
-                self._splits_active = True
-                flag_changed = True
-
-        # first_split_active
-        if (
-            self._most_recent_split_index == 0
-            and self._splitter.splits.current_loop == 0
-        ):
-            if self._first_split_active is not True:
-                self._first_split_active = True
-                flag_changed = True
-        else:
-            if self._first_split_active is not False:
-                self._first_split_active = False
-                flag_changed = True
-
-        # last_split_active
-        if (
-            self._splits_active
-            and self._most_recent_split_index == len(self._splitter.splits.list) - 1
-            and self._splitter.splits.current_loop
-            == self._splitter.splits.list[self._most_recent_split_index].loops
-        ):
-            if self._last_split_active is not True:
-                self._last_split_active = True
-                flag_changed = True
-        else:
-            if self._last_split_active is not False:
-                self._last_split_active = False
-                flag_changed = True
-
-        return flag_changed
-
-    def _set_buttons_and_hotkeys_enabled(self) -> None:
-        """Set the enabled status of buttons and hotkeys, depending on the
-        flags set in `_update_flags`.
-
-        Since the status of these buttons and hotkeys depends entirely on the
-        flags in `_update_flags`, this method is only called if `_update_flags`
-        returns True.
-        """
-        if self._splits_active:
-            # Enable split
-            self._split_hotkey_enabled = True
-
-            # Enable screenshots if video is on
-            if self._video_active:
-                self._main_window.screenshot_button.setEnabled(True)
-                self._main_window.pause_comparison_button.setEnabled(True)
-            else:
-                self._main_window.screenshot_button.setEnabled(False)
-                self._main_window.pause_comparison_button.setEnabled(False)
-
-            # Enable undo and previous if this isn't the first split
-            if self._first_split_active:
-                self._undo_hotkey_enabled = False
-                self._main_window.undo_split_button.setEnabled(False)
-                self._main_window.previous_split_button.setEnabled(False)
-            else:
-                self._undo_hotkey_enabled = True
-                self._main_window.undo_split_button.setEnabled(True)
-                self._main_window.previous_split_button.setEnabled(True)
-
-            # Enable skip and next if this isn't the last split
-            if self._last_split_active:
-                self._skip_hotkey_enabled = False
-                self._main_window.skip_split_button.setEnabled(False)
-                self._main_window.next_split_button.setEnabled(False)
-            else:
-                self._skip_hotkey_enabled = True
-                self._main_window.skip_split_button.setEnabled(True)
-                self._main_window.next_split_button.setEnabled(True)
-
-        else:
-            # Disable split, undo, skip, previous, next split, pause
-            self._split_hotkey_enabled = False
-            self._undo_hotkey_enabled = False
-            self._skip_hotkey_enabled = False
-            self._main_window.undo_split_button.setEnabled(False)
-            self._main_window.skip_split_button.setEnabled(False)
-            self._main_window.previous_split_button.setEnabled(False)
-            self._main_window.next_split_button.setEnabled(False)
-            self._main_window.pause_comparison_button.setEnabled(False)
-
-            # Enable screenshots if video is on
-            if self._video_active:
-                self._main_window.screenshot_button.setEnabled(True)
-            else:
-                self._main_window.screenshot_button.setEnabled(False)
-
-    def _null_match_percent_string(self) -> None:
-        """Return a string representing a blank match percent with the number
-        of decimal places the user chooses in settings.
-
-        Returns:
-            str: The null match percent string. Possible values are "--",
-                "--.-", and "--.--".
-        """
-        match_percent_string = "--"
-        decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
-        if decimals > 0:
-            match_percent_string += "."
-            while decimals > 0:
-                match_percent_string += "-"
-                decimals -= 1
-        return match_percent_string
-
-    def _formatted_match_percent_string(
-        self, match_percent: float, decimals: int
-    ) -> str:
-        """Format a raw match percent into a string with the number of decimal
-        places the user chooses.
-
-        Args:
-            match_percent (float): The raw integer match. E.g., 0.8931285.
-            decimals (int): The number of trailing decimals.
-
-        Returns:
-            str: The formatted value. E.g., "89.3".
-        """
-        format_string = f"{{:.{decimals}f}}"
-        return format_string.format(match_percent * 100)
+            if len(key_code) == 0 or hotkey_not_caught:
+                self._request_next_split()

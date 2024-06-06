@@ -65,7 +65,7 @@ class Splitter:
             self.splits to go to a new split image.
         comparison_frame (numpy.ndarray): Numpy array used to generate a
             comparison with a split image.
-        current_match_percent (float): The most recent match percent between a
+        match_percent (float): The most recent match percent between a
             frame and a split image.
         delay_remaining (float): The amount of time left (in seconds) until a
             planned split occurs.
@@ -74,7 +74,7 @@ class Splitter:
         dummy_split_action (bool): When True, tells ui_controller to perform a
             dummy split action.
         frame_pixmap (QPixmap): QPixmap used to show video feed on UI.
-        highest_match_percent (float): The highest match percent so far between
+        highest_percent (float): The highest match percent so far between
             a frame and a split image.
         normal_split_action (bool): When True, tells ui_controller to perform a
             normal split action.
@@ -103,14 +103,13 @@ class Splitter:
         self.comparison_frame = None
         self.frame_pixmap = None
         self.capture_thread = threading.Thread(target=self._capture)
-        self._ui_frame = None
         self._cap = None
         self._capture_thread_finished = False
 
         # _compare_thread
         self.splits = SplitDir()
-        self.current_match_percent = None
-        self.highest_match_percent = None
+        self.match_percent = None
+        self.highest_percent = None
         self.delaying = False
         self.delay_remaining = None
         self.suspended = True
@@ -123,10 +122,6 @@ class Splitter:
 
         self.changing_splits = False
         self.waiting_for_split_change = False
-
-        # _split_thread variables
-        self._split_thread = threading.Thread(target=self._set_normal_split_action)
-        self._split_thread_finished = False
 
     ##################
     #                #
@@ -153,9 +148,6 @@ class Splitter:
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
-        if self._split_thread.is_alive():
-            self._split_thread_finished = True
-            self._split_thread.join()
 
     def start_compare_thread(self) -> None:
         """Safely start _compare_thread.
@@ -170,17 +162,10 @@ class Splitter:
         self.suspended = False
 
     def safe_exit_compare_thread(self) -> None:
-        """Safely kill _compare_thread.
-
-        Also kills _split_thread, since _split_thread should only be active if
-        _compare_thread is active.
-        """
+        """Safely kill _compare_thread."""
         if self._compare_thread.is_alive():
             self._compare_thread_finished = True
             self._compare_thread.join()
-        if self._split_thread.is_alive():
-            self._split_thread_finished = True
-            self._split_thread.join()
         self.suspended = True
 
     def set_next_capture_index(self) -> None:
@@ -237,23 +222,26 @@ class Splitter:
     def _open_capture(self) -> cv2.VideoCapture:
         """Open and configure a cv2 VideoCapture.
 
-        Sets CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
-        Sets CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to their respective
-        values because these appear to be the smallest available values. The
-        smaller the capture's width and height, the fast images can be
-        downscaled, and the less CPU is required to do so.
-        Sets self._capture_max_fps to the capture's maximum FPS on platforms
+        Set CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
+
+        Set CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to our target value.
+        I can't imagine any capture cards actually support this, but this
+        forces the capture source to choose the next-closest value, which in
+        some cases is quite a lot smaller than the default. This saves CPU.
+
+        Set self._capture_max_fps to the capture's maximum FPS on platforms
         where this is supported. This is done to prevent unnecessary
         comparisons from being generated in _compare due to a mismatch between
         the user's selected framerate and a capture-imposed cap which is lower.
+        This also saves CPU.
 
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
         """
         cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, COMPARISON_FRAME_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, COMPARISON_FRAME_HEIGHT)
         try:
             self._capture_max_fps = cap.get(cv2.CAP_PROP_FPS)
         except cv2.error:
@@ -312,9 +300,9 @@ class Splitter:
                 # Don't need to generate a separate ui_frame -- the
                 # comparison_frame is already the right size
                 if settings.get_bool("SHOW_MIN_VIEW"):
-                    self._ui_frame = None
+                    ui_frame = None
                 else:
-                    self._ui_frame = self.comparison_frame
+                    ui_frame = self.comparison_frame
 
             else:
                 self.comparison_frame = cv2.resize(
@@ -323,9 +311,9 @@ class Splitter:
                     interpolation=cv2.INTER_LINEAR,
                 )
                 if settings.get_bool("SHOW_MIN_VIEW"):
-                    self._ui_frame = None
+                    ui_frame = None
                 else:
-                    self._ui_frame = cv2.resize(
+                    ui_frame = cv2.resize(
                         frame,
                         (
                             settings.get_int("FRAME_WIDTH"),
@@ -334,12 +322,11 @@ class Splitter:
                         interpolation=cv2.INTER_NEAREST,
                     )
 
-            self.frame_pixmap = self._frame_to_pixmap(self._ui_frame)
+            self.frame_pixmap = self._frame_to_pixmap(ui_frame)
 
         self._cap.release()
 
         # Setting these to None tells ui_controller the capture isn't active
-        self._ui_frame = None
         self.comparison_frame = None
         self.frame_pixmap = None
 
@@ -393,19 +380,19 @@ class Splitter:
         The following flags are used to determine when to return a value:
             match_found: False until one of two conditions is met--
                 1) The split image's below_flag is False, and
-                    current_match_percent >= threshold_match_percent
-                2) went_above_threshold_flag is True and current_match_percent
-                    < threshold_match_percent
+                    match_percent >= threshold_percent
+                2) went_above_threshold_flag is True and match_percent
+                    < threshold_percent
             went_above_threshold_flag: False until the split image's below_flag
-                is True, and current_match_percent >= threshold_match_percent
+                is True, and match_percent >= threshold_percent
 
         Returns:
             bool: True if one of the two above match_found conditions are met.
                 False if self._compare_thread_finished is called, terminating
                 the thread.
         """
-        self.current_match_percent = 0
-        self.highest_match_percent = 0
+        self.match_percent = 0
+        self.highest_percent = 0
         match_found = False
         went_above_threshold_flag = False
         frames_this_second = 0
@@ -436,12 +423,12 @@ class Splitter:
                 continue
 
             # Check image against template image
-            self.current_match_percent = self._get_match_percent(frame)
-            if self.current_match_percent > self.highest_match_percent:
-                self.highest_match_percent = self.current_match_percent
+            self.match_percent = self._get_match_percent(frame)
+            if self.match_percent > self.highest_percent:
+                self.highest_percent = self.match_percent
 
             if (
-                self.current_match_percent
+                self.match_percent
                 >= self.splits.list[self.splits.current_image_index].threshold
             ):
                 if self.splits.list[self.splits.current_image_index].below_flag:
@@ -455,8 +442,8 @@ class Splitter:
                 break
 
         # Setting these to None tells the ui_controller the splitter is down
-        self.current_match_percent = None
-        self.highest_match_percent = None
+        self.match_percent = None
+        self.highest_percent = None
         return match_found
 
     def _update_fps_factor(
@@ -560,21 +547,17 @@ class Splitter:
         The various flags set by this method are read by ui_controller, which
         references them to update the UI and send hotkey presses.
         """
-        # Get these values now so that changing splits later doesn't break
-        # anything
-        delay_duration = self.splits.list[
-            self.splits.current_image_index
-        ].delay_duration
-        suspend_duration = self.splits.list[
-            self.splits.current_image_index
-        ].pause_duration
-        pause_flag = self.splits.list[self.splits.current_image_index].pause_flag
-        dummy_flag = self.splits.list[self.splits.current_image_index].dummy_flag
+        # Save now so we can execute the delay_duration block correctly
+        # The split will have already changed, but we rely on these values
+        # to execute that block so we need to save them now
+        loop = self.splits.current_loop
+        index = self.splits.current_image_index
+        split_image = self.splits.list[index]
 
         # Handle delay
-        if delay_duration > 0:
+        if split_image.delay_duration > 0:
             self.delaying = True
-            self.delay_remaining = delay_duration
+            self.delay_remaining = split_image.delay_duration
             start_time = time.perf_counter()
 
             # Poll at regular intervals, both to update self.delay_remaining,
@@ -582,10 +565,10 @@ class Splitter:
             # kill the thread. The same thing is done in the suspend_duration
             # block below.
             while (
-                time.perf_counter() - start_time < delay_duration
+                time.perf_counter() - start_time < split_image.delay_duration
                 and not self._compare_thread_finished
             ):
-                self.delay_remaining = delay_duration - (
+                self.delay_remaining = split_image.delay_duration - (
                     time.perf_counter() - start_time
                 )
                 time.sleep(self._interval)
@@ -599,76 +582,29 @@ class Splitter:
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
-        if pause_flag:
+        if split_image.pause_flag:
             self.pause_split_action = True
-        elif dummy_flag:
+        elif split_image.dummy_flag:
             self.dummy_split_action = True
         else:
-            self._start_split_thread()
+            self.normal_split_action = True
 
-        # Handle post-split pause
-        if suspend_duration > 0:
+        # Don't delay after very last split
+        if index == len(self.splits.list) - 1 and loop == split_image.loops:
+            return
+
+        # Handle post-split delay
+        elif split_image.pause_duration > 0:
             self.suspended = True
-            self.suspend_remaining = suspend_duration
+            self.suspend_remaining = split_image.pause_duration
             start_time = time.perf_counter()
             while (
-                time.perf_counter() - start_time < suspend_duration
+                time.perf_counter() - start_time < split_image.pause_duration
                 and not self._compare_thread_finished
             ):
-                self.suspend_remaining = suspend_duration - (
+                self.suspend_remaining = split_image.pause_duration - (
                     time.perf_counter() - start_time
                 )
                 time.sleep(self._interval)
             self.suspended = False
             self.suspend_remaining = None
-
-            if self._compare_thread_finished:
-                return
-
-    def _start_split_thread(self) -> None:
-        """Start _split_thread with target=self._set_normal_split_action."""
-        self._split_thread = threading.Thread(target=self._set_normal_split_action)
-        self._split_thread_finished = False
-        self._split_thread.daemon = True
-        self._split_thread.start()
-
-    def _set_normal_split_action(self) -> None:
-        """Set normal_split_action = True without triggering a "double split".
-
-        Since there is a chance a split image could be matched when global
-        hotkeys are disabled and the program is not in focus, we want to make
-        sure the program can still send the split keypress without failing to
-        split. We do this by calling next_split_image directly from this method
-        and setting a flag in split_dir that prevents next_split_image() from
-        being called again for 1 second.
-
-        If next_split_image() is called within 1 second, ignore_split_request
-        is unset and the loop ends.
-
-        Using this method guarantees that though there might be 2 calls made
-        to next_split_image, there will never be 0, and we will always go
-        forward exactly 1 split image, not 0 or 2.
-
-        A thread is used so that this doesn't block for 1 second in the worst
-        case scenario. Instead, the worse case scenario is that for 1 second,
-        if the user presses the split hotkey after a split already occurs,
-        nothing will happen, which I can live with.
-
-        This is not exactly a clean solution, but I think something like this
-        has to be implemented if we are going to allow disabling global
-        hotkeys.
-        """
-        self.splits.next_split_image()
-        self.splits.ignore_split_request = True
-
-        self.normal_split_action = True
-
-        start_time = time.perf_counter()
-        while (
-            time.perf_counter() - start_time < 1
-            and self.splits.ignore_split_request
-            and not self._split_thread_finished
-        ):
-            time.sleep(0.001)
-
-        self.splits.ignore_split_request = False
