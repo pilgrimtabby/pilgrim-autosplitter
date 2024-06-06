@@ -55,10 +55,10 @@ Force a split to loop. Useful if consecutive splits use the same image.
 
 Insert the value between "at" signs: `@value@`.
 
-Default: `0`
+Default: `1`
 
 {: .example }
-`001_mysplit_@1@.png` The split will repeat one additional time.
+`001_mysplit_@2@.png` The split will be used twice instead of once.
 
 # Special Split Types
 
@@ -76,7 +76,7 @@ Force Pilgrim Autosplitter to press the [pause hotkey]({% link 04-settings.md %}
 Insert a `p` between curly braces: `{p}`.
 
 {: .example }
-`001_mysplit_{p}.png` Press the pause hotkey when a match is found.
+`001_mysplit_{p}.png` Press the pause hotkey instead of the split hotkey when a match is found.
 
 ## Dummy type
 
