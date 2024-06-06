@@ -23,7 +23,7 @@ This is the settings menu:
 ## Frames per second
 
 {: .important }
-LOWERING THIS SETTING CAN DRAMATICALLY REDUCE CPU USAGE!
+Lowering this setting is a great way to save CPU.
 
 The amount of frames per second Pilgrim Autosplitter captures and processes.
 
