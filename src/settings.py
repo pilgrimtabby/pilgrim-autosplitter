@@ -289,6 +289,9 @@ def set_defaults() -> None:
 def get_latest_version() -> str:
     """Get the latest release's version number from the github repo.
 
+    The `try` block at the beginning is to handle cases where the internet is
+    either (1) not connected or (2) very slow.
+
     Returns:
         str: The version number (or the current version if something goes
             wrong).
@@ -296,7 +299,7 @@ def get_latest_version() -> str:
     try:
         # Use timeout=1 to prevent hanging for too long
         github_page_text = requests.get(REPO_URL, timeout=1).text
-    except requests.exceptions.ConnectionError:  # No internet connection
+    except (requests.exceptions.ConnectionError, requests.Timeout):
         return VERSION_NUMBER
 
     # The way GitHub works right now, releases_text is present in the html
