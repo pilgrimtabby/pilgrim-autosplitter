@@ -1576,60 +1576,56 @@ class UIController:
     def _handle_hotkey_press(self) -> None:
         """React to the flags set in _handle_key_press.
 
-        When a hotkey is pressed, this method determines what happens.
-        The dict contains the following:
-            1) `flags`: A tuple with three values. Value 1 is the flag set
-                `in _handle_key_press`; value 2 is a string representation
-                of value 1; value 3 is the flag enabling or disabling the
-                hotkey, which is set in `_set_buttons_and_hotkeys_enabled`
-                (or just `True` if there is no flag).
-            2) `action`: The method or function to be called when the hotkey is
-                executed.
-        This dict implementation is kind of messy and hard to understand, but I
-        feel that the alternative of having everything laid out in if-blocks
-        was worse.
+        When a hotkey is pressed, do its action if hotkeys are allowed now.
+        Then, unset the flag no matter what.
+
+        The toggle_hotkeys hotkey has no hotkey_presses_allowed check because
+        it is always enabled, even when global hotkeys are disabled and the
+        program isn't in focus. This is to make it easy for the user to enable/
+        disable global hotkeys without having to click the app back in focus.
         """
         global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
-        if self._toggle_hotkeys_hotkey_pressed:
-            self._toggle_hotkeys_hotkey_pressed = False
-            settings.set_value("GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled)
-            return
-
-        hotkey_press_allowed = (
+        hotkey_presses_allowed = (
             global_hotkeys_enabled or self._application.focusWindow() is not None
         )
-        if not hotkey_press_allowed:
-            return
 
-        if self._split_hotkey_pressed:
-            if self._split_hotkey_enabled:
+        if self._toggle_hotkeys_hotkey_pressed:
+            settings.set_value("GLOBAL_HOTKEYS_ENABLED", not global_hotkeys_enabled)
+            self._toggle_hotkeys_hotkey_pressed = False
+
+        elif self._split_hotkey_pressed:
+            if self._split_hotkey_enabled and hotkey_presses_allowed:
                 self._request_next_split()
             self._split_hotkey_pressed = False
 
         elif self._reset_hotkey_pressed:
-            self._request_reset_splits()
+            if hotkey_presses_allowed:
+                self._request_reset_splits()
             self._reset_hotkey_pressed = False
 
         elif self._undo_hotkey_pressed:
-            if self._undo_hotkey_enabled:
+            if self._undo_hotkey_enabled and hotkey_presses_allowed:
                 self._request_previous_split()
             self._undo_hotkey_pressed = False
 
         elif self._skip_hotkey_pressed:
-            if self._skip_hotkey_enabled:
+            if self._skip_hotkey_enabled and hotkey_presses_allowed:
                 self._request_next_split()
             self._skip_hotkey_pressed = False
 
         elif self._previous_hotkey_pressed:
-            self._main_window.previous_button.click()
+            if hotkey_presses_allowed:
+                self._main_window.previous_button.click()
             self._previous_hotkey_pressed = False
 
         elif self._next_hotkey_pressed:
-            self._main_window.next_button.click()
+            if hotkey_presses_allowed:
+                self._main_window.next_button.click()
             self._next_hotkey_pressed = False
 
         elif self._screenshot_hotkey_pressed:
-            self._main_window.screenshot_button.click()
+            if hotkey_presses_allowed:
+                self._main_window.screenshot_button.click()
             self._screenshot_hotkey_pressed = False
 
     def _press_hotkey(self, key_code: str) -> None:
