@@ -30,6 +30,7 @@
 input to the UI and the splitter.
 """
 
+import glob
 import os
 import platform
 import subprocess
@@ -729,11 +730,11 @@ class UIController:
             QTimer.singleShot(10000, lambda: msg.done(0))
 
     def get_file_number(self, dir: str) -> str:
-        """Return the lowest three-digit number that will allow a unique
-        filename in this format: "xxx_screenshot.png"
+        """Return the lowest three-digit number not already used as a .png
+        filename suffix in the given directory.
 
         Args:
-            dir (str): The target directory for the file
+            dir (str): The target directory for the file.
 
         Raises:
             Exception: Throw an exception if there are more than 1,000 files in
@@ -746,11 +747,12 @@ class UIController:
         file_int = 0
         while True:
             if file_int > 999:
-                raise Exception(f"Error: no suitable filename found in {dir}")
+                raise Exception(f"Error: over 1000 split images already in {dir}")
 
             leading_zeros = "0" * (3 - len(str(file_int)))
             file_number = f"{leading_zeros}{file_int}"
-            if Path(f"{dir}/{file_number}_screenshot.png").is_file():
+            files_with_same_number = glob.glob(f"{dir}/{file_number}*.png")
+            if len(files_with_same_number) > 0:
                 file_int += 1
             else:
                 return file_number
