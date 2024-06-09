@@ -30,6 +30,7 @@
 input to the UI and the splitter.
 """
 
+import datetime
 import glob
 import os
 import platform
@@ -1335,27 +1336,54 @@ class UIController:
             splits_min_label.lower()  # Make sure it's not covering others
 
     def _update_split_delay_suspend(self) -> None:
-        """Display remaining delay or suspend time.
-
-        Keep track of both overlays, regardless of view, so we can hide the one
-        not currently in use.
+        """Display remaining delay or suspend time on the split image overlay.
         """
         overlay = self._main_window.split_overlay
-        delay_txt = self._main_window.overlay_delay_txt
-        pause_txt = self._main_window.overlay_pause_txt
+        delay = self._splitter.delay_remaining
+        suspend = self._splitter.suspend_remaining
         min_view = settings.get_bool("SHOW_MIN_VIEW")
 
         # Splitter is delaying pre-split
-        if self._splitter.delaying and self._splitter.delay_remaining is not None:
+        if self._splitter.delaying and delay is not None:
             if not min_view:
                 overlay.setVisible(True)
-                overlay.setText(delay_txt.format(self._splitter.delay_remaining))
+                if delay < 60:  # Less than 1 minute, so we show special text.
+                    # Round high values down to 59.94 and low values up to 0.06
+                    # so that the string formatter in main_window doesn't show
+                    # 60.0 and 0.0 on the overlay.
+                    delay_txt = self._main_window.overlay_delay_txt_secs
+                    overlay.setText(delay_txt.format(max(min(delay, 59.94), 0.06)))
+                else:
+                    delta = datetime.timedelta(seconds=delay)
+                    delay_txt = self._main_window.overlay_delay_txt_mins
+                    if delay < 600:  # Less than 10 minutes -- remove leading 0
+                        # Split call strips decimals from the second
+                        overlay.setText(delay_txt.format(str(delta)[3:]).split(".")[0])
+                    elif delay < 3600:  # Less than 1 hr -- remove hour info
+                        overlay.setText(delay_txt.format(str(delta)[2:]).split(".")[0])
+                    else:  # At least 1 hour, show the whole thing
+                        overlay.setText(delay_txt.format(str(delta)).split(".")[0])
 
         # Splitter is pausing post-split
-        elif self._splitter.suspended and self._splitter.suspend_remaining is not None:
+        elif self._splitter.suspended and suspend is not None:
             if not min_view:
                 overlay.setVisible(True)
-                overlay.setText(pause_txt.format(self._splitter.suspend_remaining))
+                if suspend < 60:  # Less than 1 minute, so we show special txt.
+                    # Round high values down to 59.94 and low values up to 0.06
+                    # so that the string formatter in main_window doesn't show
+                    # 60.0 and 0.0 on the overlay.
+                    pause_txt = self._main_window.overlay_pause_txt_secs
+                    overlay.setText(pause_txt.format(max(min(suspend, 59.94), 0.06)))
+                else:
+                    delta = datetime.timedelta(seconds=suspend)
+                    pause_txt = self._main_window.overlay_pause_txt_mins
+                    if suspend < 600:  # Less than 10 minutes -- remove leading 0
+                        # Split call strips decimals from the second
+                        overlay.setText(pause_txt.format(str(delta)[3:]).split(".")[0])
+                    elif suspend < 3600:  # Less than 1 hr -- remove hour info
+                        overlay.setText(pause_txt.format(str(delta)[2:]).split(".")[0])
+                    else:  # At least 1 hour, show the whole thing
+                        overlay.setText(pause_txt.format(str(delta)).split(".")[0])
 
         # Splitter isn't pausing or delaying, but the overlay is showing
         elif overlay.text() != "":
@@ -1397,9 +1425,13 @@ class UIController:
 
     def _update_pause_button(self):
         """Adjust the length and content of the pause button's text according
-        to aspect ratio and splitter status.
+        to aspect ratio and whether the splitter is active.
+
+        Rely on self._splitter.match_percent to detect whether the splitter is
+        active, since this particular value is never None when the splitter is
+        active.
         """
-        suspended = self._splitter.suspended
+        splitter_active = (self._splitter.match_percent is not None)
         pause_button = self._main_window.pause_button
         show_short_text = (
             settings.get_bool("SHOW_MIN_VIEW")
@@ -1407,16 +1439,16 @@ class UIController:
         )
 
         if show_short_text:
-            if suspended:
-                pause_button.setText(self._main_window.unpause_short_txt)
-            else:
+            if splitter_active:
                 pause_button.setText(self._main_window.pause_short_txt)
+            else:
+                pause_button.setText(self._main_window.unpause_short_txt)
 
         else:
-            if suspended:
-                pause_button.setText(self._main_window.unpause_long_txt)
-            else:
+            if splitter_active:
                 pause_button.setText(self._main_window.pause_long_txt)
+            else:
+                pause_button.setText(self._main_window.unpause_long_txt)
 
     def _set_buttons_and_hotkeys_enabled(self) -> bool:
         """Enable and disable hotkeys and buttons depending on whether splits

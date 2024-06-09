@@ -65,8 +65,6 @@ class Splitter:
             self.splits to go to a new split image.
         comparison_frame (numpy.ndarray): Numpy array used to generate a
             comparison with a split image.
-        match_percent (float): The most recent match percent between a
-            frame and a split image.
         delay_remaining (float): The amount of time left (in seconds) until a
             planned split occurs.
         delaying (bool): Indicates whether _split is waiting before setting a
@@ -76,6 +74,9 @@ class Splitter:
         frame_pixmap (QPixmap): QPixmap used to show video feed on UI.
         highest_percent (float): The highest match percent so far between
             a frame and a split image.
+        match_percent (float): The most recent match percent between a
+            frame and a split image. Can safely be used by other classes to
+            check if splitter_thread is active.
         normal_split_action (bool): When True, tells ui_controller to perform a
             normal split action.
         pause_split_action (bool): When True, tells ui_controller to perform a
@@ -193,8 +194,12 @@ class Splitter:
         settings.set_value("LAST_CAPTURE_SOURCE_INDEX", source)
 
     def toggle_suspended(self) -> None:
-        """Stop _compare_thread if it's running; else, start it if possible."""
-        if self.suspended:
+        """Stop _compare_thread if it's running; else, start it if possible.
+        
+        Use self.match_percent, since it will never be None if compare_thread
+        is alive.
+        """
+        if self.match_percent is None:
             self.safe_exit_compare_thread()
             if len(self.splits.list) > 0:
                 self.start_compare_thread()
@@ -557,7 +562,10 @@ class Splitter:
         # Handle delay
         if split_image.delay_duration > 0:
             self.delaying = True
-            self.delay_remaining = split_image.delay_duration
+            # Save total_delay because if the user changes default delay in
+            # settings during this method, we don't want the delay remaining
+            # to be updated accordingly.
+            self.delay_remaining = total_delay = split_image.delay_duration
             start_time = time.perf_counter()
 
             # Poll at regular intervals, both to update self.delay_remaining,
@@ -565,10 +573,10 @@ class Splitter:
             # kill the thread. The same thing is done in the suspend_duration
             # block below.
             while (
-                time.perf_counter() - start_time < split_image.delay_duration
+                time.perf_counter() - start_time < total_delay
                 and not self._compare_thread_finished
             ):
-                self.delay_remaining = split_image.delay_duration - (
+                self.delay_remaining = total_delay - (
                     time.perf_counter() - start_time
                 )
                 time.sleep(self._interval)
@@ -596,13 +604,16 @@ class Splitter:
         # Handle post-split pause
         elif split_image.pause_duration > 0:
             self.suspended = True
-            self.suspend_remaining = split_image.pause_duration
+            # Save total_suspend because if the user changes default suspend in
+            # settings during this method, we don't want the suspend remaining
+            # to be updated accordingly.
+            self.suspend_remaining = total_suspend = split_image.pause_duration
             start_time = time.perf_counter()
             while (
-                time.perf_counter() - start_time < split_image.pause_duration
+                time.perf_counter() - start_time < total_suspend
                 and not self._compare_thread_finished
             ):
-                self.suspend_remaining = split_image.pause_duration - (
+                self.suspend_remaining = total_suspend - (
                     time.perf_counter() - start_time
                 )
                 time.sleep(self._interval)
