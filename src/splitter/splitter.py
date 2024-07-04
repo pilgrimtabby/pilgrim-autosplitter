@@ -183,7 +183,7 @@ class Splitter:
         found_valid_source = False
         tries = 0
         while tries < 3:
-            if platform.system == "Windows":
+            if platform.system() == "Windows":
                 # Using CAP_DSHOW greatly boosts performance on Windows.
                 # It can break things on other platforms.
                 test_cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
@@ -249,7 +249,7 @@ class Splitter:
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
         """
-        if platform.system == "Windows":
+        if platform.system() == "Windows":
             # Using CAP_DSHOW greatly boosts performance on Windows.
             # It can break things on other platforms.
             cap = cv2.VideoCapture(
