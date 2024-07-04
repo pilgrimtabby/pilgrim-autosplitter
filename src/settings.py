@@ -79,20 +79,16 @@ def get_str(key: str) -> str:
 def get_bool(key: str) -> bool:
     """Return a bool from settings, regardless of the stored value's type.
 
-    If this is used on a setting that is not a boolean, it will always return
-    True if the setting is populated, so only use this function to get values
-    that are stored as True or False.
-
     Args:
         key (str): The name of the setting. E.g. "CHEESE_FLAVOR".
 
     Returns:
         bool: The setting.
     """
-    if settings.value(key) == "False":
-        return False
-    else:
+    if settings.value(key) == "True":
         return True
+    else:
+        return False
 
 
 def get_int(key: str) -> int:

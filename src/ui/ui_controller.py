@@ -1336,8 +1336,7 @@ class UIController:
             splits_min_label.lower()  # Make sure it's not covering others
 
     def _update_split_delay_suspend(self) -> None:
-        """Display remaining delay or suspend time on the split image overlay.
-        """
+        """Display remaining delay or suspend time on the split image overlay."""
         overlay = self._main_window.split_overlay
         delay = self._splitter.delay_remaining
         suspend = self._splitter.suspend_remaining
@@ -1431,7 +1430,7 @@ class UIController:
         active, since this particular value is never None when the splitter is
         active.
         """
-        splitter_active = (self._splitter.match_percent is not None)
+        splitter_active = self._splitter.match_percent is not None
         pause_button = self._main_window.pause_button
         show_short_text = (
             settings.get_bool("SHOW_MIN_VIEW")
