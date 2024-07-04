@@ -1,6 +1,6 @@
-# Pilgrim Autosplitter for MacOS
+# Pilgrim Autosplitter for Windows and MacOS
 
-Finally, an image-based speedrun autosplitter compatible with MacOS!
+Finally, an image-based speedrun autosplitter compatible with multiple platforms, including MacOS!
 
 ![Demonstration GIF](resources/demo.gif)
 
