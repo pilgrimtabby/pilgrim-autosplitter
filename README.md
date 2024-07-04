@@ -29,7 +29,7 @@ The installation method depends on your operating system.
 > [!IMPORTANT]  
 > This option is currently only available for silicon-based Macs. If you're not sure what kind of chip your computer has, see [Apple's guide](https://support.apple.com/en-us/116943). A build for Intel-based Macs will be released by the end of June. For now, if you're using an Intel-based Mac, you'll have to [run the app from source](#run-from-source-with-python).
 
-Download the latest MacOS build by going to the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) and downloading `pilgrim-autosplitter-v1.0.1.zip` (or whatever the newest version number is). Extract the app from the .zip folder.
+Download the latest MacOS build by going to the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) and downloading `pilgrim-autosplitter-v1.1.zip` (or whatever the newest version number is). Extract the app from the .zip folder.
 
 Pros:
 
@@ -73,7 +73,7 @@ If you're comfortable using Python:
 
 If you're NOT comfortable using Python:
 
-* You need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
+* You need Python 3.10 or newer. [Install it here](https://www.python.org/downloads/).
 
 > [!Important]
 > When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
@@ -104,6 +104,22 @@ Cons:
 
 ## Windows
 
+### Download Application
+
+Download the latest Windows build by going to the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) and downloading `pilgrim-autosplitter-v1.1.zip` (or whatever the newest version number is). Extract the app from the .zip folder.
+
+Pros:
+
+* Only one file
+
+* Easy to install and use.
+
+Cons:
+
+* Takes a little longer to boot up.
+
+* The app's custom icon doesn't show up correctly in the dock.
+
 ### Run from source with Python
 
 > [!WARNING]  
@@ -111,7 +127,7 @@ Cons:
 
 If you're comfortable using Python:
 
-* Make sure you have Python 3.9+ installed
+* Make sure you have Python 3.10+ installed
 
 * `python -m pip install -r requirements.txt`
 
@@ -119,7 +135,7 @@ If you're comfortable using Python:
 
 If you're NOT comfortable using Python:
 
-* You need Python 3.9 or newer. [Install it here](https://www.python.org/downloads/).
+* You need Python 3.10 or newer. [Install it here](https://www.python.org/downloads/).
 
 > [!Important]
 > When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
