@@ -90,10 +90,21 @@ def main():
             self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
             # Without the absolute path, the icon only shows up when running
             # the program from the same directory /resources is in. This makes
-            # it show up no matter what
-            self.pilgrim_autosplitter.setWindowIcon(
-                QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
-            )
+            # it show up regardless
+            if platform.system() == "Windows":
+                # This doesn't work yet, but I'm leaving it in because I think
+                # I'm on the right track
+                self.pilgrim_autosplitter.setWindowIcon(
+                    QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
+                )
+                # Tell Windows this app is its own process so icon shows up
+                import ctypes
+                app_id = u"pilgrim_tabby.pilgrim_autosplitter.latest"
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+            else:
+                self.pilgrim_autosplitter.setWindowIcon(
+                    QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
+                )
 
             settings.set_defaults()
 

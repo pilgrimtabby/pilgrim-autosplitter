@@ -1,0 +1,3 @@
+Copy and paste the following into Command Prompt:
+
+path\to\pyinstaller.exe --onefile --noconsole --icon=path\to\icon-windows.ico path\to\pilgrim_autosplitter.py
