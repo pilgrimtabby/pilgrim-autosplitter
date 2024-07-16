@@ -12,7 +12,9 @@ Bring your best speedgame whether you’re running on console, MacOS, or PC.
 
 This program has only been minimally tested on Windows, so there may be unknown issues. If you encounter problems or have an idea for an improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
-I don't have plans to introduce Linux support, but if you're interested in adding such support, feel free to [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
+### Note about Linux
+
+Pilgrim Autosplitter relies on [Pynput](https://pypi.org/project/pynput/) for its global hotkeys, but Pynput is [difficult to implement](https://pynput.readthedocs.io/en/latest/limitations.html#linux) on Linux. Everything else appears to work fine. Unfortunately, I don't have the resources to manage this issue right now, so there is no official Linux version. Feel free to download and run the source code, and if you fix things up yourself, go ahead and [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
 # Usage
 
@@ -65,13 +67,13 @@ TROUBLESHOOTING
 
 If you're comfortable using Python:
 
-* Make sure you have Python 3.9+ installed
+* Make sure you have Python 3.10+ installed
 
 * `pip3 install -r requirements.txt`
 
 * `python3 pilgrim_autosplitter.py`
 
-If you're NOT comfortable using Python:
+If this is your first time using Python:
 
 * You need Python 3.10 or newer. [Install it here](https://www.python.org/downloads/).
 
@@ -133,7 +135,7 @@ If you're comfortable using Python:
 
 * `python pilgrim_autosplitter.py`
 
-If you're NOT comfortable using Python:
+If this is your first time using Python:
 
 * You need Python 3.10 or newer. [Install it here](https://www.python.org/downloads/).
 
@@ -150,4 +152,4 @@ If you're NOT comfortable using Python:
 
 ## Linux
 
-I don't have access to a Linux development environment... sorry. If you're feeling motivated, feel free to [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls). Pilgrim Autosplitter is built to be cross-platform, and there shouldn't (in theory) be too much standing in the way of a working Linux implementation.
+This program has [run into some problems](#note-about-linux) on Linux, so there's no official release. If you're feeling motivated, feel free to [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).

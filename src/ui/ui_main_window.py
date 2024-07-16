@@ -208,7 +208,7 @@ class UIMainWindow(QMainWindow):
         # Layout attributes
         self.LEFT_EDGE_CORRECTION = -44
         self.TOP_EDGE_CORRECTION = -215
-        if platform.system() == "Windows":
+        if platform.system() != "Darwin":
             self.HEIGHT_CORRECTION = 22
         else:
             self.HEIGHT_CORRECTION = 0
