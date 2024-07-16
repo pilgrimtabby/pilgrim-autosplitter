@@ -109,6 +109,9 @@ Default: `disabled`
 If enabled, hotkeys will work no matter what app is in focus.  
 If disabled, hotkeys will only work when Pilgrim Autosplitter is in focus. (For an exception to this behavior, see [Toggle global](#toggle-global).)
 
+{: .note }
+For global hotkeys to work on MacOS, you might have to give Terminal [accessibility privileges](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac) in Privacy and Security in System Settings. This allows Pilgrim Autosplitter to monitor your keyboard for inputs even when it's not in focus. If this doesn't work, you can also run Pilgrim Autosplitter as root.
+
 Default: `enabled`
 
 ## Check for updates
