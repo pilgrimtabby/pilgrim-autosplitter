@@ -146,6 +146,7 @@ def set_defaults() -> None:
 
     Makes sure that the correct aspect ratio is shown.
     """
+    home_dir = get_home_dir()
     if not get_bool("SETTINGS_SET"):
         # Indicate whether default settings have been populated
         set_value("SETTINGS_SET", True)
@@ -163,7 +164,7 @@ def set_defaults() -> None:
         set_value("FPS", 30)
 
         # The location of split images
-        set_value("LAST_IMAGE_DIR", "")
+        set_value("LAST_IMAGE_DIR", home_dir)
 
         # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
@@ -251,11 +252,10 @@ def set_defaults() -> None:
         # Whether program checks for updates on launch
         set_value("CHECK_FOR_UPDATES", True)
 
-    # Set last image dir to home dir if last image dir doesn't exist, or if the
-    # path is empty
+    # Make sure image dir exists and is within the user's home dir
+    # (This limits i/o to user-controlled areas)
     last_image_dir = get_str("LAST_IMAGE_DIR")
-    if len(last_image_dir) < 2 or not Path(last_image_dir).is_dir():
-        home_dir = os.path.expanduser("~")
+    if not last_image_dir.startswith(home_dir) or not Path(last_image_dir).is_dir():
         set_value("LAST_IMAGE_DIR", home_dir)
 
     # Always start in full view if video doesn't come on automatically
@@ -314,3 +314,16 @@ def get_latest_version() -> str:
             version_location : (version_location + 9)
         ].split('"')[0]
         return latest_version
+
+
+def get_home_dir() -> str:
+    """Get home directory of user, even when running as root.
+
+    Returns:
+        str: The home directory path.
+    """
+    home_dir = os.path.expanduser("~")
+    if home_dir == "/root":  # Returned if running as root
+        user = os.environ.get("SUDO_USER")
+        home_dir = os.path.expanduser(f"~{user}")
+    return home_dir

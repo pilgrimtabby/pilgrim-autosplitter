@@ -79,6 +79,10 @@ class UIMainWindow(QMainWindow):
             current image match percent.
         match_percent_sign (QLabel): Displays a percent sign after the
             current image match percent.
+        err_invalid_dir_msg (QMessageBox): Message to display if the user tries
+            to load an image directory outside the user's home directory. (This
+            is disabled so users don't try to trigger i/o somewhere vulnerable,
+            especially if they're running the program as root (e.g. on Linux)).
         err_not_found_msg (QMessageBox): Message to display if the
             controller attempts to open a file or directory that doesn't exist.
         help_action (QAction): Adds a menu bar item which triggers opening the
@@ -528,6 +532,12 @@ class UIMainWindow(QMainWindow):
             "The file or folder could not be found. Please try again."
         )
         self.err_not_found_msg.setIcon(QMessageBox.Warning)
+
+        # Invalid image directory chosen message box
+        self.err_invalid_dir_msg = QMessageBox(self)
+        self.err_invalid_dir_msg.setText("Invalid folder selection")
+        self.err_invalid_dir_msg.setInformativeText(f"You must select your home folder ({settings.get_home_dir()}) or one of its subfolders.")
+        self.err_invalid_dir_msg.setIcon(QMessageBox.Warning)
 
         #####################
         #                   #

@@ -136,7 +136,7 @@ class UIController:
         )
 
         # Split directory button
-        self._main_window.split_dir_button.clicked.connect(self.set_split_dir_path)
+        self._main_window.split_dir_button.clicked.connect(self._set_split_dir_path)
 
         # Minimal view / full view button
         self._main_window.min_view_button.clicked.connect(
@@ -425,13 +425,16 @@ class UIController:
         ):
             self._splitter.start_compare_thread()
 
-    def set_split_dir_path(self) -> None:
+    def _set_split_dir_path(self) -> None:
         """Prompt the user to select a split image directory, then open the new
         directory in a threadsafe manner.
 
-        If the directory exists and is different from the last one, change
-        `LAST_IMAGE_DIR` to the new choice. Then reset splits so the new ones
-        show up.
+        If the directory exists and is different from the last one, check if
+        the dir is within the user's home directory. If not, show an error msg
+        and re-run the method.
+
+        Otherwise, change `LAST_IMAGE_DIR` to the new choice. Then reset splits
+        so the new ones show up.
         """
         path = QFileDialog.getExistingDirectory(
             self._main_window,
@@ -439,6 +442,11 @@ class UIController:
             settings.get_str("LAST_IMAGE_DIR"),
         )
         if len(path) > 1 and path != settings.get_str("LAST_IMAGE_DIR"):
+            if not path.startswith(settings.get_home_dir()):
+                msg = self._main_window.err_invalid_dir_msg
+                msg.exec()
+                return self._set_split_dir_path()
+
             settings.set_value("LAST_IMAGE_DIR", path)
             self._set_split_directory_box_text()
             self._request_reset_splits()
@@ -766,6 +774,11 @@ class UIController:
 
         If the path doesn't exist, show an error message and return.
 
+        On Linux, we have to spawn a child process that isn't using root, due
+        to issues caused when trying to open the file explorer as root. To do
+        that, we get the username from the environment variable $SUPER_USER and
+        pass that value to subprocess.
+
         Args:
             path (str): The file to open.
         """
@@ -781,7 +794,8 @@ class UIController:
         elif platform.system() == "Darwin":
             subprocess.call(["open", path])
         else:
-            subprocess.call(["xdg-open", path])
+            non_root_user = os.environ.get("SUDO_USER")
+            subprocess.Popen(["xdg-open", path], user=non_root_user)
 
     def _set_main_window_layout(self) -> None:
         """Set the size, location, and visibility of the main window's widgets
@@ -1561,7 +1575,7 @@ class UIController:
 
         We set flags when hotkeys are pressed instead of directly calling a
         method because PyQt5 doesn't allow other threads to manipulate the UI.
-        Doing so almost always causes a zsh trace trap error / crash.
+        Doing so almost always causes a trace trap error / crash.
 
         Args:
             key (keyboard.Key): The key that was pressed.
@@ -1666,8 +1680,8 @@ class UIController:
 
         Args:
             key_code (str): A string representation of a pynput.keyboard.Key.vk
-                value. Passed as a string because I use QSettings, which only
-                handles strings when used cross-platform.
+                value. Passed as a string because we use QSettings, which
+                converts all types to strings on some backends.
         """
         key_code = int(key_code)
         key = keyboard.KeyCode(vk=key_code)
