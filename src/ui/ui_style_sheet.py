@@ -34,6 +34,7 @@ be less awkward to simply keep it in a separate file.
 """
 
 
+import platform
 from string import Template
 
 from PyQt5.QtCore import QObject
@@ -54,11 +55,18 @@ style_dict_dark = {
     "button_fill_color": "#4e4e4e",
     "text_and_borders": "white",
 }
+
+if platform.system() == "Windows" or platform.system() == "Darwin":
+    font_size = "16px"
+else:
+    font_size = "14px"
+style_dict_dark["font_size"] = font_size
+
 style_sheet_dark = Template(
     """
     * {
-        font-family: "Gill Sans", "Calibri";
-        font-size: 16px;
+        font-family: "Gill Sans", "Calibri", "Noto Sans";
+        font-size: $font_size;
         color: $text_and_borders;
         background-color: $default_background;
     }
@@ -170,11 +178,13 @@ style_dict_light = {
     "button_fill_color": "#aaaaaa",
     "text_and_borders": "black",
 }
+style_dict_light["font_size"] = font_size
+
 style_sheet_light = Template(
     """
     * {
-        font-family: "Gill Sans", "Calibri";
-        font-size: 16px;
+        font-family: "Gill Sans", "Calibri", "Noto Sans";
+        font-size: $font_size;
         color: $text_and_borders;
         background-color: $default_background;
     }
