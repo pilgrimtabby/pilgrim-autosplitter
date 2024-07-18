@@ -1,6 +1,6 @@
 # Pilgrim Autosplitter
 
-Finally, a truly multi-platform image-based speedrun autosplitter!
+Finally, a multi-platform image-based speedrun autosplitter!
 
 ![Demonstration GIF](resources/demo.gif)
 
