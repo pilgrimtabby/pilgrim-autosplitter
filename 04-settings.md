@@ -112,7 +112,7 @@ If disabled, hotkeys will only work when Pilgrim Autosplitter is in focus. (For 
 Default: `enabled`
 
 {: .note }
-For global hotkeys to work on MacOS, you need to give Terminal [accessibility privileges](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac) in Privacy and Security in System Settings. This allows Pilgrim Autosplitter to monitor your keyboard for inputs even when it's not in focus. If this doesn't work, you can also run Pilgrim Autosplitter as root.
+For global hotkeys to work on MacOS, you need to give Terminal [accessibility privileges](https://support.apple.com/guide/mac-help/allow-accessibility-apps-to-access-your-mac-mh43185/mac) in Privacy and Security in System Settings. If that doesn't work, you can also run Pilgrim Autosplitter as root. In addition, on Linux you must run Pilgrim Autosplitter as root. This allows Pilgrim Autosplitter to monitor your keyboard for inputs even when the app's not in focus.
 
 ## Check for updates
 

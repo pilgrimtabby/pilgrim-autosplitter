@@ -11,18 +11,18 @@ title: Overview
 <link rel="stylesheet" href="css/main.css">
 </header>
 
-# Pilgrim Autosplitter for MacOS: User Manual
+# Pilgrim Autosplitter: User Manual
 
-Finally, an image-based speedrun autosplitter compatible with MacOS!  
+Finally, a multi-platform image-based speedrun autosplitter!
 
 <figure>
   <img src="images/demo.gif" class="massive-image" alt="A simple demonstration">
 </figure>
 
-Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which are generally incompatible with MacOS.
+Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which generally only run on Windows.
 
-Bring your best speedgame whether you're running on console, MacOS, or PC.
+Bring your best speedgame on Windows, MacOS, and Linux (and whether you game on console or computer).
 
-Compatible with MacOS and Windows.
+Compatible with Windows, MacOS, and Linux.
 
-[Get the latest release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases), or [check out the source code](https://github.com/pilgrimtabby/pilgrim-autosplitter/).
+[Get the latest release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), or [check out the source code](https://github.com/pilgrimtabby/pilgrim-autosplitter/).

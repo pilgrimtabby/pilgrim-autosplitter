@@ -45,9 +45,9 @@ Your speedgame may not have a reliable, repeatable frame for each split — that
 I want to split when I pick up a heart piece, but my screen won't look exactly like this every time. However, the words on the screen are always in the same spot. Let's use this knowledge to make a split image that will always match.
 
 {: .tip }
-There are lots of free image editors, but these work well with Pilgrim Autosplitter:  
+There are lots of free image editors, but these work well for our purposes:  
 For Windows: [paint.net](https://www.getpaint.net/)  
-For MacOS: [krita](https://krita.org/en/download/)
+For MacOS/Linux: [krita](https://krita.org/en/download/)
 
 I'll use Krita in this example. In Krita, press `cmd+o` and select the screenshot. You should see a window like this:
 

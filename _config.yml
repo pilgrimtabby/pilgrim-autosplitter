@@ -21,10 +21,10 @@
 title: Pilgrim Autosplitter
 email: pilgrimtabby@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
-  Finally, an image-based autosplitter for console, Windows PC, and MacOS!
-  Set up global hotkeys, customize split images, choose from
-  different themes, and never touch a keyboard during a speedrun
-  again — even when streaming from or playing on MacOS.
+  A multi-platform image-based speedrun autosplitter including Windows,
+  MacOS and Linux. Set up global hotkeys, customize split images, choose
+  from different themes, and never touch a keyboard during a speedrun
+  again.
 domain: pilgrimtabby.github.io
 baseurl: /pilgrim-autosplitter/ # the subpath of your site, e.g. /blog
 url: https://pilgrimtabby.github.io # the base hostname & protocol for your site, e.g. http://example.com
