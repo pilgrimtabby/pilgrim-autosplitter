@@ -1,55 +1,93 @@
-# Pilgrim Autosplitter for Windows and MacOS
+# Pilgrim Autosplitter
 
-Finally, an image-based speedrun autosplitter compatible with multiple platforms, including MacOS!
+Finally, a truly multi-platform image-based speedrun autosplitter!
 
 ![Demonstration GIF](resources/demo.gif)
 
-Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which are generally incompatible with MacOS.
+Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which generally only run on Windows.
 
-Bring your best speedgame whether you’re running on console, MacOS, or PC.
+Bring your best speedgame on Windows, MacOS, and Linux (and whether you game on console or computer).
 
-## Compatible with MacOS and Windows
+This program is still relatively new, so you may encounter bugs. If you do, or if you have an idea for a new feature or improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
-This program has only been minimally tested on Windows, so there may be unknown issues. If you encounter problems or have an idea for an improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
+# About
 
-### Note about Linux
+Use screenshots taken in-app to trigger splits (or other actions) while speedrunning. Never forget to split, accidentally miss a key, or get distracted during a PB-pace run again!
 
-Pilgrim Autosplitter relies on [Pynput](https://pypi.org/project/pynput/) for its global hotkeys, but Pynput is [difficult to implement](https://pynput.readthedocs.io/en/latest/limitations.html#linux) on Linux. Everything else appears to work fine. Unfortunately, I don't have the resources to manage this issue right now, so there is no official Linux version. Feel free to download and run the source code, and if you fix things up yourself, go ahead and [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
+Table of contents:
+
+- [Usage](#usage)
+- [Installation](#installation)
+   * [Windows](#windows)
+      + [Method 1: Download Application](#method-1-download-application)
+      + [Method 2: Run from source with Python](#method-2-run-from-source-with-python)
+   * [MacOS](#macos)
+      + [Method 1: Download application](#method-1-download-application-1)
+         - [TROUBLESHOOTING](#troubleshooting)
+      + [Method 2: Run from source with Python](#method-2-run-from-source-with-python-1)
+   * [Linux](#linux)
+      + [Method 1: Download application](#method-1-download-application-2)
+      + [Method 2: Run from source with Python](#method-2-run-from-source-with-python-2)
 
 # Usage
 
-For usage instructions, see the [Pilgrim Autosplitter user manual](https://pilgrimtabby.github.io/pilgrim-autosplitter/).
+For usage instructions and a detailed tutorial with pictures, see the [Pilgrim Autosplitter user manual](https://pilgrimtabby.github.io/pilgrim-autosplitter/).
 
 # Installation
 
 The installation method depends on your operating system.
 
+## Windows
+
+### Method 1: Download Application
+
+Download the latest Windows build (Pilgrim.Autosplitter.Windows.v1.x.x) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Unzip and run Pilgrim Autosplitter.exe.
+
+### Method 2: Run from source with Python
+
+If you're familiar with Python:
+
+* Make sure you have Python 3.10+ installed
+
+* Run `python -m pip install -r requirements.txt`
+
+> [!Note]
+> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
+> Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
+
+* Open the app with `python pilgrim_autosplitter.py`
+
+If this is your first time using Python:
+
+* Install the latest version of Python (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
+
+> [!Important]
+> When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, the next part won't work.
+
+* Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
+
+* Open the Start Menu and search for "Command Prompt", then click enter to open it.
+
+* Type `python -m pip install -r ` (with a space after it) into Command Prompt, then click and drag the file `requirements.txt` from Pilgrim Autosplitter's source code into Command Prompt. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen informing you that Python is installing the necessary third-party packages for running the app.
+
+* In the source code folder, open the folder `src`. In Command Prompt, type `python ` (with a space after it), then click and drag the file `pilgrim_autosplitter.py` into Command Prompt, just like before, and press enter. If you did everything right, the program should open. You can minimize the Command Prompt window.
+
 ## MacOS
 
-### Download application
+### Method 1: Download application
 
 > [!IMPORTANT]  
-> This option is currently only available for silicon-based Macs. If you're not sure what kind of chip your computer has, see [Apple's guide](https://support.apple.com/en-us/116943). A build for Intel-based Macs will be released by the end of June. For now, if you're using an Intel-based Mac, you'll have to [run the app from source](#run-from-source-with-python).
+> This option is currently only available for silicon-based Macs. If you're not sure what kind of chip your computer has, see [Apple's guide](https://support.apple.com/en-us/116943). A build for Intel-based Macs will be released soon. For now, if you're using an Intel-based Mac, you'll have to [run the app from source](#run-from-source-with-python).
 
-Download the latest MacOS build by going to the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) and downloading `pilgrim-autosplitter-v1.1.zip` (or whatever the newest version number is). Extract the app from the .zip folder.
+Download the latest MacOS build (Pilgrim.Autosplitter.MacOS.v1.x.x) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Extract and run Pilgrim Autosplitter.app.
 
-Pros:
+Known limitations:
 
-* Only one file
+* The MacOS build opens a Terminal window that can't be closed without shutting the program down.
 
-* Easy to install and use.
+* It takes a long time to boot up (at least 30 seconds on my M1 Macbook Air).
 
-Cons:
-
-* A quirk of building this program on MacOS is that opening it always opens a Terminal window that can't be closed without shutting the program down too. However, the Terminal window can be easily minimzed and ignored.
-
-* Pilgrim Autosplitter takes much longer to load when running from the executible (about 30 seconds on my M1 Macbook Air).
-
-* The app's custom icon doesn't show up correctly in the dock (unfortunately, there is apparently no known way to persist MacOS icons for files in Github repositories).
-
-* None of these problems exist when [running from source](#run-from-source-with-python), but running from source is much less convenient and can be tricky if you don't have much experience.
-
-TROUBLESHOOTING
+#### TROUBLESHOOTING
 
 * If you get the following error: `“Pilgrim Autosplitter.app” cannot be opened because the developer cannot be verified.`
 
@@ -63,93 +101,54 @@ TROUBLESHOOTING
 
   * You're likely using an Intel-based Mac, not a silicon-based Mac. Use the other installation method below.
 
-### Run from source with Python
+### Method 2: Run from source with Python
 
-If you're comfortable using Python:
+If you're familiar with Python:
 
 * Make sure you have Python 3.10+ installed
 
-* `pip3 install -r requirements.txt`
+* Run `pip3 install -r requirements.txt`
 
-* `python3 pilgrim_autosplitter.py`
+> [!Note]
+> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
+> Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
+
+* Open the app with `python3 pilgrim_autosplitter.py`
 
 If this is your first time using Python:
 
-* You need Python 3.10 or newer. [Install it here](https://www.python.org/downloads/).
+* Install the latest version of Python (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
 
 > [!Important]
 > When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
 
-* Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
+* Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
 
-* Open Terminal (if you can't find it, press `cmd+space` to open Spotlight and search for "Terminal").
+* Open Terminal (press `cmd+space` to open Spotlight and search for "Terminal").
 
-* Type `pip install -r` (with a space after it) into the open Terminal window, then click and drag the file `requirements.txt` from the program folder into Terminal. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen. That means Python is installing third-party packages needed to run Pilgrim Autosplitter.
+* Type `pip install -r ` (with a space after it) in Terminal, then click and drag the file `requirements.txt` from Pilgrim Autosplitter's source code into Terminal. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen informing you that Python is installing the necessary third-party packages for running the app.
 
-* In the source code, open the folder called `src`. In Terminal, type `python3` (with a space after it), then click and drag the file called `pilgrim_autosplitter.py` into the Terminal, just like before, and press enter. If you did everything right, the program should open. You can minimize the Terminal window.
-
-Pros:
-
-* More flexible usage if you're comfortable using Python and the command line
-
-* Much smaller file size
-
-* Starts faster
-
-* Terminal window can be closed if you use `bash` commands like `nohup`
-
-Cons:
-
-* Complicated installation process
-
-* Lots of files
-
-## Windows
-
-### Download Application
-
-Download the latest Windows build by going to the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) and downloading `pilgrim-autosplitter-v1.1.zip` (or whatever the newest version number is). Extract the app from the .zip folder.
-
-Pros:
-
-* Only one file
-
-* Easy to install and use.
-
-Cons:
-
-* Takes a little longer to boot up.
-
-* The app's custom icon doesn't show up correctly in the dock.
-
-### Run from source with Python
-
-> [!WARNING]  
-> It bears repeating that this program has only been tested minimally on Windows. There might be problems. Feel free to [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues/) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
-
-If you're comfortable using Python:
-
-* Make sure you have Python 3.10+ installed
-
-* `python -m pip install -r requirements.txt`
-
-* `python pilgrim_autosplitter.py`
-
-If this is your first time using Python:
-
-* You need Python 3.10 or newer. [Install it here](https://www.python.org/downloads/).
-
-> [!Important]
-> When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
-
-* Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
-
-* Open Command Prompt (if you can't find it, open the Start Menu and search for "Command Prompt").
-
-* Type `python -m pip install -r` (with a space after it) into Command Prompt, then click and drag the file `requirements.txt` from the program folder into Command Prompt. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen. That means Python is installing third-party packages needed to run Pilgrim Autosplitter.
-
-* In the source code, open the folder called `src`. In Command Prompt, type `python` (with a space after it), then click and drag the file called `pilgrim_autosplitter.py` into Command Prompt, just like before, and press enter. If you did everything right, the program should open. You can minimize the Command Prompt window.
+* In the source code, open the folder `src`. In Terminal, type `python3 ` (with a space after it), then click and drag the file `pilgrim_autosplitter.py` into the Terminal, just like before, and press enter. If you did everything right, the program should open. You can minimize the Terminal window.
 
 ## Linux
 
-This program has [run into some problems](#note-about-linux) on Linux, so there's no official release. If you're feeling motivated, feel free to [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
+### Method 1: Download application
+
+> [!IMPORTANT]  
+> This option is currently only available for Linux distributions running on ARM-based architecture (tested on Ubuntu 20.04). Sorry.
+
+Download the latest Linux build (Pilgrim.Autosplitter.Linux.v1.x.x) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Extract Pilgrim Autosplitter and use the command line to run it AS ROOT (there is no other known way to make hotkeys work as intended).
+
+Known limitations:
+
+* Pilgrim Autosplitter on Linux must be run as root.
+
+* There is no AMD-compatible executible build yet (the source code should work fine on AMD architectures, though).
+
+### Method 2: Run from source with Python
+
+If you're on Linux, I assume you know what you're doing. Get the latest release [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), use pip to install the dependencies in `requirements-linux.txt`, and run `src/pilgrim_autosplitter.py` as root. Python >=3.10 is required.
+
+> [!Note]
+> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
+> Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.

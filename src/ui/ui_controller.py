@@ -30,6 +30,7 @@
 input to the UI and the splitter.
 """
 
+
 import datetime
 import glob
 import os
@@ -40,7 +41,6 @@ import webbrowser
 from pathlib import Path
 
 import cv2
-from pynput import keyboard
 from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
@@ -50,6 +50,13 @@ import ui.ui_style_sheet as style_sheet
 from splitter.splitter import Splitter
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
+
+if platform.system() == "Windows" or platform.system() == "Darwin":
+    # Don't import the whole pynput library since that takes a while
+    from pynput import keyboard as pynput_keyboard
+else:
+    # Pynput doesn't work well on Linux, so use keyboard instead
+    import keyboard
 
 
 class UIController:
@@ -136,7 +143,7 @@ class UIController:
         )
 
         # Split directory button
-        self._main_window.split_dir_button.clicked.connect(self.set_split_dir_path)
+        self._main_window.split_dir_button.clicked.connect(self._set_split_dir_path)
 
         # Minimal view / full view button
         self._main_window.min_view_button.clicked.connect(
@@ -215,11 +222,14 @@ class UIController:
         #######################################
 
         # Start keyboard listener
-        self._keyboard_controller = keyboard.Controller()
-        self._keyboard_listener = keyboard.Listener(
-            on_press=self._handle_key_press, on_release=None
-        )
-        self._keyboard_listener.start()
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            self._keyboard_controller = pynput_keyboard.Controller()
+            self._keyboard_listener = pynput_keyboard.Listener(
+                on_press=self._handle_key_press, on_release=None
+            )
+            self._keyboard_listener.start()
+        else:
+            keyboard.on_press(self._handle_key_press)
 
         # Start poller
         self._poller = QTimer()
@@ -425,13 +435,16 @@ class UIController:
         ):
             self._splitter.start_compare_thread()
 
-    def set_split_dir_path(self) -> None:
+    def _set_split_dir_path(self) -> None:
         """Prompt the user to select a split image directory, then open the new
         directory in a threadsafe manner.
 
-        If the directory exists and is different from the last one, change
-        `LAST_IMAGE_DIR` to the new choice. Then reset splits so the new ones
-        show up.
+        If the directory exists and is different from the last one, check if
+        the dir is within the user's home directory. If not, show an error msg
+        and re-run the method.
+
+        Otherwise, change `LAST_IMAGE_DIR` to the new choice. Then reset splits
+        so the new ones show up.
         """
         path = QFileDialog.getExistingDirectory(
             self._main_window,
@@ -439,6 +452,11 @@ class UIController:
             settings.get_str("LAST_IMAGE_DIR"),
         )
         if len(path) > 1 and path != settings.get_str("LAST_IMAGE_DIR"):
+            if not path.startswith(settings.get_home_dir()):
+                msg = self._main_window.err_invalid_dir_msg
+                msg.exec()
+                return self._set_split_dir_path()
+
             settings.set_value("LAST_IMAGE_DIR", path)
             self._set_split_directory_box_text()
             self._request_reset_splits()
@@ -766,6 +784,11 @@ class UIController:
 
         If the path doesn't exist, show an error message and return.
 
+        On Linux, we have to spawn a child process that isn't using root, due
+        to issues caused when trying to open the file explorer as root. To do
+        that, we get the username from the environment variable $SUPER_USER and
+        pass that value to subprocess.
+
         Args:
             path (str): The file to open.
         """
@@ -781,7 +804,8 @@ class UIController:
         elif platform.system() == "Darwin":
             subprocess.call(["open", path])
         else:
-            subprocess.call(["xdg-open", path])
+            non_root_user = os.environ.get("SUDO_USER")
+            subprocess.Popen(["xdg-open", path], user=non_root_user)
 
     def _set_main_window_layout(self) -> None:
         """Set the size, location, and visibility of the main window's widgets
@@ -1549,7 +1573,7 @@ class UIController:
         self._handle_hotkey_press()
         self._execute_split_action()
 
-    def _handle_key_press(self, key: keyboard.Key) -> None:
+    def _handle_key_press(self, key) -> None:
         """Process key presses, setting flags if the key is a hotkey.
 
         Called each time any key is pressed, whether or not the program is in
@@ -1561,17 +1585,22 @@ class UIController:
 
         We set flags when hotkeys are pressed instead of directly calling a
         method because PyQt5 doesn't allow other threads to manipulate the UI.
-        Doing so almost always causes a zsh trace trap error / crash.
+        Doing so almost always causes a trace trap error / crash.
 
         Args:
-            key (keyboard.Key): The key that was pressed.
+            key (pynput.keyboard.Key) -- Windows, MacOS
+                (keyboard.KeyboardEvent) -- Linux:
+                Wrapper containing info about the key that was pressed.
         """
         # Get the key's name and internal value. If the key is not an
         # alphanumeric key, the try block throws AttributeError.
-        try:
-            key_name, key_code = key.char, key.vk
-        except AttributeError:
-            key_name, key_code = str(key).replace("Key.", ""), key.value.vk
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            try:
+                key_name, key_code = key.char, key.vk
+            except AttributeError:
+                key_name, key_code = str(key).replace("Key.", ""), key.value.vk
+        else:
+            key_name = key_code = key.name
 
         # Use #1 (set hotkey settings in settings window)
         for hotkey_box in [
@@ -1666,13 +1695,17 @@ class UIController:
 
         Args:
             key_code (str): A string representation of a pynput.keyboard.Key.vk
-                value. Passed as a string because I use QSettings, which only
-                handles strings when used cross-platform.
+                value (or a keyboard.KeyboardEvent.name value on Linux).
+                Passed as a string because we use QSettings, which converts all
+                types to strings on some backends.
         """
-        key_code = int(key_code)
-        key = keyboard.KeyCode(vk=key_code)
-        self._keyboard_controller.press(key)
-        self._keyboard_controller.release(key)
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            key_code = int(key_code)
+            key = pynput_keyboard.KeyCode(vk=key_code)
+            self._keyboard_controller.press(key)
+            self._keyboard_controller.release(key)
+        else:
+            keyboard.send(key_code)
 
     def _execute_split_action(self) -> None:
         """Send a hotkey press and request the next split image when the

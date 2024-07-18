@@ -45,20 +45,21 @@ def main():
     import os
 
     os.system("cls || clear")  # This works cross-platform
-    print("Welcome to Pilgrim Autosplitter!")
-    print("You can minimize this window, but DO NOT close it.")
 
-    print("\nImporting third-party packages...")
+    print("Welcome to Pilgrim Autosplitter!")
+    print("You can minimize this window, but DO NOT close it.\n")
+
+    print("Importing third-party packages...")
 
     from PyQt5.QtGui import QIcon, QPixmap
     from PyQt5.QtWidgets import QApplication
 
-    print("\nImporting built-in packages...")
+    print("Importing built-in packages...")
 
     import platform
     import sys
 
-    print("\nInitializing Pilgrim Autosplitter...")
+    print("Initializing Pilgrim Autosplitter...")
 
     # Class definition
     class PilgrimAutosplitter:
@@ -99,7 +100,8 @@ def main():
                 )
                 # Tell Windows this app is its own process so icon shows up
                 import ctypes
-                app_id = u"pilgrim_tabby.pilgrim_autosplitter.latest"
+
+                app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
             else:
                 self.pilgrim_autosplitter.setWindowIcon(
@@ -122,18 +124,8 @@ def main():
             self.splitter.safe_exit_all_threads()
 
     # Open application
-    print("\nStarting Pilgrim Autosplitter...")
-
-    if platform.system() != "Windows":
-        import traceback
-
-        with open("/tmp/pilgrimautosplitter.log", "a") as log:
-            try:
-                PilgrimAutosplitter()
-            except Exception:
-                traceback.print_exc(file=log)
-    else:
-        PilgrimAutosplitter()
+    print("Starting Pilgrim Autosplitter...\n")
+    PilgrimAutosplitter()
 
 
 if __name__ == "__main__":
