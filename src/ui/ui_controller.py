@@ -222,7 +222,7 @@ class UIController:
         #######################################
 
         # Start keyboard listener
-        if platform.system() == "Windows" or platform.system == "Darwin":
+        if platform.system() == "Windows" or platform.system() == "Darwin":
             self._keyboard_controller = pynput_keyboard.Controller()
             self._keyboard_listener = pynput_keyboard.Listener(
                 on_press=self._handle_key_press, on_release=None
@@ -1699,7 +1699,7 @@ class UIController:
                 Passed as a string because we use QSettings, which converts all
                 types to strings on some backends.
         """
-        if platform.system == "Windows" or platform.system == "Darwin":
+        if platform.system() == "Windows" or platform.system() == "Darwin":
             key_code = int(key_code)
             key = pynput_keyboard.KeyCode(vk=key_code)
             self._keyboard_controller.press(key)
