@@ -163,7 +163,7 @@ class UISettingsWindow(QDialog):
         self._fps_label.setToolTip("Read this many frames per second from video source")
 
         self.fps_spinbox = QSpinBox(self)
-        self.fps_spinbox.setGeometry(QRect(160 + self._LEFT, 12 + self._TOP, 70, 27))
+        self.fps_spinbox.setGeometry(QRect(160 + self._LEFT, 12 + self._TOP, 75, 27))
         self.fps_spinbox.setMinimum(10)
         self.fps_spinbox.setMaximum(60)
 
@@ -206,7 +206,7 @@ class UISettingsWindow(QDialog):
 
         self.threshold_spinbox = QDoubleSpinBox(self)
         self.threshold_spinbox.setGeometry(
-            QRect(160 + self._LEFT, 72 + self._TOP, 70, 27)
+            QRect(160 + self._LEFT, 72 + self._TOP, 75, 27)
         )
         self.threshold_spinbox.setDecimals(2)
         self.threshold_spinbox.setMinimum(0.1)
@@ -226,7 +226,7 @@ class UISettingsWindow(QDialog):
 
         self.decimals_spinbox = QSpinBox(self)
         self.decimals_spinbox.setGeometry(
-            QRect(160 + self._LEFT, 102 + self._TOP, 70, 27)
+            QRect(160 + self._LEFT, 102 + self._TOP, 75, 27)
         )
         self.decimals_spinbox.setMinimum(0)
         self.decimals_spinbox.setMaximum(2)
@@ -240,7 +240,7 @@ class UISettingsWindow(QDialog):
         )
 
         self.delay_spinbox = QDoubleSpinBox(self)
-        self.delay_spinbox.setGeometry(QRect(160 + self._LEFT, 132 + self._TOP, 70, 27))
+        self.delay_spinbox.setGeometry(QRect(160 + self._LEFT, 132 + self._TOP, 75, 27))
         self.delay_spinbox.setDecimals(3)
         self.delay_spinbox.setMinimum(0)
         self.delay_spinbox.setMaximum(99999)
@@ -256,7 +256,7 @@ class UISettingsWindow(QDialog):
         )
 
         self.pause_spinbox = QDoubleSpinBox(self)
-        self.pause_spinbox.setGeometry(QRect(160 + self._LEFT, 162 + self._TOP, 70, 27))
+        self.pause_spinbox.setGeometry(QRect(160 + self._LEFT, 162 + self._TOP, 75, 27))
         self.pause_spinbox.setDecimals(0)
         self.pause_spinbox.setMinimum(1)
         self.pause_spinbox.setMaximum(99999)
@@ -289,7 +289,7 @@ class UISettingsWindow(QDialog):
 
         self.theme_combo_box = QComboBox(self)
         self.theme_combo_box.setGeometry(
-            QRect(160 + self._LEFT, 224 + self._TOP, 70, 23)
+            QRect(160 + self._LEFT, 224 + self._TOP, 75, 23)
         )
         self.theme_combo_box.addItems(["dark", "light"])
 
