@@ -319,6 +319,9 @@ def get_latest_version() -> str:
 def get_home_dir() -> str:
     """Get home directory of user, even when running as root.
 
+    Replace backslashes found in Windows-like paths with forward slashes for
+    consistency.
+
     Returns:
         str: The home directory path.
     """
@@ -326,4 +329,4 @@ def get_home_dir() -> str:
     if home_dir == "/root":  # Returned if running as root
         user = os.environ.get("SUDO_USER")
         home_dir = os.path.expanduser(f"~{user}")
-    return home_dir
+    return home_dir.replace("\\", "/")
