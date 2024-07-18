@@ -30,6 +30,7 @@
 input to the UI and the splitter.
 """
 
+
 import datetime
 import glob
 import os
@@ -40,7 +41,6 @@ import webbrowser
 from pathlib import Path
 
 import cv2
-from pynput import keyboard
 from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
@@ -50,6 +50,13 @@ import ui.ui_style_sheet as style_sheet
 from splitter.splitter import Splitter
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
+
+if platform.system() == "Windows" or platform.system() == "Darwin":
+    # Don't import the whole pynput library since that takes a while
+    from pynput import keyboard as pynput_keyboard
+else:
+    # Pynput doesn't work well on Linux, so use keyboard instead
+    import keyboard
 
 
 class UIController:
@@ -215,11 +222,14 @@ class UIController:
         #######################################
 
         # Start keyboard listener
-        self._keyboard_controller = keyboard.Controller()
-        self._keyboard_listener = keyboard.Listener(
-            on_press=self._handle_key_press, on_release=None
-        )
-        self._keyboard_listener.start()
+        if platform.system() == "Windows" or platform.system == "Darwin":
+            self._keyboard_controller = pynput_keyboard.Controller()
+            self._keyboard_listener = pynput_keyboard.Listener(
+                on_press=self._handle_key_press, on_release=None
+            )
+            self._keyboard_listener.start()
+        else:
+            keyboard.on_press(self._handle_key_press)
 
         # Start poller
         self._poller = QTimer()
@@ -1563,7 +1573,7 @@ class UIController:
         self._handle_hotkey_press()
         self._execute_split_action()
 
-    def _handle_key_press(self, key: keyboard.Key) -> None:
+    def _handle_key_press(self, key) -> None:
         """Process key presses, setting flags if the key is a hotkey.
 
         Called each time any key is pressed, whether or not the program is in
@@ -1578,14 +1588,19 @@ class UIController:
         Doing so almost always causes a trace trap error / crash.
 
         Args:
-            key (keyboard.Key): The key that was pressed.
+            key (pynput.keyboard.Key) -- Windows, MacOS
+                (keyboard.KeyboardEvent) -- Linux:
+                Wrapper containing info about the key that was pressed.
         """
         # Get the key's name and internal value. If the key is not an
         # alphanumeric key, the try block throws AttributeError.
-        try:
-            key_name, key_code = key.char, key.vk
-        except AttributeError:
-            key_name, key_code = str(key).replace("Key.", ""), key.value.vk
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            try:
+                key_name, key_code = key.char, key.vk
+            except AttributeError:
+                key_name, key_code = str(key).replace("Key.", ""), key.value.vk
+        else:
+            key_name = key_code = key.name
 
         # Use #1 (set hotkey settings in settings window)
         for hotkey_box in [
@@ -1680,13 +1695,17 @@ class UIController:
 
         Args:
             key_code (str): A string representation of a pynput.keyboard.Key.vk
-                value. Passed as a string because we use QSettings, which
-                converts all types to strings on some backends.
+                value (or a keyboard.KeyboardEvent.name value on Linux).
+                Passed as a string because we use QSettings, which converts all
+                types to strings on some backends.
         """
-        key_code = int(key_code)
-        key = keyboard.KeyCode(vk=key_code)
-        self._keyboard_controller.press(key)
-        self._keyboard_controller.release(key)
+        if platform.system == "Windows" or platform.system == "Darwin":
+            key_code = int(key_code)
+            key = pynput_keyboard.KeyCode(vk=key_code)
+            self._keyboard_controller.press(key)
+            self._keyboard_controller.release(key)
+        else:
+            keyboard.send(key_code)
 
     def _execute_split_action(self) -> None:
         """Send a hotkey press and request the next split image when the
