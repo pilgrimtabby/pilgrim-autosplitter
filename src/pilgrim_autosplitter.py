@@ -100,7 +100,8 @@ def main():
                 )
                 # Tell Windows this app is its own process so icon shows up
                 import ctypes
-                app_id = u"pilgrim_tabby.pilgrim_autosplitter.latest"
+
+                app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
             else:
                 self.pilgrim_autosplitter.setWindowIcon(

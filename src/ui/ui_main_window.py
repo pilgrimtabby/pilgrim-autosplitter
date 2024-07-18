@@ -536,7 +536,9 @@ class UIMainWindow(QMainWindow):
         # Invalid image directory chosen message box
         self.err_invalid_dir_msg = QMessageBox(self)
         self.err_invalid_dir_msg.setText("Invalid folder selection")
-        self.err_invalid_dir_msg.setInformativeText(f"You must select your home folder ({settings.get_home_dir()}) or one of its subfolders.")
+        self.err_invalid_dir_msg.setInformativeText(
+            f"You must select your home folder ({settings.get_home_dir()}) or one of its subfolders."
+        )
         self.err_invalid_dir_msg.setIcon(QMessageBox.Warning)
 
         #####################

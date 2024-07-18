@@ -656,7 +656,7 @@ class KeyLineEdit(QLineEdit):
     implementation details.
 
     Attributes:
-        key_code (str): A string representation of a key value 
+        key_code (str): A string representation of a key value
             (pynput.keyboard.Key.vk or keyboard.KeyboardEvent.name,
             depending on the backend used).
     """
