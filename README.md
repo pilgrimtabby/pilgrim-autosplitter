@@ -6,7 +6,7 @@ Finally, a truly multi-platform image-based speedrun autosplitter!
 
 Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which generally only run on Windows.
 
-Bring your best speedgame whether you use Windows, MacOS, or Linux (and whether you game on console or computer).
+Bring your best speedgame on Windows, MacOS, and Linux (and whether you game on console or computer).
 
 This program is still relatively new, so you may encounter bugs. If you do, or if you have an idea for a new feature or improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
