@@ -8,9 +8,26 @@ Pilgrim Autosplitter was designed to fill the gap left by other image-based spee
 
 Bring your best speedgame whether you use Windows, MacOS, or Linux (and whether you game on console or computer).
 
-## Compatible with Windows, MacOS, and Linux
+This program is still relatively new, so you may encounter bugs. If you do, or if you have an idea for a new feature or improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
-This program is still relatively new, so you may encounter bugs. If you do, or if you have an idea for an improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
+# About
+
+Use screenshots taken in-app to trigger splits (or other actions) while speedrunning. Never forget to split, accidentally miss a key, or get distracted during a PB-pace run again!
+
+Table of contents:
+
+- [Usage](#usage)
+- [Installation](#installation)
+   * [Windows](#windows)
+      + [Method 1: Download Application](#method-1-download-application)
+      + [Method 2: Run from source with Python](#method-2-run-from-source-with-python)
+   * [MacOS](#macos)
+      + [Method 1: Download application](#method-1-download-application-1)
+         - [TROUBLESHOOTING](#troubleshooting)
+      + [Method 2: Run from source with Python](#method-2-run-from-source-with-python-1)
+   * [Linux](#linux)
+      + [Method 1: Download application](#method-1-download-application-2)
+      + [Method 2: Run from source with Python](#method-2-run-from-source-with-python-2)
 
 # Usage
 
@@ -35,7 +52,7 @@ If you're familiar with Python:
 * Run `python -m pip install -r requirements.txt`
 
 > [!Note]
-> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`
+> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
 > Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
 
 * Open the app with `python pilgrim_autosplitter.py`
@@ -70,7 +87,7 @@ Known limitations:
 
 * It takes a long time to boot up (at least 30 seconds on my M1 Macbook Air).
 
-TROUBLESHOOTING
+#### TROUBLESHOOTING
 
 * If you get the following error: `“Pilgrim Autosplitter.app” cannot be opened because the developer cannot be verified.`
 
@@ -93,7 +110,7 @@ If you're familiar with Python:
 * Run `pip3 install -r requirements.txt`
 
 > [!Note]
-> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`
+> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
 > Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
 
 * Open the app with `python3 pilgrim_autosplitter.py`
@@ -133,5 +150,5 @@ Known limitations:
 If you're on Linux, I assume you know what you're doing. Get the latest release [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), use pip to install the dependencies in `requirements-linux.txt`, and run `src/pilgrim_autosplitter.py` as root.
 
 > [!Note]
-> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`
+> If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
 > Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
