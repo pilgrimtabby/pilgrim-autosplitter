@@ -147,7 +147,7 @@ Known limitations:
 
 ### Method 2: Run from source with Python
 
-If you're on Linux, I assume you know what you're doing. Get the latest release [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), use pip to install the dependencies in `requirements-linux.txt`, and run `src/pilgrim_autosplitter.py` as root.
+If you're on Linux, I assume you know what you're doing. Get the latest release [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), use pip to install the dependencies in `requirements-linux.txt`, and run `src/pilgrim_autosplitter.py` as root. Python >=3.10 is required.
 
 > [!Note]
 > If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
