@@ -75,11 +75,7 @@ def main():
         """
 
         def __init__(self) -> None:
-            """Initialize splitter and controller to run Pilgrim Autosplitter.
-
-            Optionally, check for a newer release version if the user has
-            enabled Check for updates in the settings window.
-            """
+            """Initialize splitter and controller to run Pilgrim Autosplitter."""
             import settings
             from splitter.splitter import Splitter
             from ui.ui_controller import UIController
@@ -89,20 +85,20 @@ def main():
             self.pilgrim_autosplitter = QApplication(sys.argv)
             self.pilgrim_autosplitter.setStyle("fusion")
             self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
-            # Without the absolute path, the icon only shows up when running
-            # the program from the same directory /resources is in. This makes
-            # it show up regardless
+
+            # Set taskbar icons. Doesn't seem to really do anything, but it's a
+            # work in progress so I'll leave it for now
             if platform.system() == "Windows":
-                # This doesn't work yet, but I'm leaving it in because I think
-                # I'm on the right track
                 self.pilgrim_autosplitter.setWindowIcon(
                     QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
                 )
                 # Tell Windows this app is its own process so icon shows up
                 import ctypes
-
                 app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+            # Without the absolute path, the icon only shows up when running
+            # the program from the same directory /resources is in. This makes
+            # it show up regardless (at least when ran from source, not build)
             else:
                 self.pilgrim_autosplitter.setWindowIcon(
                     QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
