@@ -9,7 +9,7 @@ nav_order: 5
 
 # Installation
 
-You can download the latest build for your operating system [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/).
+You can download the latest build for your operating system [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest).
 
 If you'd like to run the source code directly (Python), here's a [step-by-step guide](https://github.com/pilgrimtabby/pilgrim-autosplitter/?tab=readme-ov-file#installation).
 
