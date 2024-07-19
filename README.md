@@ -76,10 +76,9 @@ If this is your first time using Python:
 
 ### Method 1: Download application
 
-> [!IMPORTANT]  
-> This option is currently only available for silicon-based Macs. If you're not sure what kind of chip your computer has, see [Apple's guide](https://support.apple.com/en-us/116943). A build for Intel-based Macs will be released soon. For now, if you're using an Intel-based Mac, you'll have to [run the app from source](#run-from-source-with-python).
+Download the latest MacOS build corresponding to your computer's architecture (`MacOS.Intel` or `MacOS.Silicon`) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). If you're not sure which option you should choose, see [this guide](https://support.apple.com/en-us/116943).
 
-Download the latest MacOS build (Pilgrim.Autosplitter.MacOS.v1.x.x) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Extract and run Pilgrim Autosplitter.app.
+Extract and run Pilgrim Autosplitter.app. When prompted to allow access in System Settings (or System Preferences, depending on your MacOS version), do it. Then, navigate to `Privacy and Security > Accessibility` and toggle the app so it has permissions. You may need to close and restart the app. 
 
 Known limitations:
 
@@ -93,13 +92,9 @@ Known limitations:
 
   * Right-click on the app, hold the `option` key, and press `open`. When the warning pops up, you should see a new option: `open`.
 
-* If global hotkeys aren't working:
+* If global hotkeys aren't working / you are seeing the following message: `This process is not trusted! Input event monitoring will not be possible until it is added to accessibility clients.`:
 
-  * Make sure you've given the application accessibility permissions in `System Settings > Privacy and Security > Accessibility`. Pilgrim Autosplitter needs access to the keyboard so it can enter hotkeys.
-
-* If you see an error in the Terminal window about using the wrong kind of CPU:
-
-  * You're likely using an Intel-based Mac, not a silicon-based Mac. Use the other installation method below.
+  * Make sure you've given the application accessibility permissions in `System Settings > Privacy and Security > Accessibility`. For good measure, allow access to the keyboard as well.
 
 ### Method 2: Run from source with Python
 
@@ -119,14 +114,11 @@ If this is your first time using Python:
 
 * Install the latest version of Python (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
 
-> [!Important]
-> When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, you won't be able to use Python in the command line.
-
 * Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
 
 * Open Terminal (press `cmd+space` to open Spotlight and search for "Terminal").
 
-* Type `pip install -r ` (with a space after it) in Terminal, then click and drag the file `requirements.txt` from Pilgrim Autosplitter's source code into Terminal. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen informing you that Python is installing the necessary third-party packages for running the app.
+* Type `pip3 install -r ` (with a space after it) in Terminal, then click and drag the file `requirements.txt` from Pilgrim Autosplitter's source code into Terminal. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen informing you that Python is installing the necessary third-party packages for running the app.
 
 * In the source code, open the folder `src`. In Terminal, type `python3 ` (with a space after it), then click and drag the file `pilgrim_autosplitter.py` into the Terminal, just like before, and press enter. If you did everything right, the program should open. You can minimize the Terminal window.
 
@@ -134,16 +126,11 @@ If this is your first time using Python:
 
 ### Method 1: Download application
 
-> [!IMPORTANT]  
-> This option is currently only available for Linux distributions running on ARM-based architecture (tested on Ubuntu 20.04). Sorry.
-
-Download the latest Linux build (Pilgrim.Autosplitter.Linux.v1.x.x) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Extract Pilgrim Autosplitter and use the command line to run it AS ROOT (there is no other known way to make hotkeys work as intended).
+Download the latest Linux build for your architecture (`Linux.AMD` or `Linux.ARM`) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Extract Pilgrim Autosplitter and use the command line to run it AS ROOT (there is no other known way to make hotkeys work as intended).
 
 Known limitations:
 
 * Pilgrim Autosplitter on Linux must be run as root.
-
-* There is no AMD-compatible executible build yet (the source code should work fine on AMD architectures, though).
 
 ### Method 2: Run from source with Python
 
