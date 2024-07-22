@@ -41,6 +41,8 @@ Maximum: `60`
 
 When selected, Pilgrim Autosplitter will open automatically open screenshots in your default image viewer.
 
+Default: `disabled`
+
 ## Default threshold
 
 The current video feed and the current split image must match this much for Pilgrim Autosplitter to split.
@@ -78,7 +80,7 @@ Minimum: `1 second`
 
 ## GUI aspect ratio
 
-Customize the size of your video and split images. 
+Customize the size of your video and split images.
 
 Supported resolutions:
 
@@ -106,7 +108,7 @@ Default: `disabled`
 
 ## Global hotkeys
 
-If enabled, hotkeys will work no matter what app is in focus.  
+If enabled, [hotkeys](#hotkeys) will work no matter what app is in focus.  
 If disabled, hotkeys will only work when Pilgrim Autosplitter is in focus. (For an exception to this behavior, see [Toggle global](#toggle-global).)
 
 Default: `enabled`
@@ -121,6 +123,12 @@ When enabled, Pilgrim Autosplitter will automatically check if a new version has
 Upgrading to a new version doesn't erase your settings; they are saved by the system.
 
 Default: `enabled`
+
+## Always on top
+
+When enabled, Pilgrim Autosplitter will stay on top of other apps, even when not in focus.
+
+Default: `disabled`
 
 # Hotkeys
 
