@@ -638,7 +638,7 @@ class UIController:
             else:
                 value = True
             settings.set_value(setting_string, value)
-        
+
         self._set_main_window_always_top()
 
         # Hotkeys
@@ -1269,13 +1269,15 @@ class UIController:
 
     def _set_main_window_always_top(self, on_boot=False) -> None:
         """Set always on top status according to user settings.
-        
+
         Args:
             on_boot (bool): If True, don't call self._main_window.show. Useful
                 because this method is called during bootup but before the
                 main window is actually ready to show.
         """
-        self._main_window.setWindowFlag(Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP"))
+        self._main_window.setWindowFlag(
+            Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP")
+        )
         if not on_boot:
             # Required, since setting the flag unshows the window by default
             self._main_window.show()
