@@ -832,7 +832,7 @@ class UIController:
         as user, not as root, to avoid crashes / permission errors.
         """
         if platform.system() == "Windows" or platform.system() == "Darwin":
-            lambda: webbrowser.open(url, new=0, autoraise=True)
+            webbrowser.open(url, new=0, autoraise=True)
         else:
             non_root_user = os.environ.get("SUDO_USER")
             subprocess.Popen(["xdg-open", url], user=non_root_user)
