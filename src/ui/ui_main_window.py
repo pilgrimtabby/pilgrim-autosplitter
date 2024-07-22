@@ -200,7 +200,7 @@ class UIMainWindow(QMainWindow):
         self.settings_action = QAction("Open settings menu", self)
         self.settings_action.setShortcut("Ctrl+.")
 
-        self.help_action = QAction("Help", self)
+        self.help_action = QAction("User manual", self)
 
         self._menu_bar = QMenuBar(self._container)
         self.setMenuBar(self._menu_bar)

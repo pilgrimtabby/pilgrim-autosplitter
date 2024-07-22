@@ -31,6 +31,7 @@ and should be provided in a controller class.
 """
 
 
+import platform
 from typing import Union
 
 from PyQt5.QtCore import QEvent, QRect, Qt
@@ -123,6 +124,10 @@ class UISettingsWindow(QDialog):
         #################
 
         super().__init__()
+
+        # Hide question mark button in top right on Windows
+        if platform.system() == "Windows":
+            self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
 
         # Shift all widgets, except the frame, this many pixels right
         self._LEFT = 0
