@@ -233,6 +233,9 @@ def set_defaults() -> None:
         # The aspect ratio
         set_value("ASPECT_RATIO", "4:3 (480x360)")
 
+        # Always on top value
+        set_value("ALWAYS_ON_TOP", False)
+
         # The last cv2 capture source index. This is an imperfect way to
         # remember the last video source used, since the indexes can reference
         # different sources at different times, but it's the best I can do in a

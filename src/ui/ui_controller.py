@@ -131,6 +131,7 @@ class UIController:
 
         # Set layout
         self._set_main_window_layout()
+        self._set_main_window_always_top(on_boot=True)
 
         # "Update available" message box
         self._main_window.update_available_msg.buttonClicked.connect(
@@ -527,6 +528,9 @@ class UIController:
             self._settings_window.check_for_updates_checkbox: settings.get_bool(
                 "CHECK_FOR_UPDATES"
             ),
+            self._settings_window.always_on_top_checkbox: settings.get_bool(
+                "ALWAYS_ON_TOP"
+            ),
         }.items():
             if value:
                 checkbox.setCheckState(Qt.Checked)
@@ -627,12 +631,15 @@ class UIController:
             self._settings_window.start_with_video_checkbox: "START_WITH_VIDEO",
             self._settings_window.global_hotkeys_checkbox: "GLOBAL_HOTKEYS_ENABLED",
             self._settings_window.check_for_updates_checkbox: "CHECK_FOR_UPDATES",
+            self._settings_window.always_on_top_checkbox: "ALWAYS_ON_TOP",
         }.items():
             if checkbox.checkState() == 0:
                 value = False
             else:
                 value = True
             settings.set_value(setting_string, value)
+        
+        self._set_main_window_always_top()
 
         # Hotkeys
         for hotkey, setting_strings in {
@@ -1259,6 +1266,19 @@ class UIController:
         self._main_window.split_display.setVisible(visible)
         # Only display this when the other widgets are hidden
         self._main_window.split_info_min_label.setVisible(not visible)
+
+    def _set_main_window_always_top(self, on_boot=False) -> None:
+        """Set always on top status according to user settings.
+        
+        Args:
+            on_boot (bool): If True, don't call self._main_window.show. Useful
+                because this method is called during bootup but before the
+                main window is actually ready to show.
+        """
+        self._main_window.setWindowFlag(Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP"))
+        if not on_boot:
+            # Required, since setting the flag unshows the window by default
+            self._main_window.show()
 
     ###########################
     #                         #

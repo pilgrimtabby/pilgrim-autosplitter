@@ -375,6 +375,33 @@ class UISettingsWindow(QDialog):
             self._checkbox_shadow
         )
 
+        # Always on top checkbox
+        self._always_on_top_label = QLabel("Always on top:", self)
+        self._always_on_top_label.setGeometry(
+            QRect(20 + self._LEFT, 340 + self._TOP, 191, 31)
+        )
+        self._always_on_top_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._always_on_top_label.setToolTip(
+            "Check for updates to Pilgrim Autosplitter on launch."
+        )
+
+        self.always_on_top_checkbox = QCheckBox(self)
+        self.always_on_top_checkbox.setGeometry(
+            QRect(161 + self._LEFT, 349 + self._TOP, 13, 13)
+        )
+
+        self._always_on_top_checkbox_helper_label = QLabel(self)
+        self._always_on_top_checkbox_helper_label.setGeometry(
+            QRect(161 + self._LEFT, 348 + self._TOP, 14, 15)
+        )
+        self._always_on_top_checkbox_helper_label.setObjectName("checkbox_helper")
+        self._always_on_top_checkbox_helper_label.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+        self._always_on_top_checkbox_helper_label.setGraphicsEffect(
+            self._checkbox_shadow
+        )
+
         ######################
         #                    #
         # Right Side Widgets #
