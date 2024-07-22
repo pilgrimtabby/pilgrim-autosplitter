@@ -41,7 +41,7 @@ import webbrowser
 from pathlib import Path
 
 import cv2
-from PyQt5.QtCore import QRect, Qt, QTimer
+from PyQt5.QtCore import QObject, QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
 
@@ -131,7 +131,9 @@ class UIController:
 
         # Set layout
         self._set_main_window_layout()
-        self._set_main_window_always_top(on_boot=True)
+        self._main_window.setWindowFlag(
+            Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP")
+        )
 
         # "Update available" message box
         self._main_window.update_available_msg.buttonClicked.connect(
@@ -494,6 +496,11 @@ class UIController:
         """Set up and open the settings window UI."""
         self._settings_window.setFocus(True)  # Make sure no widgets have focus
         self._reset_settings()
+        # On some platforms, the main window hides the settings window if we
+        # don't set this flag
+        self._settings_window.setWindowFlag(
+            Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP")
+        )
         self._settings_window.exec()
 
     def _reset_settings(self) -> None:
@@ -639,7 +646,13 @@ class UIController:
                 value = True
             settings.set_value(setting_string, value)
 
-        self._set_main_window_always_top()
+        self._main_window.setWindowFlag(
+            Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP")
+        )
+        # Required, since setting the above flag hides the window by default
+        self._main_window.show()
+        # Hack to make the transition look less awkward
+        self._settings_window.show()
 
         # Hotkeys
         for hotkey, setting_strings in {
@@ -1266,21 +1279,6 @@ class UIController:
         self._main_window.split_display.setVisible(visible)
         # Only display this when the other widgets are hidden
         self._main_window.split_info_min_label.setVisible(not visible)
-
-    def _set_main_window_always_top(self, on_boot=False) -> None:
-        """Set always on top status according to user settings.
-
-        Args:
-            on_boot (bool): If True, don't call self._main_window.show. Useful
-                because this method is called during bootup but before the
-                main window is actually ready to show.
-        """
-        self._main_window.setWindowFlag(
-            Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP")
-        )
-        if not on_boot:
-            # Required, since setting the flag unshows the window by default
-            self._main_window.show()
 
     ###########################
     #                         #

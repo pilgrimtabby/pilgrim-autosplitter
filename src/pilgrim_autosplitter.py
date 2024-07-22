@@ -82,7 +82,12 @@ def main():
 
             program_directory = os.path.dirname(os.path.abspath(__file__))
 
-            self.pilgrim_autosplitter = QApplication(sys.argv)
+            if platform.system() == "Windows":
+                # Force title bar to follow system theme
+                extra_args = ['-platform', 'windows:darkmode=1']
+            else:
+                extra_args = []
+            self.pilgrim_autosplitter = QApplication(sys.argv + extra_args)
             self.pilgrim_autosplitter.setStyle("fusion")
             self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
 
