@@ -197,7 +197,7 @@ class UIController:
 
         # Help action
         self._main_window.help_action.triggered.connect(
-            lambda: webbrowser.open(settings.USER_MANUAL_URL, new=0, autoraise=True)
+            lambda: self._open_url(settings.USER_MANUAL_URL)
         )
 
         ##########################
@@ -488,9 +488,7 @@ class UIController:
 
         # "Open" was clicked -- open the GitHub releases page
         elif button.text() == self._main_window.open_button_txt:
-            webbrowser.open(
-                f"{settings.REPO_URL}releases/latest", new=0, autoraise=True
-            )
+            self._open_url(f"{settings.REPO_URL}releases/latest")
 
     def _exec_settings_window(self) -> None:
         """Set up and open the settings window UI."""
@@ -826,6 +824,18 @@ class UIController:
         else:
             non_root_user = os.environ.get("SUDO_USER")
             subprocess.Popen(["xdg-open", path], user=non_root_user)
+
+    def _open_url(self, url: str) -> None:
+        """Open a URL using webbrowser or xdg-open, depending on platform.
+
+        Use xdg-open on Linux so we can make sure to execute the process
+        as user, not as root, to avoid crashes / permission errors.
+        """
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            lambda: webbrowser.open(url, new=0, autoraise=True)
+        else:
+            non_root_user = os.environ.get("SUDO_USER")
+            subprocess.Popen(["xdg-open", url], user=non_root_user)
 
     def _set_main_window_layout(self) -> None:
         """Set the size, location, and visibility of the main window's widgets
