@@ -123,6 +123,10 @@ class UIController:
         self._screenshot_hotkey_pressed = False
         self._toggle_hotkeys_hotkey_pressed = False
 
+        # Store values for keeping display awake
+        self._last_wake_time = time.perf_counter()
+        self._wake_interval = 30  # Attempt wake every 30 seconds
+
         ######################
         #                    #
         # Main Window Config #
@@ -243,13 +247,15 @@ class UIController:
         self._main_window.show()
 
     def _poll(self) -> None:
-        """Use information from UI, splitter, and keyboard to update the UI
-        and splitter.
+        """Update the UI and splitter (should be called each frame).
 
-        Should be called each frame.
+        Uses information from UI, splitter, and keyboard to update the UI
+        and splitter. Also keeps the computer's display awake if the splitter
+        is active.
         """
         self._update_from_splitter()
         self._update_from_keyboard()
+        self._wake_display()
 
     ###########################
     #                         #
@@ -1772,3 +1778,39 @@ class UIController:
             )
             if len(key_code) == 0 or hotkey_not_caught:
                 self._request_next_split()
+
+    def _wake_display(self):
+        """Keep the display awake by sending a virtual key release action.
+
+        Each time this method is called, check if more than _wake_interval
+        seconds have passed. If so, update _last_wake_time to the current time.
+
+        If _splitter._compare_thread is alive, send a key release. Why a key
+        release? It's the least invasive solution that's easily available cross
+        platform (compare other popular solutions, like clicking the mouse,
+        that are obvious to the user and can cause problems/ be annoying). 
+        Releasing a key doesn't require it to be pressed; it also does NOT
+        interrupt an actual, physical keypress by the user. In other words,
+        the vast majority of users will have no idea a key is being "released"
+        virtually by this program. It also drastically reduces concerns of
+        possible side effects, like accidental "misclicks" or other weird
+        things that might bother a user.
+
+        There are other, less hacky solutions, but they are complicated to 
+        implement, not always effective, are platform-specific, and sometimes
+        require importing large outside libraries, which presents challenges
+        when bundling with PyInstaller. This solution is lightweight,
+        imperceptable to the end user, and doesn't require any extra libraries
+        or permissions. In other words, I think it's good enough.
+        """
+        if time.perf_counter() - self._last_wake_time >= self._wake_interval:
+            self._last_wake_time = time.perf_counter()
+            delay = self._splitter.delay_remaining
+            suspend = self._splitter.suspend_remaining
+
+            if not self._splitter.suspended or (self._splitter.delaying and delay is not None) or (self._splitter.suspended and suspend is not None):
+                key = "a"
+                if platform.system() == "Windows" or platform.system() == "Darwin":
+                    self._keyboard_controller.release(key)
+                else:
+                    keyboard.release(key)
