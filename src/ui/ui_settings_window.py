@@ -702,3 +702,19 @@ class KeyLineEdit(QLineEdit):
         """
         QLineEdit.__init__(self, parent)
         self.key_code = ""
+
+    def get_text_width(self) -> int:
+        """Get the current width in pixels of the current text.
+
+        Returns:
+            int: The width of the text.
+        """
+        return self.fontMetrics().boundingRect(self.text()).width()
+
+    def get_font_size(self) -> int:
+        """Shortcut method to get the current font size.
+
+        Returns:
+            int: The font size.
+        """
+        return self.fontInfo().pointSize()

@@ -31,6 +31,7 @@
 
 
 import platform
+
 if platform.system() == "Windows" or platform.system() == "Darwin":
     # Don't import the whole pynput library since that takes a while
     from pynput import keyboard as pynput_keyboard
@@ -47,14 +48,14 @@ class UIKeyboardController:
     to meet the current needs of Pilgrim Autosplitter. It provides a layer of
     abstraction to simplify development and maintanence in ui_controller.py.
     """
+
     def __init__(self) -> None:
-        """Initialize the keyboard controller (required for pynput backend).
-        """
+        """Initialize the keyboard controller (required for pynput backend)."""
         if platform.system() == "Windows" or platform.system() == "Darwin":
             self._controller = pynput_keyboard.Controller()
         else:
             self._controller = None
-    
+
     def start_listener(self, on_press, on_release) -> None:
         """Start a keyboard listener.
 

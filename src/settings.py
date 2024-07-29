@@ -189,7 +189,7 @@ def set_defaults() -> None:
         set_value("SKIP_HOTKEY_NAME", "")
 
         # The text value of the previous split hotkey
-        set_value("PREVIOUS_HOTKEY_NAME", "")
+        set_value("PREV_HOTKEY_NAME", "")
 
         # The text value of the next split hotkey
         set_value("NEXT_HOTKEY_NAME", "")
@@ -216,7 +216,7 @@ def set_defaults() -> None:
         set_value("SKIP_HOTKEY_CODE", "")
 
         # The pynput.keyboard.Key.vk value of the previous split hotkey
-        set_value("PREVIOUS_HOTKEY_CODE", "")
+        set_value("PREV_HOTKEY_CODE", "")
 
         # The pynput.keyboard.Key.vk value of the next split hotkey
         set_value("NEXT_HOTKEY_CODE", "")

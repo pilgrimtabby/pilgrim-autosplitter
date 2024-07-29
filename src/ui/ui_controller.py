@@ -564,8 +564,8 @@ class UIController:
                 settings.get_str("SKIP_HOTKEY_CODE"),
             ),
             self._settings_window.previous_hotkey_box: (
-                settings.get_str("PREVIOUS_HOTKEY_NAME"),
-                settings.get_str("PREVIOUS_HOTKEY_CODE"),
+                settings.get_str("PREV_HOTKEY_NAME"),
+                settings.get_str("PREV_HOTKEY_CODE"),
             ),
             self._settings_window.next_hotkey_box: (
                 settings.get_str("NEXT_HOTKEY_NAME"),
@@ -674,8 +674,8 @@ class UIController:
                 "SKIP_HOTKEY_CODE",
             ),
             self._settings_window.previous_hotkey_box: (
-                "PREVIOUS_HOTKEY_NAME",
-                "PREVIOUS_HOTKEY_CODE",
+                "PREV_HOTKEY_NAME",
+                "PREV_HOTKEY_CODE",
             ),
             self._settings_window.next_hotkey_box: (
                 "NEXT_HOTKEY_NAME",
@@ -1624,6 +1624,13 @@ class UIController:
         # alphanumeric key, the try block throws AttributeError.
         key_name, key_code = self._keyboard.parse_key_info(key)
 
+        # Some keys aren't handled very well by pynput -- they return a key
+        # code but no name. I don't have the resources to compile an exhaustive
+        # list of codes that correspond to names on different platforms, so I
+        # think it's better to just have them do nothing for now.
+        if key_name is None:
+            return
+
         # Use #1 (set hotkey settings in settings window)
         for hotkey_box in [
             self._settings_window.split_hotkey_box,
@@ -1639,21 +1646,40 @@ class UIController:
             if hotkey_box.hasFocus():
                 hotkey_box.setText(key_name)
                 hotkey_box.key_code = key_code
+
+                # Reset font size to the default
+                f_size = self._settings_window.fontInfo().pointSize()
+                hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
+
+                # If the key name is too big for the box, resize the font down
+                # until it fits. Subtract 10 from the width so that there's a
+                # little bit of padding on the right-hand side of the box.
+                while hotkey_box.get_text_width() >= hotkey_box.width() - 10:
+                    f_size = hotkey_box.get_font_size() - 1
+                    hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
                 return
 
         # Use #2 (set "hotkey pressed" flag for _react_to_hotkey_flags)
         if not self._settings_window.isVisible():
-            for hotkey_pressed, settings_string in {
-                "_split_hotkey_pressed": "SPLIT_HOTKEY_CODE",
-                "_reset_hotkey_pressed": "RESET_HOTKEY_CODE",
-                "_undo_hotkey_pressed": "UNDO_HOTKEY_CODE",
-                "_skip_hotkey_pressed": "SKIP_HOTKEY_CODE",
-                "_previous_hotkey_pressed": "PREVIOUS_HOTKEY_CODE",
-                "_next_hotkey_pressed": "NEXT_HOTKEY_CODE",
-                "_screenshot_hotkey_pressed": "SCREENSHOT_HOTKEY_CODE",
-                "_toggle_hotkeys_hotkey_pressed": "TOGGLE_HOTKEYS_HOTKEY_CODE",
+            for hotkey_pressed, setting in {
+                "_split_hotkey_pressed": ("SPLIT_HOTKEY_NAME", "SPLIT_HOTKEY_CODE"),
+                "_reset_hotkey_pressed": ("RESET_HOTKEY_NAME", "RESET_HOTKEY_CODE"),
+                "_undo_hotkey_pressed": ("UNDO_HOTKEY_NAME", "UNDO_HOTKEY_CODE"),
+                "_skip_hotkey_pressed": ("SKIP_HOTKEY_NAME", "SKIP_HOTKEY_CODE"),
+                "_previous_hotkey_pressed": ("PREV_HOTKEY_NAME", "PREV_HOTKEY_CODE"),
+                "_next_hotkey_pressed": ("NEXT_HOTKEY_NAME", "NEXT_HOTKEY_CODE"),
+                "_screenshot_hotkey_pressed": (
+                    "SCREENSHOT_HOTKEY_NAME",
+                    "SCREENSHOT_HOTKEY_CODE",
+                ),
+                "_toggle_hotkeys_hotkey_pressed": (
+                    "TOGGLE_HOTKEYS_HOTKEY_NAME",
+                    "TOGGLE_HOTKEYS_HOTKEY_CODE",
+                ),
             }.items():
-                if str(key_code) == settings.get_str(settings_string):
+                settings_name = settings.get_str(setting[0])
+                settings_code = settings.get_str(setting[1])
+                if str(key_name) == settings_name and str(key_code) == settings_code:
                     # Use setattr because that allows us to use this dict format
                     setattr(self, hotkey_pressed, True)
 
