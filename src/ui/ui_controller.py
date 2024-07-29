@@ -125,7 +125,10 @@ class UIController:
 
         # Store values for keeping display awake
         self._last_wake_time = time.perf_counter()
-        self._wake_interval = 30  # Attempt wake every 30 seconds
+        self._wake_interval = 45  # Attempt wake after this many seconds
+        if platform.system() == "Darwin":
+            # See _wake_display for why we store this value here
+            self._caffeinate_path = self._get_exec_path("caffeinate")
 
         ######################
         #                    #
@@ -826,7 +829,7 @@ class UIController:
         if platform.system() == "Windows":
             os.startfile(path)
         elif platform.system() == "Darwin":
-            subprocess.call(["open", path])
+            subprocess.Popen(["open", path])
         else:
             non_root_user = os.environ.get("SUDO_USER")
             subprocess.Popen(["xdg-open", path], user=non_root_user)
@@ -1803,7 +1806,20 @@ class UIController:
         On MacOS, use the built-in `caffeinate` command to keep the display
         alive. Helpfully, calling it for even 1 second, as we do, resets the
         display sleep timer, so we can open a 1-sec process in the background
-        with subprocess.Popen every interval.
+        with subprocess.Popen every interval. If caffeinate isn't available,
+        fall back to the "release key method" (caffeinate doesn't force the
+        keyboard's backlight to stay on, but the "release key" method does, so
+        caffeinate is preferred even though it's slower. Another option would
+        be to call caffeinate -d just once in a separate thread and then
+        terminate the thread)
+
+        Note: We store self._caffeinate_path so we only have to check once if
+        caffeinate is available on the user's machine. If it's not available,
+        skipping directly to keyboard.release saves about .009 seconds per call
+        (on my machine), which isn't nothing considering that's a good chunk of
+        a frame at 60fps.
+        Note2: Using caffeinate doesn't force the keyboard backlight to stay on,
+        but keyboard.release does -- another reason caffeinate is desirable.
 
         On Linux, we use the "release key" approach too. I don't have the right
         testing environment to see if this works, but it definitely works on
@@ -1811,18 +1827,41 @@ class UIController:
         """
         if time.perf_counter() - self._last_wake_time >= self._wake_interval:
             self._last_wake_time = time.perf_counter()
-            delay = self._splitter.delay_remaining
             suspend = self._splitter.suspend_remaining
+            delay = self._splitter.delay_remaining
 
             if (
                 not self._splitter.suspended
-                or (self._splitter.delaying and delay is not None)
                 or (self._splitter.suspended and suspend is not None)
+                or (self._splitter.delaying and delay is not None)
             ):
                 key = "a"  # Something arbitrary; it shouldn't matter
                 if platform.system() == "Windows":
                     self._keyboard_controller.release(key)
                 elif platform.system() == "Darwin":
-                    subprocess.Popen(["caffeinate", "-d", "-t", "1"])
+                    if self._caffeinate_path is not None:
+                        subprocess.Popen([self._caffeinate_path, "-d", "-t", "1"])
+                    else:
+                        self._keyboard_controller.release(key)
                 else:
                     keyboard.release(key)
+
+    def _get_exec_path(self, name: str) -> str | None:
+        """Return the path to an executable file, if it exists.
+
+        Args:
+            name (str): The name (not path) of an exectable file. Ex: "grep"
+
+        Returns:
+            str: The absolute path to the executable, if it exists.
+        """
+        if platform.system() == "Windows":
+            search = "where"
+        else:
+            search = "which"
+        try:
+            return subprocess.check_output([search, name]).decode().strip()
+
+        # The executable doesn't exist (or at least isn't on PATH)
+        except subprocess.CalledProcessError:
+            return None
