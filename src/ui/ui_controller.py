@@ -48,15 +48,9 @@ from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
 import settings
 import ui.ui_style_sheet as style_sheet
 from splitter.splitter import Splitter
+from ui.ui_keyboard_controller import UIKeyboardController
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
-
-if platform.system() == "Windows" or platform.system() == "Darwin":
-    # Don't import the whole pynput library since that takes a while
-    from pynput import keyboard as pynput_keyboard
-else:
-    # Pynput doesn't work well on Linux, so use keyboard instead
-    import keyboard
 
 
 class UIController:
@@ -129,6 +123,8 @@ class UIController:
         if platform.system() == "Darwin":
             # See _wake_display for why we store this value here
             self._caffeinate_path = self._get_exec_path("caffeinate")
+        else:
+            self._caffeinate_path = None
 
         ######################
         #                    #
@@ -232,14 +228,8 @@ class UIController:
         #######################################
 
         # Start keyboard listener
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            self._keyboard_controller = pynput_keyboard.Controller()
-            self._keyboard_listener = pynput_keyboard.Listener(
-                on_press=self._handle_key_press, on_release=None
-            )
-            self._keyboard_listener.start()
-        else:
-            keyboard.on_press(self._handle_key_press)
+        self._keyboard = UIKeyboardController()
+        self._keyboard.start_listener(on_press=self._handle_key_press, on_release=None)
 
         # Start poller
         self._poller = QTimer()
@@ -286,7 +276,7 @@ class UIController:
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._press_hotkey(key_code)
+            self._keyboard.press_and_release(key_code)
         else:
             self._request_previous_split()
 
@@ -310,7 +300,7 @@ class UIController:
         """
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._press_hotkey(key_code)
+            self._keyboard.press_and_release(key_code)
         else:
             self._request_next_split()
 
@@ -334,7 +324,7 @@ class UIController:
         """
         key_code = settings.get_str("RESET_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._press_hotkey(key_code)
+            self._keyboard.press_and_release(key_code)
         else:
             self._request_reset_splits()
 
@@ -1609,8 +1599,8 @@ class UIController:
 
     def _update_from_keyboard(self) -> None:
         """Use flags set in _handle_key_press to split and do other actions."""
-        self._handle_hotkey_press()
-        self._execute_split_action()
+        self._react_to_hotkey_flags()
+        self._react_to_split_flags()
 
     def _handle_key_press(self, key) -> None:
         """Process key presses, setting flags if the key is a hotkey.
@@ -1624,22 +1614,15 @@ class UIController:
 
         We set flags when hotkeys are pressed instead of directly calling a
         method because PyQt5 doesn't allow other threads to manipulate the UI.
-        Doing so almost always causes a trace trap error / crash.
+        Doing so almost always causes a trace trap / crash.
 
         Args:
-            key (pynput.keyboard.Key) -- Windows, MacOS
-                (keyboard.KeyboardEvent) -- Linux:
-                Wrapper containing info about the key that was pressed.
+            key: Wrapper containing info about the key that was pressed. For
+                more information, see the ui_keyboard_controller module.
         """
         # Get the key's name and internal value. If the key is not an
         # alphanumeric key, the try block throws AttributeError.
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            try:
-                key_name, key_code = key.char, key.vk
-            except AttributeError:
-                key_name, key_code = str(key).replace("Key.", ""), key.value.vk
-        else:
-            key_name = key_code = key.name
+        key_name, key_code = self._keyboard.parse_key_info(key)
 
         # Use #1 (set hotkey settings in settings window)
         for hotkey_box in [
@@ -1658,7 +1641,7 @@ class UIController:
                 hotkey_box.key_code = key_code
                 return
 
-        # Use #2 (set "hotkey pressed" flag for _handle_hotkey_press)
+        # Use #2 (set "hotkey pressed" flag for _react_to_hotkey_flags)
         if not self._settings_window.isVisible():
             for hotkey_pressed, settings_string in {
                 "_split_hotkey_pressed": "SPLIT_HOTKEY_CODE",
@@ -1674,7 +1657,7 @@ class UIController:
                     # Use setattr because that allows us to use this dict format
                     setattr(self, hotkey_pressed, True)
 
-    def _handle_hotkey_press(self) -> None:
+    def _react_to_hotkey_flags(self) -> None:
         """React to the flags set in _handle_key_press.
 
         When a hotkey is pressed, do its action if hotkeys are allowed now.
@@ -1729,36 +1712,19 @@ class UIController:
                 self._main_window.screenshot_button.click()
             self._screenshot_hotkey_pressed = False
 
-    def _press_hotkey(self, key_code: str) -> None:
-        """Press and release a hotkey.
+    def _react_to_split_flags(self) -> None:
+        """Press a hotkey & go to next split when self._splitter sets flags.
 
-        Args:
-            key_code (str): A string representation of a pynput.keyboard.Key.vk
-                value (or a keyboard.KeyboardEvent.name value on Linux).
-                Passed as a string because we use QSettings, which converts all
-                types to strings on some backends.
-        """
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            key_code = int(key_code)
-            key = pynput_keyboard.KeyCode(vk=key_code)
-            self._keyboard_controller.press(key)
-            self._keyboard_controller.release(key)
-        else:
-            keyboard.send(key_code)
-
-    def _execute_split_action(self) -> None:
-        """Send a hotkey press and request the next split image when the
-        splitter finds a matching image.
-
-        If no hotkey is set for a given action, ignore the hotkey press and
-        request the next split image anyway.
+        If the normal_split_action flag is set but no split hotkey is assigned,
+        or the hotkey wasn't heard by the application, request the next split
+        image manually.
         """
         # Pause split (press pause hotkey)
         if self._splitter.pause_split_action:
             self._splitter.pause_split_action = False
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
             if len(key_code) > 0:
-                self._press_hotkey(key_code)
+                self._keyboard.press_and_release(key_code)
             self._request_next_split()
 
         # Dummy split (silently advance to next split)
@@ -1771,7 +1737,7 @@ class UIController:
             self._splitter.normal_split_action = False
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
             if len(key_code) > 0:
-                self._press_hotkey(key_code)
+                self._keyboard.press_and_release(key_code)
             # If key didn't get pressed, OR if it did get pressed but global
             # hotkeys are off and the app isn't in focus, move the split image
             # forward, since pressing the key on its own won't do that
@@ -1836,15 +1802,13 @@ class UIController:
                 or (self._splitter.delaying and delay is not None)
             ):
                 key = "a"  # Something arbitrary; it shouldn't matter
-                if platform.system() == "Windows":
-                    self._keyboard_controller.release(key)
-                elif platform.system() == "Darwin":
+                if platform.system() == "Darwin":
                     if self._caffeinate_path is not None:
                         subprocess.Popen([self._caffeinate_path, "-d", "-t", "1"])
                     else:
-                        self._keyboard_controller.release(key)
+                        self._keyboard.release(key)
                 else:
-                    keyboard.release(key)
+                    self._keyboard.release(key)
 
     def _get_exec_path(self, name: str) -> str | None:
         """Return the path to an executable file, if it exists.
