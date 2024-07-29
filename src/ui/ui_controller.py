@@ -41,7 +41,7 @@ import webbrowser
 from pathlib import Path
 
 import cv2
-from PyQt5.QtCore import QObject, QRect, Qt, QTimer
+from PyQt5.QtCore import QRect, Qt, QTimer
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
 
@@ -1790,23 +1790,24 @@ class UIController:
         Each time this method is called, check if more than _wake_interval
         seconds have passed. If so, update _last_wake_time to the current time.
 
-        If _splitter._compare_thread is alive, send a key release. Why a key
-        release? It's the least invasive solution that's easily available cross
-        platform (compare other popular solutions, like clicking the mouse,
-        that are obvious to the user and can cause problems/ be annoying).
+        This method works differently depending on the platform. On Windows,
+        if _splitter._compare_thread is alive, send a key release. Why a key
+        release? It's the least invasive solution I could find that didn't
+        require using C to permanently change some system value. I want to make
+        sure the system will sleep normally if this program exits abruptly.
         Releasing a key doesn't require it to be pressed; it also does NOT
-        interrupt an actual, physical keypress by the user. In other words,
-        the vast majority of users will have no idea a key is being "released"
-        virtually by this program. It also drastically reduces concerns of
-        possible side effects, like accidental "misclicks" or other weird
-        things that might bother a user.
+        interrupt an actual, physical keypress by the user -- so most users
+        should never notice that anything is happening behind the scenes. Hacky
+        but it works.
 
-        There are other, less hacky solutions, but they are complicated to
-        implement, not always effective, are platform-specific, and sometimes
-        require importing large outside libraries, which presents challenges
-        when bundling with PyInstaller. This solution is lightweight,
-        imperceptable to the end user, and doesn't require any extra libraries
-        or permissions. In other words, I think it's good enough.
+        On MacOS, use the built-in `caffeinate` command to keep the display
+        alive. Helpfully, calling it for even 1 second, as we do, resets the
+        display sleep timer, so we can open a 1-sec process in the background
+        with subprocess.Popen every interval.
+
+        On Linux, we use the "release key" approach too. I don't have the right
+        testing environment to see if this works, but it definitely works on
+        Windows, so might as well put this down for now...
         """
         if time.perf_counter() - self._last_wake_time >= self._wake_interval:
             self._last_wake_time = time.perf_counter()
@@ -1818,12 +1819,10 @@ class UIController:
                 or (self._splitter.delaying and delay is not None)
                 or (self._splitter.suspended and suspend is not None)
             ):
-                if platform.system() == "Windows" or platform.system() == "Darwin":
-                    key = "a"  # Something arbitrary; it shouldn't matter
+                key = "a"  # Something arbitrary; it shouldn't matter
+                if platform.system() == "Windows":
                     self._keyboard_controller.release(key)
+                elif platform.system() == "Darwin":
+                    subprocess.Popen(["caffeinate", "-d", "-t", "1"])
                 else:
-                    # This doesn't currently work on Linux; the "release key"
-                    # approach is the only acceptable hack I can think of for
-                    # now, and it doesn't work on my Linux setup, so for now,
-                    # we're out of luck.
-                    pass
+                    keyboard.release(key)
