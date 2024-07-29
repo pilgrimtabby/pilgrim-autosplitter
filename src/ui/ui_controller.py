@@ -1782,13 +1782,18 @@ class UIController:
     def _wake_display(self):
         """Keep the display awake by sending a virtual key release action.
 
+        This should probably happen anyway (I'm assuming most use cases will
+        involve LiveSplit or some other app that keeps the screen on), but just
+        in case, this app should also keep the screen alive when it's being
+        actively used.
+
         Each time this method is called, check if more than _wake_interval
         seconds have passed. If so, update _last_wake_time to the current time.
 
         If _splitter._compare_thread is alive, send a key release. Why a key
         release? It's the least invasive solution that's easily available cross
         platform (compare other popular solutions, like clicking the mouse,
-        that are obvious to the user and can cause problems/ be annoying). 
+        that are obvious to the user and can cause problems/ be annoying).
         Releasing a key doesn't require it to be pressed; it also does NOT
         interrupt an actual, physical keypress by the user. In other words,
         the vast majority of users will have no idea a key is being "released"
@@ -1796,7 +1801,7 @@ class UIController:
         possible side effects, like accidental "misclicks" or other weird
         things that might bother a user.
 
-        There are other, less hacky solutions, but they are complicated to 
+        There are other, less hacky solutions, but they are complicated to
         implement, not always effective, are platform-specific, and sometimes
         require importing large outside libraries, which presents challenges
         when bundling with PyInstaller. This solution is lightweight,
@@ -1808,9 +1813,17 @@ class UIController:
             delay = self._splitter.delay_remaining
             suspend = self._splitter.suspend_remaining
 
-            if not self._splitter.suspended or (self._splitter.delaying and delay is not None) or (self._splitter.suspended and suspend is not None):
-                key = "a"
+            if (
+                not self._splitter.suspended
+                or (self._splitter.delaying and delay is not None)
+                or (self._splitter.suspended and suspend is not None)
+            ):
                 if platform.system() == "Windows" or platform.system() == "Darwin":
+                    key = "a"  # Something arbitrary; it shouldn't matter
                     self._keyboard_controller.release(key)
                 else:
-                    keyboard.release(key)
+                    # This doesn't currently work on Linux; the "release key"
+                    # approach is the only acceptable hack I can think of for
+                    # now, and it doesn't work on my Linux setup, so for now,
+                    # we're out of luck.
+                    pass

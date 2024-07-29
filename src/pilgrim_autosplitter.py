@@ -84,7 +84,7 @@ def main():
 
             if platform.system() == "Windows":
                 # Force title bar to follow system theme
-                extra_args = ['-platform', 'windows:darkmode=1']
+                extra_args = ["-platform", "windows:darkmode=1"]
             else:
                 extra_args = []
             self.pilgrim_autosplitter = QApplication(sys.argv + extra_args)
@@ -94,11 +94,12 @@ def main():
             # Set taskbar icons. Doesn't seem to really do anything, but it's a
             # work in progress so I'll leave it for now
             if platform.system() == "Windows":
+                import ctypes
+
                 self.pilgrim_autosplitter.setWindowIcon(
                     QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
                 )
                 # Tell Windows this app is its own process so icon shows up
-                import ctypes
                 app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
             # Without the absolute path, the icon only shows up when running
