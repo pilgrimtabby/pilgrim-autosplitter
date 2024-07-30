@@ -617,13 +617,12 @@ class UIController:
                 value = float(spinbox.value()) / 100
             else:
                 value = spinbox.value()
+            settings.set_value(setting_string, value)
 
             # Send new FPS value to controller and splitter
             if spinbox == self._settings_window.fps_spinbox:
                 self._poller.setInterval(self._get_interval())
                 self._splitter.target_fps = value
-
-            settings.set_value(setting_string, value)
 
         self._splitter.splits.set_default_threshold()
         self._splitter.splits.set_default_delay()
