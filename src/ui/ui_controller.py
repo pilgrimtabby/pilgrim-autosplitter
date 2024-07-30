@@ -39,6 +39,7 @@ import subprocess
 import time
 import webbrowser
 from pathlib import Path
+from threading import Thread
 
 import cv2
 from PyQt5.QtCore import QRect, Qt, QTimer
@@ -117,14 +118,14 @@ class UIController:
         self._screenshot_hotkey_pressed = False
         self._toggle_hotkeys_hotkey_pressed = False
 
-        # Store values for keeping display awake
+        # Values for keeping display awake (see _wake_display)
         self._last_wake_time = time.perf_counter()
-        self._wake_interval = 45  # Attempt wake after this many seconds
-        if platform.system() == "Darwin":
-            # See _wake_display for why we store this value here
-            self._caffeinate_path = self._get_exec_path("caffeinate")
-        else:
-            self._caffeinate_path = None
+        # Attempt wake after this many seconds. Should be < 1 min, since that's
+        # the minimum allowed time to trigger display sleep on most OSs
+        self._wake_interval = 45
+        # MacOS-specific values (MacOS uses caffeinate)
+        self._caffeinate_thread = Thread(target=self._caffeinate)
+        self._caffeinate_thread_finished = True
 
         ######################
         #                    #
@@ -1774,66 +1775,93 @@ class UIController:
                 self._request_next_split()
 
     def _wake_display(self):
-        """Keep the display awake by sending a virtual key release action.
+        """Keep the display awake when the splitter is active.
 
-        This should probably happen anyway (I'm assuming most use cases will
-        involve LiveSplit or some other app that keeps the screen on), but just
-        in case, this app should also keep the screen alive when it's being
-        actively used.
+        Each time this method is called, check if at least _wake_interval
+        seconds have passed. If so, update _last_wake_time to the current time,
+        and check if the splitter is active or delaying / suspending with a
+        countdown. If it is, attempt to wake the display (the method differs by
+        operating system).
 
-        Each time this method is called, check if more than _wake_interval
-        seconds have passed. If so, update _last_wake_time to the current time.
+        MacOS method: caffeinate (key release as fallback, see below)
+        Even if called with a 1 second timeout, as we do here, caffeinate
+        resets the OS's sleep countdown, so we only need to run it about once a
+        minute (1 minute is the lowest sleep timeout on MacOS) to prevent the
+        screen from dimming. We use a separate thread to reduce overhead
+        (creating a new thread requires less overhead than calling
+        subprocess.Popen, once, and we only need to do it once, instead of once
+        every _wake_interval).
+        If caffeinate isn't available, fall back to the "release key" method.
+        (see below). Caffeinate is preferred because, unlike releasing a key,
+        it doesn't force the keyboard's backlight to stay on, but releasing a
+        key at least keeps the display alive.
 
-        This method works differently depending on the platform. On Windows,
-        if _splitter._compare_thread is alive, send a key release. Why a key
-        release? It's the least invasive solution I could find that didn't
-        require using C to permanently change some system value. I want to make
-        sure the system will sleep normally if this program exits abruptly.
-        Releasing a key doesn't require it to be pressed; it also does NOT
-        interrupt an actual, physical keypress by the user -- so most users
-        should never notice that anything is happening behind the scenes. Hacky
-        but it works.
+        Windows method: Key release
+        This is the least invasive solution that doesn't require permanently
+        changing a registry or system value, which would prevent the machine
+        from sleeping normally if this program exits abruptly. Key releases
+        instead of key presses or mouse clicks / wiggles are ideal because
+        releasing a key doesn't require the key to be pressed, and does NOT
+        interrupt an actual, physical keypress being held by the user, so users
+        should never notice that anything is happening behind the scenes. It's
+        hacky but hopefully relatively uninvasive, and its effects subside as
+        soon as the program stops running.
 
-        On MacOS, use the built-in `caffeinate` command to keep the display
-        alive. Helpfully, calling it for even 1 second, as we do, resets the
-        display sleep timer, so we can open a 1-sec process in the background
-        with subprocess.Popen every interval. If caffeinate isn't available,
-        fall back to the "release key method" (caffeinate doesn't force the
-        keyboard's backlight to stay on, but the "release key" method does, so
-        caffeinate is preferred even though it's slower. Another option would
-        be to call caffeinate -d just once in a separate thread and then
-        terminate the thread)
-
-        Note: We store self._caffeinate_path so we only have to check once if
-        caffeinate is available on the user's machine. If it's not available,
-        skipping directly to keyboard.release saves about .009 seconds per call
-        (on my machine), which isn't nothing considering that's a good chunk of
-        a frame at 60fps.
-        Note2: Using caffeinate doesn't force the keyboard backlight to stay on,
-        but keyboard.release does -- another reason caffeinate is desirable.
-
-        On Linux, we use the "release key" approach too. I don't have the right
-        testing environment to see if this works, but it definitely works on
-        Windows, so might as well put this down for now...
+        Linux: Key release (untested, may not be reliable)
         """
         if time.perf_counter() - self._last_wake_time >= self._wake_interval:
             self._last_wake_time = time.perf_counter()
             suspend = self._splitter.suspend_remaining
             delay = self._splitter.delay_remaining
-
-            if (
+            splitter_active = (
                 not self._splitter.suspended
                 or (self._splitter.suspended and suspend is not None)
                 or (self._splitter.delaying and delay is not None)
-            ):
-                key = "a"  # Something arbitrary; it shouldn't matter
-                if platform.system() == "Darwin":
-                    if self._caffeinate_path is not None:
-                        subprocess.Popen([self._caffeinate_path, "-d", "-t", "1"])
-                    else:
+            )
+
+            # Key should be alphanumeric to work cross platform; beyond that it
+            # doesn't matter, since the user won't detect its release
+            key = "a"
+
+            # MacOS: Try caffeinate, fall back to key release if necessary
+            if platform.system() == "Darwin":
+                if splitter_active:
+
+                    caffeinate_path = self._get_exec_path("caffeinate")
+
+                    # No caffeinate, use fallback
+                    if caffeinate_path is None:
                         self._keyboard.release(key)
+
+                    # Caffeinate exists; start thread if it hasn't been started
+                    elif not self._caffeinate_thread.is_alive():
+                        self._caffeinate_thread_finished = False
+                        self._caffeinate_thread = Thread(
+                            target=self._caffeinate, args=(caffeinate_path,)
+                        )
+                        self._caffeinate_thread.daemon = True
+                        self._caffeinate_thread.start()
+
+                # Splitter inactive; kill thread (join not needed, will die)
                 else:
-                    self._keyboard.release(key)
+                    self._caffeinate_thread_finished = True
+
+            # Winodws / Linux: release a key if splitter active
+            elif splitter_active:
+                self._keyboard.release(key)
+
+    def _caffeinate(self, caffeinate_path: str) -> None:
+        """Use built-in caffeinate to keep the machine's display on (MacOS).
+
+        A 1-second timeout is used because caffeinate resets the sleep timer
+        (i.e. it doesn't need to be constantly running). This is good because
+        it's hard to reliably terminate an ongoing caffeinate process; this way
+        we guarantee that users' sleep settings will return to normal after the
+        program terminates.
+        """
+        while not self._caffeinate_thread_finished:
+            subprocess.Popen([caffeinate_path, "-d", "-t", "1"])
+            time.sleep(self._wake_interval)
 
     def _get_exec_path(self, name: str) -> str | None:
         """Return the path to an executable file, if it exists.
