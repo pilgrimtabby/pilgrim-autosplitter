@@ -47,19 +47,20 @@ Download the latest Windows build (Pilgrim.Autosplitter.Windows.v1.x.x) from the
 
 If you're familiar with Python:
 
-* Make sure you have Python 3.10+ installed
+* Make sure you have Python 3.8+ installed (Python 3.11+ is recommended for an optimal experience)
 
 * Run `python -m pip install -r requirements.txt`
 
 > [!Note]
 > If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
 > Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
+> In addition, if using Python <=3.10, you may need to manually install PyQt5 using `python -m pip install pyqt5-tools`.
 
 * Open the app with `python pilgrim_autosplitter.py`
 
 If this is your first time using Python:
 
-* Install the latest version of Python (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
+* Install the latest stable Python release (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
 
 > [!Important]
 > When installing Python using the Python installer, you MUST check the box next to `Add Python to PATH`. If you don't, the next part won't work.
@@ -100,19 +101,20 @@ Known limitations:
 
 If you're familiar with Python:
 
-* Make sure you have Python 3.10+ installed
+* Make sure you have Python 3.8+ installed (Python 3.11+ is recommended for an optimal experience)
 
 * Run `pip3 install -r requirements.txt`
 
 > [!Note]
 > If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
 > Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
+> In addition, if using Python <=3.10, you may need to manually install PyQt5 using `python -m pip install pyqt5-tools`.
 
 * Open the app with `python3 pilgrim_autosplitter.py`
 
 If this is your first time using Python:
 
-* Install the latest version of Python (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
+* Install the latest stable Python release (3.12 at this time) by clicking [here](https://www.python.org/downloads/).
 
 * Download Pilgrim Autosplitter's source code from the [most recent release](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest) (click on `Source code (zip)` or `Source code (tar.gz)`). Extract the files.
 
@@ -134,8 +136,9 @@ Known limitations:
 
 ### Method 2: Run from source with Python
 
-If you're on Linux, I assume you know what you're doing. Get the latest release [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), use pip to install the dependencies in `requirements-linux.txt`, and run `src/pilgrim_autosplitter.py` as root. Python >=3.10 is required.
+If you're on Linux, I assume you know what you're doing. Get the latest release [here](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest), use pip to install the dependencies in `requirements-linux.txt`, and run `src/pilgrim_autosplitter.py` as root. Python >=3.8 is required (Python 3.11+ is recommended for an optimal experience).
 
 > [!Note]
 > If installation hangs up when trying to download PyQt5, try running the following command: `python -m pip install pyqt5 --config-settings --confirm-license= --verbose`.
 > Some users (including myself) have experienced a softlock when verifying the PyQt5 license; this should solve that problem.
+> In addition, if using Python <=3.10, you may need to manually install PyQt5 using `python -m pip install pyqt5-tools`.
