@@ -40,7 +40,7 @@ import time
 from typing import Optional, Union
 import webbrowser
 from pathlib import Path
-from threading import Thread
+from threading import Lock, Thread
 
 import cv2
 from PyQt5.QtCore import QRect, Qt, QTimer
@@ -103,6 +103,13 @@ class UIController:
         # Tell _update_ui to update split labels
         # Should be set whenever the split image is modified
         self._redraw_split_labels = True
+
+        # Values for updating hotkeys in settings menu
+        # (see _react_to_settings_menu_flags)
+        self._hotkey_box_to_change = None
+        self._hotkey_box_key_code = None
+        self._hotkey_box_key_name = None
+        self._hotkey_box_lock = Lock()
 
         # Flags to disable hotkeys
         self._split_hotkey_enabled = False
@@ -1601,6 +1608,7 @@ class UIController:
     def _update_from_keyboard(self) -> None:
         """Use flags set in _handle_key_press to split and do other actions."""
         self._react_to_hotkey_flags()
+        self._react_to_settings_menu_flags()
         self._react_to_split_flags()
 
     def _handle_key_press(
@@ -1611,13 +1619,19 @@ class UIController:
         Called each time any key is pressed, whether or not the program is in
         focus. This method has two main uses:
             1) Updates users' custom hotkey bindings. It does this by checking
-                if a given hotkey "line edit" has focus and, if so, changing
-                its key_code and text to match the key.
+                if a given hotkey "line edit" has focus and, if so, setting
+                flags so its name and key code are updated.
+
+                Uses a lock so the poller doesn't try to update these values as
+                they're being written (the worst case would be setting a hotkey
+                with the correct name but wrong key code -- unlikely but not
+                impossible).
+
             2) If a hotkey is pressed, sets a flag indicating it was pressed.
 
-        We set flags when hotkeys are pressed instead of directly calling a
-        method because PyQt5 doesn't allow other threads to manipulate the UI.
-        Doing so almost always causes a trace trap / crash.
+        We set flags when keys are pressed instead of directly calling a method
+        because PyQt5 doesn't play nice when other threads try to manipulate
+        the GUI. Doing so often causes a trace trap / segmentation fault.
 
         Args:
             key: Wrapper containing info about the key that was pressed. For
@@ -1647,20 +1661,11 @@ class UIController:
             self._settings_window.toggle_global_hotkeys_hotkey_box,
         ]:
             if hotkey_box.hasFocus():
-                hotkey_box.setText(key_name)
-                hotkey_box.key_code = key_code
-
-                # Reset font size to the default
-                f_size = self._settings_window.fontInfo().pointSize()
-                hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
-
-                # If the key name is too big for the box, resize the font down
-                # until it fits. Subtract 10 from the width so that there's a
-                # little bit of padding on the right-hand side of the box.
-                while hotkey_box.get_text_width() >= hotkey_box.width() - 10:
-                    f_size = hotkey_box.get_font_size() - 1
-                    hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
-                return
+                with self._hotkey_box_lock:
+                    self._hotkey_box_to_change = hotkey_box
+                    self._hotkey_box_key_code = key_code
+                    self._hotkey_box_key_name = key_name
+                    return
 
         # Use #2 (set "hotkey pressed" flag for _react_to_hotkey_flags)
         if not self._settings_window.isVisible():
@@ -1687,7 +1692,7 @@ class UIController:
                     setattr(self, hotkey_pressed, True)
 
     def _react_to_hotkey_flags(self) -> None:
-        """React to the flags set in _handle_key_press.
+        """React to the flags set in _handle_key_press for hotkeys.
 
         When a hotkey is pressed, do its action if hotkeys are allowed now.
         Then, unset the flag no matter what.
@@ -1740,6 +1745,46 @@ class UIController:
             if hotkey_presses_allowed:
                 self._main_window.screenshot_button.click()
             self._screenshot_hotkey_pressed = False
+
+    def _react_to_settings_menu_flags(self) -> None:
+        """React to the flags set in _handle_key_press for updating hotkeys.
+
+        If _handle_hotkey_press has set self._hotkey_box_to_change to a hotkey
+        box, use the values stored in _hotkey_box_key_name and _hotkey_box_key
+        _code to update the hotkey box. Then, reset _hotkey_box_to_change back
+        to None.
+
+        We use _hotkey_box_lock to make sure the values passed from _handle_key
+        _press aren't overwritten mid-method.
+
+        Setting the hotkey box's attributes directly from _handle_hotkey_press
+        is simpler, but PyQt5 doesn't like it and it occasionally causes a
+        segmentation fault.
+        """
+        with self._hotkey_box_lock:
+            if self._hotkey_box_to_change is None:
+                return
+
+            hotkey_box = self._hotkey_box_to_change
+            key_name = self._hotkey_box_key_name
+            key_code = self._hotkey_box_key_code
+
+            # Set box attributes
+            hotkey_box.setText(key_name)
+            hotkey_box.key_code = key_code
+
+            # Reset font size to the default
+            f_size = self._settings_window.fontInfo().pointSize()
+            hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
+
+            # If the key name is too big for the box, resize the font down
+            # until it fits. Subtract 10 from the width so that there's a
+            # little bit of padding on the right-hand side of the box.
+            while hotkey_box.get_text_width() >= hotkey_box.width() - 10:
+                f_size = hotkey_box.get_font_size() - 1
+                hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
+
+            self._hotkey_box_to_change = None
 
     def _react_to_split_flags(self) -> None:
         """Press a hotkey & go to next split when self._splitter sets flags.
