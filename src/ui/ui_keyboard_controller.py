@@ -31,6 +31,7 @@
 
 
 import platform
+from typing import Callable, Optional, Tuple, Union
 
 if platform.system() == "Windows" or platform.system() == "Darwin":
     # Don't import the whole pynput library since that takes a while
@@ -56,7 +57,11 @@ class UIKeyboardController:
         else:
             self._controller = None
 
-    def start_listener(self, on_press, on_release) -> None:
+    def start_listener(
+        self,
+        on_press: Optional[Callable[..., None]],
+        on_release: Optional[Callable[..., None]],
+    ) -> None:
         """Start a keyboard listener.
 
         This method doesn't return the listener, because it's not required
@@ -64,9 +69,9 @@ class UIKeyboardController:
         becomes necessary (only possible w/ pynput).
 
         Args:
-            on_press (function | None): Function to be executed on key down. If
+            on_press (callable | None): Function to be executed on key down. If
                 None, call _do_nothing (pass).
-            on_release (function | None): Function to be executed on key up. If
+            on_release (callable | None): Function to be executed on key up. If
                 None, call _do_nothing (pass).
         """
         if on_press is None:
@@ -100,7 +105,9 @@ class UIKeyboardController:
         else:
             keyboard.send(key_code)
 
-    def release(self, key) -> None:
+    def release(
+        self, key: Union["pynput_keyboard.key", "keyboard.KeyboardEvent"]
+    ) -> None:
         """Release a key.
 
         Args:
@@ -113,7 +120,9 @@ class UIKeyboardController:
         else:
             keyboard.release(key)
 
-    def parse_key_info(self, key) -> tuple[str, str | int]:
+    def parse_key_info(
+        self, key: Union["pynput_keyboard.key", "keyboard.KeyboardEvent"]
+    ) -> Tuple[str, Union[str, int]]:
         """Return a key's string name and its internal integer value.
 
         Args:

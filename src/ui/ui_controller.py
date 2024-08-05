@@ -37,6 +37,7 @@ import os
 import platform
 import subprocess
 import time
+from typing import Optional, Union
 import webbrowser
 from pathlib import Path
 from threading import Thread
@@ -1602,7 +1603,9 @@ class UIController:
         self._react_to_hotkey_flags()
         self._react_to_split_flags()
 
-    def _handle_key_press(self, key) -> None:
+    def _handle_key_press(
+        self, key: Union["pynput.keyboard.key", "keyboard.KeyboardEvent"]
+    ) -> None:
         """Process key presses, setting flags if the key is a hotkey.
 
         Called each time any key is pressed, whether or not the program is in
@@ -1863,7 +1866,7 @@ class UIController:
             subprocess.Popen([caffeinate_path, "-d", "-t", "1"])
             time.sleep(self._wake_interval)
 
-    def _get_exec_path(self, name: str) -> str | None:
+    def _get_exec_path(self, name: str) -> Optional[str]:
         """Return the path to an executable file, if it exists.
 
         Args:

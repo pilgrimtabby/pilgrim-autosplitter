@@ -32,7 +32,7 @@ and should be provided in a controller class.
 
 
 import platform
-from typing import Union
+from typing import Optional, Union
 
 from PyQt5.QtCore import QEvent, QRect, Qt
 from PyQt5.QtGui import QColor
@@ -659,7 +659,7 @@ class UISettingsWindow(QDialog):
         self.save_button.setGeometry(QRect(459 + self._LEFT, 326 + self._TOP, 111, 31))
         self.save_button.setFocusPolicy(Qt.NoFocus)
 
-    def event(self, event) -> Union[bool, QWidget.event]:
+    def event(self, event: QWidget.event) -> Union[bool, QWidget.event]:
         """Allow the user to take focus off a widget by clicking somewhere
         else.
 
@@ -693,7 +693,7 @@ class KeyLineEdit(QLineEdit):
             depending on the backend used).
     """
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         """Initialize a KeyLineEdit with a blank key_code value.
 
         Args:
