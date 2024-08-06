@@ -32,6 +32,7 @@ should be provided in a controller class.
 
 
 import platform
+from typing import Optional
 
 from PyQt5.QtCore import QRect, Qt, pyqtSignal
 from PyQt5.QtGui import QMouseEvent
@@ -578,7 +579,7 @@ class ClickableLineEdit(QLineEdit):
 
     clicked = pyqtSignal()
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         """Inherit from QLineEdit and set attributes to None.
 
         Args:
@@ -586,7 +587,7 @@ class ClickableLineEdit(QLineEdit):
         """
         QLineEdit.__init__(self, parent)
 
-    def mouseMoveEvent(self, a0: QMouseEvent | None) -> None:
+    def mouseMoveEvent(self, a0: Optional[QMouseEvent]) -> None:
         """Prevent the mouse moving from having any effect.
 
         I override this method specifically to prevent selecting text by
@@ -599,7 +600,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseDoubleClickEvent(self, a0: QMouseEvent | None) -> None:
+    def mouseDoubleClickEvent(self, a0: Optional[QMouseEvent]) -> None:
         """Prevent a double click from having any effect.
 
         I override this method specifically to prevent double-clicking to

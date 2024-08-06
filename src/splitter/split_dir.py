@@ -36,7 +36,7 @@ import pathlib
 import re
 from multiprocessing import freeze_support
 from multiprocessing.dummy import Pool as ThreadPool
-from typing import Tuple
+from typing import List, Tuple
 
 import cv2
 import numpy
@@ -64,7 +64,7 @@ class SplitDir:
             exists.
         current_loop (int): The current split image's current loop, if it
             exists.
-        list (list[_SplitImage]): A list of all split images in the directory
+        List[List[_SplitImage]]: A list of all split images in the directory
             settings.get_str("LAST_IMAGE_DIR").
     """
 
@@ -158,7 +158,7 @@ class SplitDir:
     #             #
     ###############
 
-    def _get_split_images(self) -> list["_SplitImage"]:
+    def _get_split_images(self) -> List["_SplitImage"]:
         """Get a list of SplitImage objects from a directory.
 
         Currently supported image types include .png, .jpg, and .jpeg. Only
@@ -169,7 +169,7 @@ class SplitDir:
         lot when there are lots of images.
 
         Returns:
-            list[_SplitImage]: The list of SplitImage objects.
+            List[_SplitImage]: The list of SplitImage objects.
         """
 
         def get_split_image(index: int, path: str):

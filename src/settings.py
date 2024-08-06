@@ -43,7 +43,7 @@ COMPARISON_FRAME_WIDTH = 320
 COMPARISON_FRAME_HEIGHT = 240
 
 # Pilgrim Autosplitter's current version number
-VERSION_NUMBER = "v1.0.6"
+VERSION_NUMBER = "v1.0.7"
 
 # The URL of Pilgrim Autosplitter's GitHub repo
 REPO_URL = "https://github.com/pilgrimtabby/pilgrim-autosplitter/"
@@ -189,7 +189,7 @@ def set_defaults() -> None:
         set_value("SKIP_HOTKEY_NAME", "")
 
         # The text value of the previous split hotkey
-        set_value("PREVIOUS_HOTKEY_NAME", "")
+        set_value("PREV_HOTKEY_NAME", "")
 
         # The text value of the next split hotkey
         set_value("NEXT_HOTKEY_NAME", "")
@@ -216,7 +216,7 @@ def set_defaults() -> None:
         set_value("SKIP_HOTKEY_CODE", "")
 
         # The pynput.keyboard.Key.vk value of the previous split hotkey
-        set_value("PREVIOUS_HOTKEY_CODE", "")
+        set_value("PREV_HOTKEY_CODE", "")
 
         # The pynput.keyboard.Key.vk value of the next split hotkey
         set_value("NEXT_HOTKEY_CODE", "")
