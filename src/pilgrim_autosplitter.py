@@ -26,108 +26,100 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Initialize and run Pilgrim Autosplitter.
-"""
+"""Initialize and run Pilgrim Autosplitter."""
 
 
-def main():
-    """Initialize PilgrimAutosplitter (with logging if not on Windows).
+import os
+import platform
+import sys
 
-    This module is in an unusual format, with all the import statements behind
-    main() and the class declaration inside of main(), to accomodate the time
-    required to boot up the executable if this program is run after being built
-    with PyInstaller. To reassure the user, I've placed print messages before
-    and after the import statements, which take a very long time (sometimes as
-    long as 30 seconds).
+
+class PilgrimAutosplitter:
+    """Initialize and run Pilgrim Autosplitter.
+
+    Import statements are in __init__ because I only expect this class to be
+    instantiated once per session and I want the print statements in main to
+    appear before the import statements are run (they can take a long time to
+    complete, especially using PyInstaller).
+
+    Attributes:
+        pilgrim_autosplitter (QApplication): The application container that
+            allows QObjects, including the UI, to be initialized.
+        splitter (Splitter): Backend for capturing and comparing images to
+            video.
+        ui_controller (UIController): Backend for updating the UI and handling
+            user input.
     """
 
-    # Initial setup
-    import os
+    def __init__(self) -> None:
+        """Initialize splitter and controller to run Pilgrim Autosplitter."""
+        from PyQt5.QtGui import QIcon, QPixmap
+        from PyQt5.QtWidgets import QApplication
 
-    os.system("cls || clear")  # This works cross-platform
+        import settings
+        from splitter.splitter import Splitter
+        from ui.ui_controller import UIController
+
+        program_directory = os.path.dirname(os.path.abspath(__file__))
+
+        if platform.system() == "Windows":
+            # Force title bar to follow system theme
+            extra_args = ["-platform", "windows:darkmode=1"]
+        else:
+            extra_args = []
+        self.gui = QApplication(sys.argv + extra_args)
+        self.gui.setStyle("fusion")
+        self.gui.setApplicationName("Pilgrim Autosplitter")
+
+        # Set taskbar icons. Doesn't seem to really do anything, but it's a
+        # work in progress so I'll leave it for now
+        if platform.system() == "Windows":
+            import ctypes
+
+            self.gui.setWindowIcon(
+                QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
+            )
+            # Tell Windows this app is its own process so icon shows up
+            app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+        # Without the absolute path, the icon only shows up when running
+        # the program from the same directory /resources is in. This makes
+        # it show up regardless (at least when ran from source, not build)
+        else:
+            self.gui.setWindowIcon(
+                QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
+            )
+
+        settings.set_defaults()
+
+        self.splitter = Splitter()
+        if settings.get_bool("START_WITH_VIDEO"):
+            self.splitter.start()
+
+        self.ui_controller = UIController(self.gui, self.splitter)
+
+    def run(self) -> None:
+        """Start and, when finished, safely quit the autosplitter."""
+        self.gui.exec()
+        # Prevent segmentation fault or other clumsy errors on exit.
+        # Subthreads won't persist since they're daemons, but this helps
+        # make sure they stop BEFORE the main thread ends.
+        self.splitter.safe_exit_all_threads()
+        # TODO: make sure controller threads exit too
+
+def main():
+    """Initialize PilgrimAutosplitter."""
+    os.system("cls || clear")  # Cross-platform clear screen
 
     print("Welcome to Pilgrim Autosplitter!")
-    print("You can minimize this window, but DO NOT close it.\n")
+    print("You may minimize this window, but DO NOT close it.\n")
+    print("Loading Pilgrim Autosplitter (this may take a few minutes)...")
 
-    print("Importing third-party packages...")
+    app = PilgrimAutosplitter()
 
-    from PyQt5.QtGui import QIcon, QPixmap
-    from PyQt5.QtWidgets import QApplication
-
-    print("Importing built-in packages...")
-
-    import platform
-    import sys
-
-    print("Initializing Pilgrim Autosplitter...")
-
-    # Class definition
-    class PilgrimAutosplitter:
-        """Initialize and run Pilgrim Autosplitter.
-
-        Attributes:
-            pilgrim_autosplitter (QApplication): The application container that
-                allows QObjects, including the UI, to be initialized.
-            splitter (Splitter): Backend for capturing and comparing images to
-                video.
-            ui_controller (UIController): Backend for updating the UI and handling
-                user input.
-        """
-
-        def __init__(self) -> None:
-            """Initialize splitter and controller to run Pilgrim Autosplitter."""
-            import settings
-            from splitter.splitter import Splitter
-            from ui.ui_controller import UIController
-
-            program_directory = os.path.dirname(os.path.abspath(__file__))
-
-            if platform.system() == "Windows":
-                # Force title bar to follow system theme
-                extra_args = ["-platform", "windows:darkmode=1"]
-            else:
-                extra_args = []
-            self.pilgrim_autosplitter = QApplication(sys.argv + extra_args)
-            self.pilgrim_autosplitter.setStyle("fusion")
-            self.pilgrim_autosplitter.setApplicationName("Pilgrim Autosplitter")
-
-            # Set taskbar icons. Doesn't seem to really do anything, but it's a
-            # work in progress so I'll leave it for now
-            if platform.system() == "Windows":
-                import ctypes
-
-                self.pilgrim_autosplitter.setWindowIcon(
-                    QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
-                )
-                # Tell Windows this app is its own process so icon shows up
-                app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
-            # Without the absolute path, the icon only shows up when running
-            # the program from the same directory /resources is in. This makes
-            # it show up regardless (at least when ran from source, not build)
-            else:
-                self.pilgrim_autosplitter.setWindowIcon(
-                    QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
-                )
-
-            settings.set_defaults()
-
-            self.splitter = Splitter()
-            if settings.get_bool("START_WITH_VIDEO"):
-                self.splitter.start()
-
-            self.ui_controller = UIController(self.pilgrim_autosplitter, self.splitter)
-
-            self.pilgrim_autosplitter.exec()
-
-            # Prevent segmentation fault or other clumsy errors on exit
-            # The threads won't persist since they're daemons, but this helps
-            # make sure they stop BEFORE the main thread ends
-            self.splitter.safe_exit_all_threads()
-
-    # Open application
-    print("Starting Pilgrim Autosplitter...\n")
-    PilgrimAutosplitter()
+    print("Starting...")
+    print(app.gui.arguments())
+    # app.run()
 
 
 if __name__ == "__main__":
