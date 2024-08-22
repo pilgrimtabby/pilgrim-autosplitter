@@ -28,7 +28,6 @@
 
 """Initialize and run Pilgrim Autosplitter."""
 
-
 import os
 import platform
 import sys
@@ -98,14 +97,6 @@ class PilgrimAutosplitter:
 
         self.ui_controller = UIController(self.app, self.splitter)
 
-    def run(self) -> None:
-        """Start and, when finished, safely quit the autosplitter."""
-        self.app.exec()
-        # Prevent segmentation fault or other clumsy errors on exit.
-        # Subthreads won't persist since they're daemons, but this helps
-        # make sure they stop BEFORE the main thread ends.
-        self.splitter.safe_exit_all_threads()
-        self.ui_controller.keyboard.stop_listener()
 
 def main():
     """Initialize PilgrimAutosplitter."""
@@ -117,8 +108,16 @@ def main():
 
     pilgrim_autosplitter = PilgrimAutosplitter()
 
+    # Close threads safely (these sometimes cause segfaults otherwise), even
+    # though they are daemons.
+    # Other app threads don't risk segfaults and are daemons, so leave them
+    # alone.
+    pilgrim_autosplitter.app.aboutToQuit.connect(
+        pilgrim_autosplitter.splitter.safe_exit_all_threads
+    )
+
     print("Starting...")
-    pilgrim_autosplitter.run()
+    pilgrim_autosplitter.app.exec()
 
 
 if __name__ == "__main__":
