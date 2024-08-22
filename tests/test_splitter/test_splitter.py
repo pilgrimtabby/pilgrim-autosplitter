@@ -128,6 +128,12 @@ class TestSplitter:
         self.splitter.toggle_suspended()
         assert self.splitter._compare_thread.is_alive()
 
+    def test_toggle_suspended_off_during_split_delay(self):
+        pass
+
+    def test_toggle_suspended_off_during_split_suspend(self):
+        pass
+
     def test_toggle_suspended_off_without_split_image(self):
         self.splitter.toggle_suspended()
         assert not self.splitter._compare_thread.is_alive()

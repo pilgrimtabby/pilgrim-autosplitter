@@ -203,12 +203,16 @@ class Splitter:
         return found_valid_source
 
     def toggle_suspended(self) -> None:
-        """Stop _compare_thread if running, or start it if there are splits."""
-        compare_thread_was_alive = self._compare_thread.is_alive()
-        self.safe_exit_compare_thread()
+        """Stop _compare_thread, then start it if the splitter was suspended
+        and there are splits.
 
-        if not compare_thread_was_alive and len(self.splits.list) > 0:
-            self.start_compare_thread()
+        Use self.match_percent, since it will never be None if compare_thread
+        is alive AND not suspended, which is the condition we're looking for.
+        """
+        current_match_percent = self.match_percent
+        self.safe_exit_compare_thread()
+        if current_match_percent is None and len(self.splits.list) > 0:
+                self.start_compare_thread()
 
     ###################################
     #                                 #
