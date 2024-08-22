@@ -26,8 +26,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Persist and reference user settings and key values.
-"""
+"""Persist and reference user settings and key values."""
 
 
 import os
@@ -64,7 +63,7 @@ MAX_LOOPS_AND_WAIT = 99999
 MAX_THRESHOLD = 1
 
 
-def get_str(key: str) -> str:
+def get_str(key: str, settings: QSettings = settings) -> str:
     """Return a str from settings, regardless of the stored value's type.
 
     Args:
@@ -76,7 +75,7 @@ def get_str(key: str) -> str:
     return str(settings.value(key))
 
 
-def get_bool(key: str) -> bool:
+def get_bool(key: str, settings: QSettings = settings) -> bool:
     """Return a bool from settings, regardless of the stored value's type.
 
     Args:
@@ -91,7 +90,7 @@ def get_bool(key: str) -> bool:
         return False
 
 
-def get_int(key: str) -> int:
+def get_int(key: str, settings: QSettings = settings) -> int:
     """Return an int from settings, regardless of the stored value's type.
 
     This should only be used on settings for which is_digit would return True,
@@ -106,7 +105,7 @@ def get_int(key: str) -> int:
     return int(settings.value(key))
 
 
-def get_float(key: str) -> float:
+def get_float(key: str, settings: QSettings = settings) -> float:
     """Return a float from settings, regardless of the stored value's type.
 
     This should only be used to retrieve settings for which float(foo) would
@@ -121,7 +120,7 @@ def get_float(key: str) -> float:
     return float(settings.value(key))
 
 
-def set_value(key: str, value: any) -> None:
+def set_value(key: str, value: any, settings: QSettings = settings) -> None:
     """Persist a setting as a str, regardless of the value's type.
 
     Strings are preferred because QSettings doesn't remember types on all
@@ -134,7 +133,7 @@ def set_value(key: str, value: any) -> None:
     settings.setValue(key, str(value))
 
 
-def set_defaults() -> None:
+def set_defaults(settings: QSettings = settings) -> None:
     """Ensure that settings values make sense before they are used.
 
     Populates settings with default values if they have not yet been set.
@@ -147,142 +146,138 @@ def set_defaults() -> None:
     Makes sure that the correct aspect ratio is shown.
     """
     home_dir = get_home_dir()
-    if not get_bool("SETTINGS_SET"):
+    if not get_bool("SETTINGS_SET", settings=settings):
         # Indicate whether default settings have been populated
-        set_value("SETTINGS_SET", True)
+        set_value("SETTINGS_SET", True, settings=settings)
 
         # The default minimum match percent needed to force a split action
-        set_value("DEFAULT_THRESHOLD", 0.90)
+        set_value("DEFAULT_THRESHOLD", 0.90, settings=settings)
 
         # The default delay (seconds) before a split
-        set_value("DEFAULT_DELAY", 0.0)
+        set_value("DEFAULT_DELAY", 0.0, settings=settings)
 
         # The default pause (seconds) after a split
-        set_value("DEFAULT_PAUSE", 1.0)
+        set_value("DEFAULT_PAUSE", 1.0, settings=settings)
 
         # The FPS used by splitter and ui_controller
-        set_value("FPS", 30)
+        set_value("FPS", 30, settings=settings)
 
         # The location of split images
-        set_value("LAST_IMAGE_DIR", home_dir)
+        set_value("LAST_IMAGE_DIR", home_dir, settings=settings)
 
         # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
-        set_value("OPEN_SCREENSHOT_ON_CAPTURE", False)
+        set_value("OPEN_SCREENSHOT_ON_CAPTURE", False, settings=settings)
 
         # The number of decimal places shown when displaying match percents
-        set_value("MATCH_PERCENT_DECIMALS", 0)
+        set_value("MATCH_PERCENT_DECIMALS", 0, settings=settings)
 
         # The text value of the split hotkey
-        set_value("SPLIT_HOTKEY_NAME", "")
+        set_value("SPLIT_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the reset hotkey
-        set_value("RESET_HOTKEY_NAME", "")
+        set_value("RESET_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the pause hotkey
-        set_value("PAUSE_HOTKEY_NAME", "")
+        set_value("PAUSE_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the undo hotkey
-        set_value("UNDO_HOTKEY_NAME", "")
+        set_value("UNDO_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the skip split hotkey
-        set_value("SKIP_HOTKEY_NAME", "")
+        set_value("SKIP_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the previous split hotkey
-        set_value("PREV_HOTKEY_NAME", "")
+        set_value("PREV_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the next split hotkey
-        set_value("NEXT_HOTKEY_NAME", "")
+        set_value("NEXT_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the screenshot hotkey
-        set_value("SCREENSHOT_HOTKEY_NAME", "")
+        set_value("SCREENSHOT_HOTKEY_NAME", "", settings=settings)
 
         # The text value of the toggle global hotkeys hotkey
-        set_value("TOGGLE_HOTKEYS_HOTKEY_NAME", "")
+        set_value("TOGGLE_HOTKEYS_HOTKEY_NAME", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the split hotkey
         set_value("SPLIT_HOTKEY_CODE", "")
 
         # The pynput.keyboard.Key.vk value of the reset hotkey
-        set_value("RESET_HOTKEY_CODE", "")
+        set_value("RESET_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the pause hotkey
-        set_value("PAUSE_HOTKEY_CODE", "")
+        set_value("PAUSE_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the undo split hotkey
-        set_value("UNDO_HOTKEY_CODE", "")
+        set_value("UNDO_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the skip split hotkey
-        set_value("SKIP_HOTKEY_CODE", "")
+        set_value("SKIP_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the previous split hotkey
-        set_value("PREV_HOTKEY_CODE", "")
+        set_value("PREV_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the next split hotkey
-        set_value("NEXT_HOTKEY_CODE", "")
+        set_value("NEXT_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the screenshot hotkey
-        set_value("SCREENSHOT_HOTKEY_CODE", "")
+        set_value("SCREENSHOT_HOTKEY_CODE", "", settings=settings)
 
         # The pynput.keyboard.Key.vk value of the toggle global hotkeys hotkey
-        set_value("TOGGLE_HOTKEYS_HOTKEY_CODE", "")
+        set_value("TOGGLE_HOTKEYS_HOTKEY_CODE", "", settings=settings)
 
         # The UI theme
-        set_value("THEME", "dark")
+        set_value("THEME", "dark", settings=settings)
 
         # The aspect ratio
-        set_value("ASPECT_RATIO", "4:3 (480x360)")
+        set_value("ASPECT_RATIO", "4:3 (480x360)", settings=settings)
 
         # Always on top value
-        set_value("ALWAYS_ON_TOP", False)
+        set_value("ALWAYS_ON_TOP", False, settings=settings)
 
         # The last cv2 capture source index. This is an imperfect way to
         # remember the last video source used, since the indexes can reference
         # different sources at different times, but it's the best I can do in a
         # cross-platform environment
-        set_value("LAST_CAPTURE_SOURCE_INDEX", 0)
+        set_value("LAST_CAPTURE_SOURCE_INDEX", 0, settings=settings)
 
         # Whether the program should try to open video on startup, or wait for
         # the user to press "reconnect video"
-        set_value("START_WITH_VIDEO", False)
+        set_value("START_WITH_VIDEO", False, settings=settings)
 
         # Whether the minimal view should be showing
-        set_value("SHOW_MIN_VIEW", False)
+        set_value("SHOW_MIN_VIEW", False, settings=settings)
 
         # Whether global hotkeys are enabled (default) or only local hotkeys
-        set_value("GLOBAL_HOTKEYS_ENABLED", True)
+        set_value("GLOBAL_HOTKEYS_ENABLED", True, settings=settings)
 
         # Whether program checks for updates on launch
-        set_value("CHECK_FOR_UPDATES", True)
+        set_value("CHECK_FOR_UPDATES", True, settings=settings)
 
     # Make sure image dir exists and is within the user's home dir
     # (This limits i/o to user-controlled areas)
-    last_image_dir = get_str("LAST_IMAGE_DIR")
+    last_image_dir = get_str("LAST_IMAGE_DIR", settings=settings)
     if not last_image_dir.startswith(home_dir) or not Path(last_image_dir).is_dir():
-        set_value("LAST_IMAGE_DIR", home_dir)
+        set_value("LAST_IMAGE_DIR", home_dir, settings=settings)
 
     # Always start in full view if video doesn't come on automatically
-    if not get_bool("START_WITH_VIDEO"):
-        set_value("SHOW_MIN_VIEW", False)
+    if not get_bool("START_WITH_VIDEO", settings=settings):
+        set_value("SHOW_MIN_VIEW", False, settings=settings)
 
     # Set correct video, split image width and height relative to aspect ratio
-    aspect_ratio = get_str("ASPECT_RATIO")
+    aspect_ratio = get_str("ASPECT_RATIO", settings=settings)
     if aspect_ratio == "4:3 (480x360)":
-        set_value("ASPECT_RATIO", "4:3 (480x360)")
-        set_value("FRAME_WIDTH", 480)
-        set_value("FRAME_HEIGHT", 360)
+        set_value("FRAME_WIDTH", 480, settings=settings)
+        set_value("FRAME_HEIGHT", 360, settings=settings)
     elif aspect_ratio == "4:3 (320x240)":
-        set_value("ASPECT_RATIO", "4:3 (320x240)")
-        set_value("FRAME_WIDTH", 320)
-        set_value("FRAME_HEIGHT", 240)
+        set_value("FRAME_WIDTH", 320, settings=settings)
+        set_value("FRAME_HEIGHT", 240, settings=settings)
     elif aspect_ratio == "16:9 (512x288)":
-        set_value("ASPECT_RATIO", "16:9 (512x288)")
-        set_value("FRAME_WIDTH", 512)
-        set_value("FRAME_HEIGHT", 288)
+        set_value("FRAME_WIDTH", 512, settings=settings)
+        set_value("FRAME_HEIGHT", 288, settings=settings)
     elif aspect_ratio == "16:9 (432x243)":
-        set_value("ASPECT_RATIO", "16:9 (432x243)")
-        set_value("FRAME_WIDTH", 432)
-        set_value("FRAME_HEIGHT", 243)
+        set_value("FRAME_WIDTH", 432, settings=settings)
+        set_value("FRAME_HEIGHT", 243, settings=settings)
 
 
 def get_latest_version() -> str:
