@@ -26,14 +26,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Capture video and compare it to a template image.
-"""
-
+"""Capture video and compare it to a template image."""
 
 import platform
 import threading
 import time
-from typing import Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy
@@ -170,7 +168,7 @@ class Splitter:
             self._compare_thread.join()
         self.suspended = True
 
-    def set_next_capture_index(self) -> None:
+    def set_next_capture_index(self) -> bool:
         """Try to find the next valid cv2 capture index, if it exists.
 
         cv2 capture indexes can be separated by invalid indexes (for example, 0
@@ -178,6 +176,9 @@ class Splitter:
         method will try 3 invalid indexes before returning to index 0.
 
         Saves the new index to settings, has no return value.
+
+        Returns:
+            bool: True if a new source was found.
         """
         source = settings.get_int("LAST_CAPTURE_SOURCE_INDEX") + 1
         found_valid_source = False
@@ -199,18 +200,15 @@ class Splitter:
             source = 0  # Give up, go back to first possible index
         settings.set_value("LAST_CAPTURE_SOURCE_INDEX", source)
 
-    def toggle_suspended(self) -> None:
-        """Stop _compare_thread if it's running; else, start it if possible.
+        return found_valid_source
 
-        Use self.match_percent, since it will never be None if compare_thread
-        is alive.
-        """
-        if self.match_percent is None:
-            self.safe_exit_compare_thread()
-            if len(self.splits.list) > 0:
-                self.start_compare_thread()
-        else:
-            self.safe_exit_compare_thread()
+    def toggle_suspended(self) -> None:
+        """Stop _compare_thread if running, or start it if there are splits."""
+        compare_thread_was_alive = self._compare_thread.is_alive()
+        self.safe_exit_compare_thread()
+
+        if not compare_thread_was_alive and len(self.splits.list) > 0:
+            self.start_compare_thread()
 
     ###################################
     #                                 #
@@ -225,6 +223,7 @@ class Splitter:
         safely exited before calling this method.
         """
         self._cap = self._open_capture()
+        self._capture_max_fps = self._get_max_fps(self._cap)
         self.capture_thread = threading.Thread(target=self._capture)
         self._capture_thread_finished = False
         self.capture_thread.daemon = True
@@ -240,12 +239,6 @@ class Splitter:
         forces the capture source to choose the next-closest value, which in
         some cases is quite a lot smaller than the default. This saves CPU.
 
-        Set self._capture_max_fps to the capture's maximum FPS on platforms
-        where this is supported. This is done to prevent unnecessary
-        comparisons from being generated in _compare due to a mismatch between
-        the user's selected framerate and a capture-imposed cap which is lower.
-        This also saves CPU.
-
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
         """
@@ -260,19 +253,35 @@ class Splitter:
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, COMPARISON_FRAME_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, COMPARISON_FRAME_HEIGHT)
-        try:
-            capture_max_fps = cap.get(cv2.CAP_PROP_FPS)
-            if capture_max_fps == 0:
-                self._capture_max_fps = 60
-            else:
-                self._capture_max_fps = capture_max_fps
-        except cv2.error:
-            self._capture_max_fps = 60
         return cap
+
+    def _get_max_fps(self, cap: cv2.VideoCapture) -> int:
+        """Get the max FPS of a capture source.
+
+        Set self._capture_max_fps to the capture's maximum FPS on platforms
+        where this is supported. This is done to prevent unnecessary
+        comparisons from being generated in _compare due to a mismatch between
+        the user's selected framerate and a capture-imposed cap which is lower.
+        This also saves CPU.
+
+        Args:
+            cap (cv2.VideoCapture): The capture source to check.
+
+        Returns:
+            int: The max frames per second.
+        """
+        try:
+            max_fps = cap.get(cv2.CAP_PROP_FPS)
+            if max_fps == 0:
+                max_fps = 60
+        except cv2.error:
+            max_fps = 60
+
+        return max_fps
 
     def _capture(self) -> None:
         """Read frames from a capture source, resize them, and expose them to
-        _compare and ui_controller.
+        _compare and ui_controller in a loop.
 
         self.comparison_frame should always be 320x240. This helps with results
         consistency when matching split images; it also saves a lot of time and
@@ -292,20 +301,17 @@ class Splitter:
         which makes it a good choice for image matching.
 
         This method continues indefinitely until self._capture_thread_finished
-        is set.
+        is set to True.
         """
         start_time = time.perf_counter()
         while not self._capture_thread_finished:
 
             # We don't need to wait if we are hitting the max capture fps,
             # since cap.read() blocks until the next frame is available anyway.
-            # So we only do this if we are targeting a framerate that is lower
-            # than the max fps
+            # So we only wait on the interval if we are targeting a framerate
+            # that is lower than the max fps.
             if self.target_fps < self._capture_max_fps:
-                current_time = time.perf_counter()
-                if current_time - start_time < self._interval:
-                    time.sleep(self._interval - (current_time - start_time))
-                start_time = time.perf_counter()
+                start_time = self._wait_for_interval(start_time)
 
             frame = self._cap.read()[1]
             if frame is None:  # Video feed is down, kill the thread
@@ -355,7 +361,7 @@ class Splitter:
         # Kill comparer if capture goes down
         self.safe_exit_compare_thread()
 
-    def _frame_to_pixmap(self, frame: numpy.ndarray) -> QPixmap:
+    def _frame_to_pixmap(self, frame: Optional[numpy.ndarray]) -> QPixmap:
         """Generate a QPixmap instance from a 3-channel image stored as a numpy
         array.
 
@@ -372,6 +378,20 @@ class Splitter:
         # Use Format_BGR888 because images generated with cv2 are in BGR format
         frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_BGR888)
         return QPixmap.fromImage(frame_img)
+
+    def _wait_for_interval(self, start_time: float):
+        """Sleep until self._interval seconds has passed since start_time.
+
+        Args:
+            start_time (float): The starting time.
+
+        Returns:
+            float: The current time after sleeping.
+        """
+        current_time = time.perf_counter()
+        if current_time - start_time < self._interval:
+            time.sleep(self._interval - (current_time - start_time))
+        return time.perf_counter()
 
     ###################################
     #                                 #
@@ -423,10 +443,7 @@ class Splitter:
         start_time = frame_counter_start_time = time.perf_counter()
 
         while not self._compare_thread_finished:
-            current_time = time.perf_counter()
-            if current_time - start_time < self._interval:
-                time.sleep(self._interval - (current_time - start_time))
-            start_time = time.perf_counter()
+            start_time = self._wait_for_interval(start_time)
 
             # Update self._interval to better track target framerate
             frames_this_second, frame_counter_start_time = self._update_fps_factor(
