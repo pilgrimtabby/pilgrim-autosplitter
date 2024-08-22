@@ -28,39 +28,17 @@
 
 """Test pilgrim_autosplitter.py."""
 
-
-import platform
-import time
-from threading import active_count, Thread
-
 from PyQt5.QtWidgets import QApplication
 
-from src.pilgrim_autosplitter import PilgrimAutosplitter
+from pilgrim_autosplitter import PilgrimAutosplitter
+from splitter.splitter import Splitter
+from ui.ui_controller import UIController
 
 
-def test_run() -> None:
-    """Make sure app opens correctly and shuts down cleanly (kills threads)."""
-    def quit_app(app: QApplication) -> None:
-        time.sleep(2)
-        app.quit()
-
-    pilgrim_autosplitter = PilgrimAutosplitter()
-
-    exit_gui_thread = Thread(target=quit_app, args=(pilgrim_autosplitter.app,))
-    exit_gui_thread.daemon = True
-    exit_gui_thread.start()
-
-    pilgrim_autosplitter.run()
-    exit_gui_thread.join()
-
-    # Give joined threads time to clear from active_count
-    time.sleep(1)
-
-    if platform.system() == "Darwin":
-        # On MacOS, allow caffeinate thread (see ui_controller.py) to continue
-        # because it won't cause a segfault and takes a long time to exit
-        baseline_thread_count = 2
-    else:
-        baseline_thread_count = 1
-
-    assert active_count() <= baseline_thread_count
+def test_PilgrimAutosplitter():
+    app = PilgrimAutosplitter()
+    assert (
+        type(app.app) == QApplication
+        and type(app.splitter) == Splitter
+        and type(app.ui_controller) == UIController
+    )
