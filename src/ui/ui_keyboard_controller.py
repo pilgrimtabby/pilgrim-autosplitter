@@ -52,6 +52,7 @@ class UIKeyboardController:
 
     def __init__(self) -> None:
         """Initialize the keyboard controller (required for pynput backend)."""
+        self._keyboard_listener = None
         if platform.system() == "Windows" or platform.system() == "Darwin":
             self._controller = pynput_keyboard.Controller()
         else:
@@ -80,13 +81,19 @@ class UIKeyboardController:
             on_release = self._do_nothing
 
         if platform.system() == "Windows" or platform.system() == "Darwin":
-            keyboard_listener = pynput_keyboard.Listener(
+            self._keyboard_listener = pynput_keyboard.Listener(
                 on_press=on_press, on_release=on_release
             )
-            keyboard_listener.start()
+            self._keyboard_listener.start()
         else:
             keyboard.on_press(on_press)
             keyboard.on_release(on_release)
+
+    def stop_listener(self) -> None:
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            self._keyboard_listener.stop()
+        else:
+            pass
 
     def press_and_release(self, key_code: str) -> None:
         """Press and release a hotkey.

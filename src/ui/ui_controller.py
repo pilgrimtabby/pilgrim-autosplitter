@@ -237,8 +237,8 @@ class UIController:
         #######################################
 
         # Start keyboard listener
-        self._keyboard = UIKeyboardController()
-        self._keyboard.start_listener(on_press=self._handle_key_press, on_release=None)
+        self.keyboard = UIKeyboardController()
+        self.keyboard.start_listener(on_press=self._handle_key_press, on_release=None)
 
         # Start poller
         self._poller = QTimer()
@@ -285,7 +285,7 @@ class UIController:
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._keyboard.press_and_release(key_code)
+            self.keyboard.press_and_release(key_code)
         else:
             self._request_previous_split()
 
@@ -309,7 +309,7 @@ class UIController:
         """
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._keyboard.press_and_release(key_code)
+            self.keyboard.press_and_release(key_code)
         else:
             self._request_next_split()
 
@@ -333,7 +333,7 @@ class UIController:
         """
         key_code = settings.get_str("RESET_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._keyboard.press_and_release(key_code)
+            self.keyboard.press_and_release(key_code)
         else:
             self._request_reset_splits()
 
@@ -1639,7 +1639,7 @@ class UIController:
         """
         # Get the key's name and internal value. If the key is not an
         # alphanumeric key, the try block throws AttributeError.
-        key_name, key_code = self._keyboard.parse_key_info(key)
+        key_name, key_code = self.keyboard.parse_key_info(key)
 
         # Some keys aren't handled very well by pynput -- they return a key
         # code but no name. I don't have the resources to compile an exhaustive
@@ -1798,7 +1798,7 @@ class UIController:
             self._splitter.pause_split_action = False
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
             if len(key_code) > 0:
-                self._keyboard.press_and_release(key_code)
+                self.keyboard.press_and_release(key_code)
             self._request_next_split()
 
         # Dummy split (silently advance to next split)
@@ -1811,7 +1811,7 @@ class UIController:
             self._splitter.normal_split_action = False
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
             if len(key_code) > 0:
-                self._keyboard.press_and_release(key_code)
+                self.keyboard.press_and_release(key_code)
             # If key didn't get pressed, OR if it did get pressed but global
             # hotkeys are off and the app isn't in focus, move the split image
             # forward, since pressing the key on its own won't do that
@@ -1879,7 +1879,7 @@ class UIController:
 
                     # No caffeinate, use fallback
                     if caffeinate_path is None:
-                        self._keyboard.release(key)
+                        self.keyboard.release(key)
 
                     # Caffeinate exists; start thread if it hasn't been started
                     elif not self._caffeinate_thread.is_alive():
@@ -1896,7 +1896,7 @@ class UIController:
 
             # Winodws / Linux: release a key if splitter active
             elif splitter_active:
-                self._keyboard.release(key)
+                self.keyboard.release(key)
 
     def _caffeinate(self, caffeinate_path: str) -> None:
         """Use built-in caffeinate to keep the machine's display on (MacOS).

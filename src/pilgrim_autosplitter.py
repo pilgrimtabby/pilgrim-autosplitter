@@ -67,16 +67,16 @@ class PilgrimAutosplitter:
             extra_args = ["-platform", "windows:darkmode=1"]
         else:
             extra_args = []
-        self.gui = QApplication(sys.argv + extra_args)
-        self.gui.setStyle("fusion")
-        self.gui.setApplicationName("Pilgrim Autosplitter")
+        self.app = QApplication(sys.argv + extra_args)
+        self.app.setStyle("fusion")
+        self.app.setApplicationName("Pilgrim Autosplitter")
 
         # Set taskbar icons. Doesn't seem to really do anything, but it's a
         # work in progress so I'll leave it for now
         if platform.system() == "Windows":
             import ctypes
 
-            self.gui.setWindowIcon(
+            self.app.setWindowIcon(
                 QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
             )
             # Tell Windows this app is its own process so icon shows up
@@ -86,7 +86,7 @@ class PilgrimAutosplitter:
         # the program from the same directory /resources is in. This makes
         # it show up regardless (at least when ran from source, not build)
         else:
-            self.gui.setWindowIcon(
+            self.app.setWindowIcon(
                 QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
             )
 
@@ -96,16 +96,16 @@ class PilgrimAutosplitter:
         if settings.get_bool("START_WITH_VIDEO"):
             self.splitter.start()
 
-        self.ui_controller = UIController(self.gui, self.splitter)
+        self.ui_controller = UIController(self.app, self.splitter)
 
     def run(self) -> None:
         """Start and, when finished, safely quit the autosplitter."""
-        self.gui.exec()
+        self.app.exec()
         # Prevent segmentation fault or other clumsy errors on exit.
         # Subthreads won't persist since they're daemons, but this helps
         # make sure they stop BEFORE the main thread ends.
         self.splitter.safe_exit_all_threads()
-        # TODO: make sure controller threads exit too
+        self.ui_controller.keyboard.stop_listener()
 
 def main():
     """Initialize PilgrimAutosplitter."""
@@ -115,11 +115,10 @@ def main():
     print("You may minimize this window, but DO NOT close it.\n")
     print("Loading Pilgrim Autosplitter (this may take a few minutes)...")
 
-    app = PilgrimAutosplitter()
+    pilgrim_autosplitter = PilgrimAutosplitter()
 
     print("Starting...")
-    print(app.gui.arguments())
-    # app.run()
+    pilgrim_autosplitter.run()
 
 
 if __name__ == "__main__":
