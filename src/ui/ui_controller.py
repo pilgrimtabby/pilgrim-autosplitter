@@ -37,8 +37,10 @@ import os
 import platform
 import subprocess
 import time
+from typing import Optional, Union
 import webbrowser
 from pathlib import Path
+from threading import Lock, Thread
 
 import cv2
 from PyQt5.QtCore import QRect, Qt, QTimer
@@ -48,15 +50,9 @@ from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
 import settings
 import ui.ui_style_sheet as style_sheet
 from splitter.splitter import Splitter
+from ui.ui_keyboard_controller import UIKeyboardController
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
-
-if platform.system() == "Windows" or platform.system() == "Darwin":
-    # Don't import the whole pynput library since that takes a while
-    from pynput import keyboard as pynput_keyboard
-else:
-    # Pynput doesn't work well on Linux, so use keyboard instead
-    import keyboard
 
 
 class UIController:
@@ -108,6 +104,13 @@ class UIController:
         # Should be set whenever the split image is modified
         self._redraw_split_labels = True
 
+        # Values for updating hotkeys in settings menu
+        # (see _react_to_settings_menu_flags)
+        self._hotkey_box_to_change = None
+        self._hotkey_box_key_code = None
+        self._hotkey_box_key_name = None
+        self._hotkey_box_lock = Lock()
+
         # Flags to disable hotkeys
         self._split_hotkey_enabled = False
         self._undo_hotkey_enabled = False
@@ -123,12 +126,14 @@ class UIController:
         self._screenshot_hotkey_pressed = False
         self._toggle_hotkeys_hotkey_pressed = False
 
-        # Store values for keeping display awake
+        # Values for keeping display awake (see _wake_display)
         self._last_wake_time = time.perf_counter()
-        self._wake_interval = 45  # Attempt wake after this many seconds
-        if platform.system() == "Darwin":
-            # See _wake_display for why we store this value here
-            self._caffeinate_path = self._get_exec_path("caffeinate")
+        # Attempt wake after this many seconds. Should be < 1 min, since that's
+        # the minimum allowed time to trigger display sleep on most OSs
+        self._wake_interval = 45
+        # MacOS-specific values (MacOS uses caffeinate)
+        self._caffeinate_thread = Thread(target=self._caffeinate)
+        self._caffeinate_thread_finished = True
 
         ######################
         #                    #
@@ -232,14 +237,8 @@ class UIController:
         #######################################
 
         # Start keyboard listener
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            self._keyboard_controller = pynput_keyboard.Controller()
-            self._keyboard_listener = pynput_keyboard.Listener(
-                on_press=self._handle_key_press, on_release=None
-            )
-            self._keyboard_listener.start()
-        else:
-            keyboard.on_press(self._handle_key_press)
+        self._keyboard = UIKeyboardController()
+        self._keyboard.start_listener(on_press=self._handle_key_press, on_release=None)
 
         # Start poller
         self._poller = QTimer()
@@ -286,7 +285,7 @@ class UIController:
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._press_hotkey(key_code)
+            self._keyboard.press_and_release(key_code)
         else:
             self._request_previous_split()
 
@@ -310,7 +309,7 @@ class UIController:
         """
         key_code = settings.get_str("SKIP_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._press_hotkey(key_code)
+            self._keyboard.press_and_release(key_code)
         else:
             self._request_next_split()
 
@@ -334,7 +333,7 @@ class UIController:
         """
         key_code = settings.get_str("RESET_HOTKEY_CODE")
         if len(key_code) > 0:
-            self._press_hotkey(key_code)
+            self._keyboard.press_and_release(key_code)
         else:
             self._request_reset_splits()
 
@@ -574,8 +573,8 @@ class UIController:
                 settings.get_str("SKIP_HOTKEY_CODE"),
             ),
             self._settings_window.previous_hotkey_box: (
-                settings.get_str("PREVIOUS_HOTKEY_NAME"),
-                settings.get_str("PREVIOUS_HOTKEY_CODE"),
+                settings.get_str("PREV_HOTKEY_NAME"),
+                settings.get_str("PREV_HOTKEY_CODE"),
             ),
             self._settings_window.next_hotkey_box: (
                 settings.get_str("NEXT_HOTKEY_NAME"),
@@ -627,13 +626,12 @@ class UIController:
                 value = float(spinbox.value()) / 100
             else:
                 value = spinbox.value()
+            settings.set_value(setting_string, value)
 
             # Send new FPS value to controller and splitter
             if spinbox == self._settings_window.fps_spinbox:
                 self._poller.setInterval(self._get_interval())
                 self._splitter.target_fps = value
-
-            settings.set_value(setting_string, value)
 
         self._splitter.splits.set_default_threshold()
         self._splitter.splits.set_default_delay()
@@ -684,8 +682,8 @@ class UIController:
                 "SKIP_HOTKEY_CODE",
             ),
             self._settings_window.previous_hotkey_box: (
-                "PREVIOUS_HOTKEY_NAME",
-                "PREVIOUS_HOTKEY_CODE",
+                "PREV_HOTKEY_NAME",
+                "PREV_HOTKEY_CODE",
             ),
             self._settings_window.next_hotkey_box: (
                 "NEXT_HOTKEY_NAME",
@@ -1609,37 +1607,46 @@ class UIController:
 
     def _update_from_keyboard(self) -> None:
         """Use flags set in _handle_key_press to split and do other actions."""
-        self._handle_hotkey_press()
-        self._execute_split_action()
+        self._react_to_hotkey_flags()
+        self._react_to_settings_menu_flags()
+        self._react_to_split_flags()
 
-    def _handle_key_press(self, key) -> None:
+    def _handle_key_press(
+        self, key: Union["pynput.keyboard.key", "keyboard.KeyboardEvent"]
+    ) -> None:
         """Process key presses, setting flags if the key is a hotkey.
 
         Called each time any key is pressed, whether or not the program is in
         focus. This method has two main uses:
             1) Updates users' custom hotkey bindings. It does this by checking
-                if a given hotkey "line edit" has focus and, if so, changing
-                its key_code and text to match the key.
+                if a given hotkey "line edit" has focus and, if so, setting
+                flags so its name and key code are updated.
+
+                Uses a lock so the poller doesn't try to update these values as
+                they're being written (the worst case would be setting a hotkey
+                with the correct name but wrong key code -- unlikely but not
+                impossible).
+
             2) If a hotkey is pressed, sets a flag indicating it was pressed.
 
-        We set flags when hotkeys are pressed instead of directly calling a
-        method because PyQt5 doesn't allow other threads to manipulate the UI.
-        Doing so almost always causes a trace trap error / crash.
+        We set flags when keys are pressed instead of directly calling a method
+        because PyQt5 doesn't play nice when other threads try to manipulate
+        the GUI. Doing so often causes a trace trap / segmentation fault.
 
         Args:
-            key (pynput.keyboard.Key) -- Windows, MacOS
-                (keyboard.KeyboardEvent) -- Linux:
-                Wrapper containing info about the key that was pressed.
+            key: Wrapper containing info about the key that was pressed. For
+                more information, see the ui_keyboard_controller module.
         """
         # Get the key's name and internal value. If the key is not an
         # alphanumeric key, the try block throws AttributeError.
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            try:
-                key_name, key_code = key.char, key.vk
-            except AttributeError:
-                key_name, key_code = str(key).replace("Key.", ""), key.value.vk
-        else:
-            key_name = key_code = key.name
+        key_name, key_code = self._keyboard.parse_key_info(key)
+
+        # Some keys aren't handled very well by pynput -- they return a key
+        # code but no name. I don't have the resources to compile an exhaustive
+        # list of codes that correspond to names on different platforms, so I
+        # think it's better to just have them do nothing for now.
+        if key_name is None:
+            return
 
         # Use #1 (set hotkey settings in settings window)
         for hotkey_box in [
@@ -1654,28 +1661,38 @@ class UIController:
             self._settings_window.toggle_global_hotkeys_hotkey_box,
         ]:
             if hotkey_box.hasFocus():
-                hotkey_box.setText(key_name)
-                hotkey_box.key_code = key_code
-                return
+                with self._hotkey_box_lock:
+                    self._hotkey_box_to_change = hotkey_box
+                    self._hotkey_box_key_code = key_code
+                    self._hotkey_box_key_name = key_name
+                    return
 
-        # Use #2 (set "hotkey pressed" flag for _handle_hotkey_press)
+        # Use #2 (set "hotkey pressed" flag for _react_to_hotkey_flags)
         if not self._settings_window.isVisible():
-            for hotkey_pressed, settings_string in {
-                "_split_hotkey_pressed": "SPLIT_HOTKEY_CODE",
-                "_reset_hotkey_pressed": "RESET_HOTKEY_CODE",
-                "_undo_hotkey_pressed": "UNDO_HOTKEY_CODE",
-                "_skip_hotkey_pressed": "SKIP_HOTKEY_CODE",
-                "_previous_hotkey_pressed": "PREVIOUS_HOTKEY_CODE",
-                "_next_hotkey_pressed": "NEXT_HOTKEY_CODE",
-                "_screenshot_hotkey_pressed": "SCREENSHOT_HOTKEY_CODE",
-                "_toggle_hotkeys_hotkey_pressed": "TOGGLE_HOTKEYS_HOTKEY_CODE",
+            for hotkey_pressed, setting in {
+                "_split_hotkey_pressed": ("SPLIT_HOTKEY_NAME", "SPLIT_HOTKEY_CODE"),
+                "_reset_hotkey_pressed": ("RESET_HOTKEY_NAME", "RESET_HOTKEY_CODE"),
+                "_undo_hotkey_pressed": ("UNDO_HOTKEY_NAME", "UNDO_HOTKEY_CODE"),
+                "_skip_hotkey_pressed": ("SKIP_HOTKEY_NAME", "SKIP_HOTKEY_CODE"),
+                "_previous_hotkey_pressed": ("PREV_HOTKEY_NAME", "PREV_HOTKEY_CODE"),
+                "_next_hotkey_pressed": ("NEXT_HOTKEY_NAME", "NEXT_HOTKEY_CODE"),
+                "_screenshot_hotkey_pressed": (
+                    "SCREENSHOT_HOTKEY_NAME",
+                    "SCREENSHOT_HOTKEY_CODE",
+                ),
+                "_toggle_hotkeys_hotkey_pressed": (
+                    "TOGGLE_HOTKEYS_HOTKEY_NAME",
+                    "TOGGLE_HOTKEYS_HOTKEY_CODE",
+                ),
             }.items():
-                if str(key_code) == settings.get_str(settings_string):
+                settings_name = settings.get_str(setting[0])
+                settings_code = settings.get_str(setting[1])
+                if str(key_name) == settings_name and str(key_code) == settings_code:
                     # Use setattr because that allows us to use this dict format
                     setattr(self, hotkey_pressed, True)
 
-    def _handle_hotkey_press(self) -> None:
-        """React to the flags set in _handle_key_press.
+    def _react_to_hotkey_flags(self) -> None:
+        """React to the flags set in _handle_key_press for hotkeys.
 
         When a hotkey is pressed, do its action if hotkeys are allowed now.
         Then, unset the flag no matter what.
@@ -1729,36 +1746,59 @@ class UIController:
                 self._main_window.screenshot_button.click()
             self._screenshot_hotkey_pressed = False
 
-    def _press_hotkey(self, key_code: str) -> None:
-        """Press and release a hotkey.
+    def _react_to_settings_menu_flags(self) -> None:
+        """React to the flags set in _handle_key_press for updating hotkeys.
 
-        Args:
-            key_code (str): A string representation of a pynput.keyboard.Key.vk
-                value (or a keyboard.KeyboardEvent.name value on Linux).
-                Passed as a string because we use QSettings, which converts all
-                types to strings on some backends.
+        If _handle_hotkey_press has set self._hotkey_box_to_change to a hotkey
+        box, use the values stored in _hotkey_box_key_name and _hotkey_box_key
+        _code to update the hotkey box. Then, reset _hotkey_box_to_change back
+        to None.
+
+        We use _hotkey_box_lock to make sure the values passed from _handle_key
+        _press aren't overwritten mid-method.
+
+        Setting the hotkey box's attributes directly from _handle_hotkey_press
+        is simpler, but PyQt5 doesn't like it and it occasionally causes a
+        segmentation fault.
         """
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            key_code = int(key_code)
-            key = pynput_keyboard.KeyCode(vk=key_code)
-            self._keyboard_controller.press(key)
-            self._keyboard_controller.release(key)
-        else:
-            keyboard.send(key_code)
+        with self._hotkey_box_lock:
+            if self._hotkey_box_to_change is None:
+                return
 
-    def _execute_split_action(self) -> None:
-        """Send a hotkey press and request the next split image when the
-        splitter finds a matching image.
+            hotkey_box = self._hotkey_box_to_change
+            key_name = self._hotkey_box_key_name
+            key_code = self._hotkey_box_key_code
 
-        If no hotkey is set for a given action, ignore the hotkey press and
-        request the next split image anyway.
+            # Set box attributes
+            hotkey_box.setText(key_name)
+            hotkey_box.key_code = key_code
+
+            # Reset font size to the default
+            f_size = self._settings_window.fontInfo().pointSize()
+            hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
+
+            # If the key name is too big for the box, resize the font down
+            # until it fits. Subtract 10 from the width so that there's a
+            # little bit of padding on the right-hand side of the box.
+            while hotkey_box.get_text_width() >= hotkey_box.width() - 10:
+                f_size = hotkey_box.get_font_size() - 1
+                hotkey_box.setStyleSheet(f"KeyLineEdit{{font-size: {f_size}pt;}}")
+
+            self._hotkey_box_to_change = None
+
+    def _react_to_split_flags(self) -> None:
+        """Press a hotkey & go to next split when self._splitter sets flags.
+
+        If the normal_split_action flag is set but no split hotkey is assigned,
+        or the hotkey wasn't heard by the application, request the next split
+        image manually.
         """
         # Pause split (press pause hotkey)
         if self._splitter.pause_split_action:
             self._splitter.pause_split_action = False
             key_code = settings.get_str("PAUSE_HOTKEY_CODE")
             if len(key_code) > 0:
-                self._press_hotkey(key_code)
+                self._keyboard.press_and_release(key_code)
             self._request_next_split()
 
         # Dummy split (silently advance to next split)
@@ -1771,7 +1811,7 @@ class UIController:
             self._splitter.normal_split_action = False
             key_code = settings.get_str("SPLIT_HOTKEY_CODE")
             if len(key_code) > 0:
-                self._press_hotkey(key_code)
+                self._keyboard.press_and_release(key_code)
             # If key didn't get pressed, OR if it did get pressed but global
             # hotkeys are off and the app isn't in focus, move the split image
             # forward, since pressing the key on its own won't do that
@@ -1783,70 +1823,95 @@ class UIController:
                 self._request_next_split()
 
     def _wake_display(self):
-        """Keep the display awake by sending a virtual key release action.
+        """Keep the display awake when the splitter is active.
 
-        This should probably happen anyway (I'm assuming most use cases will
-        involve LiveSplit or some other app that keeps the screen on), but just
-        in case, this app should also keep the screen alive when it's being
-        actively used.
+        Each time this method is called, check if at least _wake_interval
+        seconds have passed. If so, update _last_wake_time to the current time,
+        and check if the splitter is active or delaying / suspending with a
+        countdown. If it is, attempt to wake the display (the method differs by
+        operating system).
 
-        Each time this method is called, check if more than _wake_interval
-        seconds have passed. If so, update _last_wake_time to the current time.
+        MacOS method: caffeinate (key release as fallback, see below)
+        Even if called with a 1 second timeout, as we do here, caffeinate
+        resets the OS's sleep countdown, so we only need to run it about once a
+        minute (1 minute is the lowest sleep timeout on MacOS) to prevent the
+        screen from dimming. We use a separate thread to reduce overhead
+        (creating a new thread requires less overhead than calling
+        subprocess.Popen, once, and we only need to do it once, instead of once
+        every _wake_interval).
+        If caffeinate isn't available, fall back to the "release key" method.
+        (see below). Caffeinate is preferred because, unlike releasing a key,
+        it doesn't force the keyboard's backlight to stay on, but releasing a
+        key at least keeps the display alive.
 
-        This method works differently depending on the platform. On Windows,
-        if _splitter._compare_thread is alive, send a key release. Why a key
-        release? It's the least invasive solution I could find that didn't
-        require using C to permanently change some system value. I want to make
-        sure the system will sleep normally if this program exits abruptly.
-        Releasing a key doesn't require it to be pressed; it also does NOT
-        interrupt an actual, physical keypress by the user -- so most users
-        should never notice that anything is happening behind the scenes. Hacky
-        but it works.
+        Windows method: Key release
+        This is the least invasive solution that doesn't require permanently
+        changing a registry or system value, which would prevent the machine
+        from sleeping normally if this program exits abruptly. Key releases
+        instead of key presses or mouse clicks / wiggles are ideal because
+        releasing a key doesn't require the key to be pressed, and does NOT
+        interrupt an actual, physical keypress being held by the user, so users
+        should never notice that anything is happening behind the scenes. It's
+        hacky but hopefully relatively uninvasive, and its effects subside as
+        soon as the program stops running.
 
-        On MacOS, use the built-in `caffeinate` command to keep the display
-        alive. Helpfully, calling it for even 1 second, as we do, resets the
-        display sleep timer, so we can open a 1-sec process in the background
-        with subprocess.Popen every interval. If caffeinate isn't available,
-        fall back to the "release key method" (caffeinate doesn't force the
-        keyboard's backlight to stay on, but the "release key" method does, so
-        caffeinate is preferred even though it's slower. Another option would
-        be to call caffeinate -d just once in a separate thread and then
-        terminate the thread)
-
-        Note: We store self._caffeinate_path so we only have to check once if
-        caffeinate is available on the user's machine. If it's not available,
-        skipping directly to keyboard.release saves about .009 seconds per call
-        (on my machine), which isn't nothing considering that's a good chunk of
-        a frame at 60fps.
-        Note2: Using caffeinate doesn't force the keyboard backlight to stay on,
-        but keyboard.release does -- another reason caffeinate is desirable.
-
-        On Linux, we use the "release key" approach too. I don't have the right
-        testing environment to see if this works, but it definitely works on
-        Windows, so might as well put this down for now...
+        Linux: Key release (untested, may not be reliable)
         """
         if time.perf_counter() - self._last_wake_time >= self._wake_interval:
             self._last_wake_time = time.perf_counter()
             suspend = self._splitter.suspend_remaining
             delay = self._splitter.delay_remaining
-
-            if (
+            splitter_active = (
                 not self._splitter.suspended
                 or (self._splitter.suspended and suspend is not None)
                 or (self._splitter.delaying and delay is not None)
-            ):
-                key = "a"  # Something arbitrary; it shouldn't matter
-                if platform.system() == "Windows":
-                    self._keyboard_controller.release(key)
-                elif platform.system() == "Darwin":
-                    if self._caffeinate_path is not None:
-                        subprocess.Popen([self._caffeinate_path, "-d", "-t", "1"])
-                    else:
-                        self._keyboard_controller.release(key)
-                else:
-                    keyboard.release(key)
+            )
 
-    def _get_exec_path(self, name: str) -> str | None:
+            # Key should be alphanumeric to work cross platform; beyond that it
+            # doesn't matter, since the user won't detect its release
+            key = "a"
+
+            # MacOS: Try caffeinate, fall back to key release if necessary
+            if platform.system() == "Darwin":
+                if splitter_active:
+
+                    caffeinate_path = self._get_exec_path("caffeinate")
+
+                    # No caffeinate, use fallback
+                    if caffeinate_path is None:
+                        self._keyboard.release(key)
+
+                    # Caffeinate exists; start thread if it hasn't been started
+                    elif not self._caffeinate_thread.is_alive():
+                        self._caffeinate_thread_finished = False
+                        self._caffeinate_thread = Thread(
+                            target=self._caffeinate, args=(caffeinate_path,)
+                        )
+                        self._caffeinate_thread.daemon = True
+                        self._caffeinate_thread.start()
+
+                # Splitter inactive; kill thread (join not needed, will die)
+                else:
+                    self._caffeinate_thread_finished = True
+
+            # Winodws / Linux: release a key if splitter active
+            elif splitter_active:
+                self._keyboard.release(key)
+
+    def _caffeinate(self, caffeinate_path: str) -> None:
+        """Use built-in caffeinate to keep the machine's display on (MacOS).
+
+        A 1-second timeout is used because caffeinate resets the sleep timer
+        (i.e. it doesn't need to be constantly running). This is good because
+        it's hard to reliably terminate an ongoing caffeinate process; this way
+        we guarantee that users' sleep settings will return to normal after the
+        program terminates.
+        """
+        while not self._caffeinate_thread_finished:
+            subprocess.Popen([caffeinate_path, "-d", "-t", "1"])
+            time.sleep(self._wake_interval)
+
+    def _get_exec_path(self, name: str) -> Optional[str]:
         """Return the path to an executable file, if it exists.
 
         Args:
