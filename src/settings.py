@@ -133,8 +133,11 @@ def set_value(key: str, value: any, settings: QSettings = settings) -> None:
     settings.setValue(key, str(value))
 
 
-def set_defaults(settings: QSettings = settings) -> None:
-    """Ensure that settings values make sense before they are used.
+def set_program_vals(settings: QSettings = settings) -> None:
+    """Ensure that settings values are updated and make sense before use.
+
+    Unsets hotkeys if last used version was <=1.0.6 due to a change in the way
+    hotkeys are implemented.
 
     Populates settings with default values if they have not yet been set.
 
@@ -146,138 +149,149 @@ def set_defaults(settings: QSettings = settings) -> None:
     Makes sure that the correct aspect ratio is shown.
     """
     home_dir = get_home_dir()
-    if not get_bool("SETTINGS_SET", settings=settings):
-        # Indicate whether default settings have been populated
-        set_value("SETTINGS_SET", True, settings=settings)
+
+    # Unset hotkeys if upgrading from <=v1.0.6 because of hotkey implementation
+    # updates
+    last_version = get_str("LAST_VERSION", settings)
+    if last_version == "None":
+        last_version = "v1.0.0"
+    if not version_ge(last_version, "v1.0.7"):
+        unset_hotkey_bindings()
+
+    if not get_bool("SETTINGS_SET", settings):
+        # Indicate that default settings have been populated
+        set_value("SETTINGS_SET", True, settings)
+
+        # Set hotkeys to default values
+        unset_hotkey_bindings()
 
         # The default minimum match percent needed to force a split action
-        set_value("DEFAULT_THRESHOLD", 0.90, settings=settings)
+        set_value("DEFAULT_THRESHOLD", 0.90, settings)
 
         # The default delay (seconds) before a split
-        set_value("DEFAULT_DELAY", 0.0, settings=settings)
+        set_value("DEFAULT_DELAY", 0.0, settings)
 
         # The default pause (seconds) after a split
-        set_value("DEFAULT_PAUSE", 1.0, settings=settings)
+        set_value("DEFAULT_PAUSE", 1.0, settings)
 
         # The FPS used by splitter and ui_controller
-        set_value("FPS", 30, settings=settings)
+        set_value("FPS", 30, settings)
 
         # The location of split images
-        set_value("LAST_IMAGE_DIR", home_dir, settings=settings)
+        set_value("LAST_IMAGE_DIR", home_dir, settings)
 
         # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
-        set_value("OPEN_SCREENSHOT_ON_CAPTURE", False, settings=settings)
+        set_value("OPEN_SCREENSHOT_ON_CAPTURE", False, settings)
 
         # The number of decimal places shown when displaying match percents
-        set_value("MATCH_PERCENT_DECIMALS", 0, settings=settings)
-
-        # The text value of the split hotkey
-        set_value("SPLIT_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the reset hotkey
-        set_value("RESET_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the pause hotkey
-        set_value("PAUSE_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the undo hotkey
-        set_value("UNDO_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the skip split hotkey
-        set_value("SKIP_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the previous split hotkey
-        set_value("PREV_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the next split hotkey
-        set_value("NEXT_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the screenshot hotkey
-        set_value("SCREENSHOT_HOTKEY_NAME", "", settings=settings)
-
-        # The text value of the toggle global hotkeys hotkey
-        set_value("TOGGLE_HOTKEYS_HOTKEY_NAME", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the split hotkey
-        set_value("SPLIT_HOTKEY_CODE", "")
-
-        # The pynput.keyboard.Key.vk value of the reset hotkey
-        set_value("RESET_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the pause hotkey
-        set_value("PAUSE_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the undo split hotkey
-        set_value("UNDO_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the skip split hotkey
-        set_value("SKIP_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the previous split hotkey
-        set_value("PREV_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the next split hotkey
-        set_value("NEXT_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the screenshot hotkey
-        set_value("SCREENSHOT_HOTKEY_CODE", "", settings=settings)
-
-        # The pynput.keyboard.Key.vk value of the toggle global hotkeys hotkey
-        set_value("TOGGLE_HOTKEYS_HOTKEY_CODE", "", settings=settings)
+        set_value("MATCH_PERCENT_DECIMALS", 0, settings)
 
         # The UI theme
-        set_value("THEME", "dark", settings=settings)
+        set_value("THEME", "dark", settings)
 
         # The aspect ratio
-        set_value("ASPECT_RATIO", "4:3 (480x360)", settings=settings)
+        set_value("ASPECT_RATIO", "4:3 (480x360)", settings)
 
         # Always on top value
-        set_value("ALWAYS_ON_TOP", False, settings=settings)
+        set_value("ALWAYS_ON_TOP", False, settings)
 
         # The last cv2 capture source index. This is an imperfect way to
         # remember the last video source used, since the indexes can reference
         # different sources at different times, but it's the best I can do in a
         # cross-platform environment
-        set_value("LAST_CAPTURE_SOURCE_INDEX", 0, settings=settings)
+        set_value("LAST_CAPTURE_SOURCE_INDEX", 0, settings)
 
         # Whether the program should try to open video on startup, or wait for
         # the user to press "reconnect video"
-        set_value("START_WITH_VIDEO", False, settings=settings)
+        set_value("START_WITH_VIDEO", False, settings)
 
         # Whether the minimal view should be showing
-        set_value("SHOW_MIN_VIEW", False, settings=settings)
+        set_value("SHOW_MIN_VIEW", False, settings)
 
         # Whether global hotkeys are enabled (default) or only local hotkeys
-        set_value("GLOBAL_HOTKEYS_ENABLED", True, settings=settings)
+        set_value("GLOBAL_HOTKEYS_ENABLED", True, settings)
 
         # Whether program checks for updates on launch
-        set_value("CHECK_FOR_UPDATES", True, settings=settings)
+        set_value("CHECK_FOR_UPDATES", True, settings)
 
     # Make sure image dir exists and is within the user's home dir
     # (This limits i/o to user-controlled areas)
-    last_image_dir = get_str("LAST_IMAGE_DIR", settings=settings)
+    last_image_dir = get_str("LAST_IMAGE_DIR", settings)
     if not last_image_dir.startswith(home_dir) or not Path(last_image_dir).is_dir():
-        set_value("LAST_IMAGE_DIR", home_dir, settings=settings)
+        set_value("LAST_IMAGE_DIR", home_dir, settings)
 
     # Always start in full view if video doesn't come on automatically
-    if not get_bool("START_WITH_VIDEO", settings=settings):
-        set_value("SHOW_MIN_VIEW", False, settings=settings)
+    if not get_bool("START_WITH_VIDEO", settings):
+        set_value("SHOW_MIN_VIEW", False, settings)
+
+    # Remember last used version number (to unset hotkeys if upgrading)
+    set_value("LAST_VERSION", VERSION_NUMBER, settings)
 
     # Set correct video, split image width and height relative to aspect ratio
-    aspect_ratio = get_str("ASPECT_RATIO", settings=settings)
+    aspect_ratio = get_str("ASPECT_RATIO", settings)
     if aspect_ratio == "4:3 (480x360)":
-        set_value("FRAME_WIDTH", 480, settings=settings)
-        set_value("FRAME_HEIGHT", 360, settings=settings)
+        set_value("FRAME_WIDTH", 480, settings)
+        set_value("FRAME_HEIGHT", 360, settings)
     elif aspect_ratio == "4:3 (320x240)":
-        set_value("FRAME_WIDTH", 320, settings=settings)
-        set_value("FRAME_HEIGHT", 240, settings=settings)
+        set_value("FRAME_WIDTH", 320, settings)
+        set_value("FRAME_HEIGHT", 240, settings)
     elif aspect_ratio == "16:9 (512x288)":
-        set_value("FRAME_WIDTH", 512, settings=settings)
-        set_value("FRAME_HEIGHT", 288, settings=settings)
+        set_value("FRAME_WIDTH", 512, settings)
+        set_value("FRAME_HEIGHT", 288, settings)
     elif aspect_ratio == "16:9 (432x243)":
-        set_value("FRAME_WIDTH", 432, settings=settings)
-        set_value("FRAME_HEIGHT", 243, settings=settings)
+        set_value("FRAME_WIDTH", 432, settings)
+        set_value("FRAME_HEIGHT", 243, settings)
+
+
+def version_ge(version1: str, version2: str) -> bool:
+    """Check whether version1 equal to or more recent than version2.
+
+    Versions are in format x.x.x or vx.x.x, where x is a nonnegative integer.
+
+    Args:
+        version1 (str): The first version number.
+        version2 (str): The second version number.
+
+    Returns:
+        bool: True if version1 is equal to or more recent than version2.
+    """
+
+    version1_numbers = version1.replace("v", "").split(".")
+    version2_numbers = version2.replace("v", "").split(".")
+
+    for i in range(3):
+        if version1_numbers[i] > version2_numbers[i]:
+            return True
+        if version1_numbers[i] < version2_numbers[i]:
+            return False
+
+    return True
+
+
+def unset_hotkey_bindings() -> None:
+    """Unset all hotkey bindings."""
+    # Text values
+    set_value("SPLIT_HOTKEY_NAME", "", settings)
+    set_value("RESET_HOTKEY_NAME", "", settings)
+    set_value("PAUSE_HOTKEY_NAME", "", settings)
+    set_value("UNDO_HOTKEY_NAME", "", settings)
+    set_value("SKIP_HOTKEY_NAME", "", settings)
+    set_value("PREV_HOTKEY_NAME", "", settings)
+    set_value("NEXT_HOTKEY_NAME", "", settings)
+    set_value("SCREENSHOT_HOTKEY_NAME", "", settings)
+    set_value("TOGGLE_HOTKEYS_HOTKEY_NAME", "", settings)
+
+    # Key IDs
+    set_value("SPLIT_HOTKEY_CODE", "", settings)
+    set_value("RESET_HOTKEY_CODE", "", settings)
+    set_value("PAUSE_HOTKEY_CODE", "", settings)
+    set_value("UNDO_HOTKEY_CODE", "", settings)
+    set_value("SKIP_HOTKEY_CODE", "", settings)
+    set_value("PREV_HOTKEY_CODE", "", settings)
+    set_value("NEXT_HOTKEY_CODE", "", settings)
+    set_value("SCREENSHOT_HOTKEY_CODE", "", settings)
+    set_value("TOGGLE_HOTKEYS_HOTKEY_CODE", "", settings)
 
 
 def get_latest_version() -> str:

@@ -89,7 +89,7 @@ class PilgrimAutosplitter:
                 QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
             )
 
-        settings.set_defaults()
+        settings.set_program_vals()
 
         self.splitter = Splitter()
         if settings.get_bool("START_WITH_VIDEO"):

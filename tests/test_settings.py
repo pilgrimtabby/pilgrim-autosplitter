@@ -163,61 +163,61 @@ class TestSettingsFunctionsWithDummySettings:
         self.dummy_settings.setValue("test", 123.123123)
         assert settings.get_float("test", settings=self.dummy_settings) == 123.123123
 
-    # Testing set_defaults
-    def test_set_defaults_runs_on_blank_settings(self):
-        settings.set_defaults(settings=self.dummy_settings)
+    # Testing set_program_vals
+    def test_set_program_vals_runs_on_blank_settings(self):
+        settings.set_program_vals(settings=self.dummy_settings)
         assert settings.get_bool("SETTINGS_SET", settings=self.dummy_settings)
 
-    def test_set_defaults_turns_off_show_min_view(self):
-        settings.set_defaults(settings=self.dummy_settings)
+    def test_set_program_vals_turns_off_show_min_view(self):
+        settings.set_program_vals(settings=self.dummy_settings)
         orig_start_with_video = settings.get_bool(
             "START_WITH_VIDEO", settings=self.dummy_settings
         )
         settings.set_value("SHOW_MIN_VIEW", True, settings=self.dummy_settings)
-        settings.set_defaults(settings=self.dummy_settings)
+        settings.set_program_vals(settings=self.dummy_settings)
         assert not orig_start_with_video and not settings.get_bool(
             "SHOW_MIN_VIEW", settings=self.dummy_settings
         )
 
-    def test_set_defaults_sets_correct_aspect_ratio_1(self):
-        settings.set_defaults(settings=self.dummy_settings)
+    def test_set_program_vals_sets_correct_aspect_ratio_1(self):
+        settings.set_program_vals(settings=self.dummy_settings)
         settings.set_value(
             "ASPECT_RATIO", "4:3 (480x360)", settings=self.dummy_settings
         )
-        settings.set_defaults(settings=self.dummy_settings)
+        settings.set_program_vals(settings=self.dummy_settings)
         assert (
             settings.get_int("FRAME_WIDTH", settings=self.dummy_settings) == 480
             and settings.get_int("FRAME_HEIGHT", settings=self.dummy_settings) == 360
         )
 
-    def test_set_defaults_sets_correct_aspect_ratio_2(self):
-        settings.set_defaults(settings=self.dummy_settings)
+    def test_set_program_vals_sets_correct_aspect_ratio_2(self):
+        settings.set_program_vals(settings=self.dummy_settings)
         settings.set_value(
             "ASPECT_RATIO", "4:3 (320x240)", settings=self.dummy_settings
         )
-        settings.set_defaults(settings=self.dummy_settings)
+        settings.set_program_vals(settings=self.dummy_settings)
         assert (
             settings.get_int("FRAME_WIDTH", settings=self.dummy_settings) == 320
             and settings.get_int("FRAME_HEIGHT", settings=self.dummy_settings) == 240
         )
 
-    def test_set_defaults_sets_correct_aspect_ratio_3(self):
-        settings.set_defaults(settings=self.dummy_settings)
+    def test_set_program_vals_sets_correct_aspect_ratio_3(self):
+        settings.set_program_vals(settings=self.dummy_settings)
         settings.set_value(
             "ASPECT_RATIO", "16:9 (512x288)", settings=self.dummy_settings
         )
-        settings.set_defaults(settings=self.dummy_settings)
+        settings.set_program_vals(settings=self.dummy_settings)
         assert (
             settings.get_int("FRAME_WIDTH", settings=self.dummy_settings) == 512
             and settings.get_int("FRAME_HEIGHT", settings=self.dummy_settings) == 288
         )
 
-    def test_set_defaults_sets_correct_aspect_ratio_4(self):
-        settings.set_defaults(settings=self.dummy_settings)
+    def test_set_program_vals_sets_correct_aspect_ratio_4(self):
+        settings.set_program_vals(settings=self.dummy_settings)
         settings.set_value(
             "ASPECT_RATIO", "16:9 (432x243)", settings=self.dummy_settings
         )
-        settings.set_defaults(settings=self.dummy_settings)
+        settings.set_program_vals(settings=self.dummy_settings)
         assert (
             settings.get_int("FRAME_WIDTH", settings=self.dummy_settings) == 432
             and settings.get_int("FRAME_HEIGHT", settings=self.dummy_settings) == 243
@@ -237,3 +237,36 @@ def test_get_latest_version():
 
 def test_get_home_dir_returns_real_path():
     assert Path(settings.get_home_dir()).is_dir()
+
+
+# Testing version_ge
+def test_version_ge_1():
+    assert settings.version_ge("1.0.1", "1.0.0")
+
+
+def test_version_ge_2():
+    assert settings.version_ge("1.0.1", "1.0.1")
+
+
+def test_version_ge_3():
+    assert settings.version_ge("1.1.0", "1.0.1")
+
+
+def test_version_ge_4():
+    assert settings.version_ge("2.1.0", "1.0.1")
+
+
+def test_version_ge_5():
+    assert settings.version_ge("1.1.0", "1.0.0")
+
+
+def test_version_ge_6():
+    assert not settings.version_ge("1.1.0", "1.1.1")
+
+
+def test_version_ge_6():
+    assert settings.version_ge("1.2.0", "1.1.10")
+
+
+def test_version_ge_7():
+    assert settings.version_ge("1.0.0", "0.20000.999")

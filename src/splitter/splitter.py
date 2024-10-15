@@ -212,7 +212,7 @@ class Splitter:
         current_match_percent = self.match_percent
         self.safe_exit_compare_thread()
         if current_match_percent is None and len(self.splits.list) > 0:
-                self.start_compare_thread()
+            self.start_compare_thread()
 
     ###################################
     #                                 #
