@@ -281,12 +281,12 @@ class UIMainWindow(QMainWindow):
         # Include placeholders for current and total loops
         self.split_loop_label_txt = "Loop {} of {}"
 
-        self.split_display = QLabel(self._container)
+        self.split_display = ClickableQLabel(self._container)
         self.split_display.setAlignment(Qt.AlignCenter)
         self.split_display.setObjectName("image_label_inactive")
         self.split_display_txt = "No split images loaded"
 
-        self.split_overlay = QLabel(self._container)
+        self.split_overlay = ClickableQLabel(self._container)
         self.split_overlay.setAlignment(Qt.AlignCenter)
         self.split_overlay.setObjectName("split_overlay")
         self.split_overlay.setVisible(False)
@@ -317,6 +317,7 @@ class UIMainWindow(QMainWindow):
         )
         self.match_percent_short_txt = "Sim:"
         self.match_percent_long_txt = "Similarity to split image:"
+        self.match_reset_percent_txt = "Similarity to reset image:"
 
         self.match_percent = QLabel(self._container)
         self.match_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -558,6 +559,58 @@ class UIMainWindow(QMainWindow):
                 # everything work, for some reason.
                 self.update_available_msg.show()
                 self.update_available_msg.open()
+
+
+class ClickableQLabel(QLabel):
+    """QLineEdit subclass that sends a clicked signal when clicked and a
+    released signal when released.
+
+    Drags are neutralized.
+
+    Attributes:
+        clicked (PyQt5.QtCore.pyqtSignal): Emitted when the label is left-
+            clicked.
+        released (PyQt5.QtCore.pyqtSignal): Emitted when the label is released
+            with the left mouse button.
+    """
+
+    clicked = pyqtSignal()
+    released = pyqtSignal()
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Inherit from QLabel and set attributes to None.
+
+        Args:
+            parent (QLabel, optional): The parent class. Defaults to None.
+        """
+        QLabel.__init__(self, parent)
+
+    def mousePressEvent(self, event):
+        """Emit self.clicked if the left mouse button is pressed.
+
+        Args:
+            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+
+    def mouseMoveEvent(self, a0: Optional[QMouseEvent]) -> None:
+        """Prevent the mouse moving from having any effect.
+
+        Args:
+            a0 (QMouseEvent | None): The mouse drag event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        pass
+
+    def mouseReleaseEvent(self, event):
+        """Emit self.released if the left mouse button is released.
+
+        Args:
+            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.button() == Qt.LeftButton:
+            self.released.emit()
 
 
 class ClickableLineEdit(QLineEdit):

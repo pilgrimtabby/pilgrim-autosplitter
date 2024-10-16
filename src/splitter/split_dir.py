@@ -36,7 +36,7 @@ import pathlib
 import re
 from multiprocessing import freeze_support
 from multiprocessing.dummy import Pool as ThreadPool
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy
@@ -69,8 +69,8 @@ class SplitDir:
     """
 
     def __init__(self):
-        """Initialize a list of SplitImage objects and set flags accordingly."""
-        self.list = self._get_split_images()
+        """Get split images and reset image and set flags accordingly."""
+        self.list, self.reset_image = self._get_split_images()
         if len(self.list) > 0:
             self.current_image_index = 0
             self.current_loop = 1
@@ -107,8 +107,9 @@ class SplitDir:
             self.current_loop -= 1
 
     def reset_split_images(self) -> None:
-        """Rebuild the split image list and reset flags."""
-        new_list = self._get_split_images()
+        """Rebuild split image list, refresh reset image, and reset flags."""
+        new_list, new_reset_image = self._get_split_images()
+        self.reset_image = new_reset_image
         if len(new_list) == 0:
             self.list = []
             self.current_image_index = None
@@ -144,7 +145,7 @@ class SplitDir:
                 image.pause_duration = default_pause
 
     def resize_images(self) -> None:
-        """Regenerate each split image's pixmap.
+        """Regenerate the reset image's and each split image's pixmap.
 
         Useful when changing aspect ratios, since the size of the pixmap can
         change.
@@ -152,14 +153,18 @@ class SplitDir:
         for image in self.list:
             image.pixmap = image.get_pixmap()
 
+        if self.reset_image is not None:
+            self.reset_image.pixmap = self.reset_image.get_pixmap()
+
     ###############
     #             #
     # Private API #
     #             #
     ###############
 
-    def _get_split_images(self) -> List["_SplitImage"]:
-        """Get a list of SplitImage objects from a directory.
+    def _get_split_images(self) -> Tuple[List["_SplitImage"], Optional["_SplitImage"]]:
+        """Get a list of SplitImage objects from a directory, including a reset
+        image if present.
 
         Currently supported image types include .png, .jpg, and .jpeg. Only
         .png is tested, and it is the only recommended image format.
@@ -170,9 +175,10 @@ class SplitDir:
 
         Returns:
             List[_SplitImage]: The list of SplitImage objects.
+            _SplitImage | None: The reset image, if present.
         """
 
-        def get_split_image(index: int, path: str):
+        def get_split_image(index: int, path: str) -> None:
             """Get a single SplitImage object and put it in split_images.
 
             Test if the image at the index in self.list is the same image by
@@ -208,7 +214,7 @@ class SplitDir:
 
         dir_path = settings.get_str("LAST_IMAGE_DIR")
         if not pathlib.Path(dir_path).is_dir():
-            return []  # The directory doesn't exist; return an empty list
+            return [], None  # The directory doesn't exist; return an empty list
 
         image_paths = sorted(
             glob.glob(f"{dir_path}/*.png")
@@ -216,9 +222,19 @@ class SplitDir:
             + glob.glob(f"{dir_path}/*.jpeg")
         )
 
+        # Get the reset image if it exists, remove it from the main list
+        reset_image_path = reset_image = None
+        for path in image_paths:
+            if "{r}" in path:
+                reset_image_path = path
+                break
+        if reset_image_path is not None:
+            image_paths.remove(reset_image_path)
+            reset_image = self._SplitImage(reset_image_path)
+
         list_length = len(image_paths)
         if list_length == 0:
-            return []  # The list is empty; return an empty list
+            return [], reset_image  # The list is empty; return an empty list
         else:
             # Initialize split_images with the same number of indexes as images
             split_images = [None] * (list_length)
@@ -232,7 +248,7 @@ class SplitDir:
         pool.starmap(func=get_split_image, iterable=indexes_and_paths)
         pool.close()
         pool.join()
-        return split_images
+        return split_images, reset_image
 
     class _SplitImage:
         """Store and modify details attributes of a single split image.
@@ -284,7 +300,7 @@ class SplitDir:
             self.image, self.mask = self.get_image_and_mask()
             self.max_dist = self._get_max_dist()
             self.pixmap = self.get_pixmap()
-            self.below_flag, self.dummy_flag, self.pause_flag = (
+            self.below_flag, self.dummy_flag, self.pause_flag, self.reset_flag = (
                 self._get_flags_from_name()
             )
             self.delay_duration, self.delay_is_default = self._get_delay_from_name()
@@ -468,9 +484,9 @@ class SplitDir:
             except IndexError:
                 return False
 
-        def _get_flags_from_name(self) -> Tuple[bool, bool, bool]:
-            """Get split image's below, dummy, and pause flags by reading the
-            filename.
+        def _get_flags_from_name(self) -> Tuple[bool, bool, bool, bool]:
+            """Get split image's below, dummy, pause, and reset flags by
+            reading the filename.
 
             A below flag is indicated with a b between brackets, like this:
             _{b}_ (the splitter will not consider a match found until the
@@ -486,17 +502,29 @@ class SplitDir:
             next split, but to press the pause hotkey instead of the split
             hotkey)
 
+            A reset flag is indicated with an r between brackets, like this:
+            _{r}_ (the splitter will tell the ui_controller to press the reset
+            hotkey and go back to the first split)
+
             A split cannot be a dummy split and a pause split, because a dummy
             split implies no hotkey press. If both flags are set, the pause
-            flag is removed.
+            flag is removed. In addition, the only flag that can be used in
+            conjunction with the reset flag is the below flag.
 
             Returns:
-                Tuple[bool, bool, bool]: below_flag, dummy_flag, and
-                pause_flag, respectively (True if set, False if not).
+                Tuple[bool, bool, bool, bool]: below_flag, dummy_flag, pause_
+                flag, and reset_flag, respectively (True if set, False if not).
             """
-            flags = re.findall(r"_\{([bdp]+?)\}", self.name)
+            flags = re.findall(r"_\{([bdpr]+?)\}", self.name)
+
+            # Remove flags that can't go together
             if "d" in flags and "p" in flags:
                 flags.remove("p")
+            if "r" in flags:
+                if "d" in flags:
+                    flags.remove("d")
+                if "p" in flags:
+                    flags.remove("p")
 
             if "b" in flags:
                 below_flag = True
@@ -510,8 +538,12 @@ class SplitDir:
                 pause_flag = True
             else:
                 pause_flag = False
+            if "r" in flags:
+                reset_flag = True
+            else:
+                reset_flag = False
 
-            return below_flag, dummy_flag, pause_flag
+            return below_flag, dummy_flag, pause_flag, reset_flag
 
         def _get_delay_from_name(self) -> float:
             """Set split image's delay duration before split by reading

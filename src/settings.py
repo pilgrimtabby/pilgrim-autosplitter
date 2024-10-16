@@ -42,7 +42,7 @@ COMPARISON_FRAME_WIDTH = 320
 COMPARISON_FRAME_HEIGHT = 240
 
 # Pilgrim Autosplitter's current version number
-VERSION_NUMBER = "v1.0.7"
+VERSION_NUMBER = "v1.1.0"
 
 # The URL of Pilgrim Autosplitter's GitHub repo
 REPO_URL = "https://github.com/pilgrimtabby/pilgrim-autosplitter/"

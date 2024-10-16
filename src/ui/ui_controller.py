@@ -104,6 +104,10 @@ class UIController:
         # Should be set whenever the split image is modified
         self._redraw_split_labels = True
 
+        # Tell _splitter to display reset image match percents, not split image
+        # match percent
+        self._show_reset_percents = False
+
         # Values for updating hotkeys in settings menu
         # (see _react_to_settings_menu_flags)
         self._hotkey_box_to_change = None
@@ -185,6 +189,14 @@ class UIController:
             self._splitter.safe_exit_all_threads
         )
         self._main_window.reconnect_button.clicked.connect(self._splitter.start)
+
+        # Split image display (click and hold to show reset image)
+        self._main_window.split_overlay.clicked.connect(self._show_reset_image_display)
+        self._main_window.split_display.clicked.connect(self._show_reset_image_display)
+
+        # Split image display (release to hide reset image)
+        self._main_window.split_overlay.released.connect(self._hide_reset_image_display)
+        self._main_window.split_display.released.connect(self._hide_reset_image_display)
 
         # Pause comparison / unpause comparison button
         self._main_window.pause_button.clicked.connect(self._splitter.toggle_suspended)
@@ -497,6 +509,39 @@ class UIController:
         # "Open" was clicked -- open the GitHub releases page
         elif button.text() == self._main_window.open_button_txt:
             self._open_url(f"{settings.REPO_URL}releases/latest")
+
+    def _show_reset_image_display(self) -> None:
+        """Show the reset image, if it exists, over the current split image.
+
+        Also force the match percent chart to show the match percents for the
+        reset image.
+        """
+        reset_image = self._splitter.splits.reset_image
+        split_display = self._main_window.split_display
+        match_percent_label = self._main_window.match_percent_label
+        aspect_ratio = settings.get_str("ASPECT_RATIO")
+
+        if reset_image is not None:
+            split_display.setPixmap(reset_image.pixmap)
+            if aspect_ratio != "4:3 (320x240)":
+                match_percent_label.setText(self._main_window.match_reset_percent_txt)
+
+            self._show_reset_percents = True
+
+    def _hide_reset_image_display(self) -> None:
+        """Hides the reset image from the UI after it's been shown over the
+        split image.
+        """
+        match_percent_label = self._main_window.match_percent_label
+        aspect_ratio = settings.get_str("ASPECT_RATIO")
+
+        if aspect_ratio == "4:3 (320x240)":
+            match_percent_label.setText(self._main_window.match_percent_short_txt)
+        else:
+            match_percent_label.setText(self._main_window.match_percent_long_txt)
+
+        self._redraw_split_labels = True  # Force UI to show split image again
+        self._show_reset_percents = False
 
     def _exec_settings_window(self) -> None:
         """Set up and open the settings window UI."""
@@ -1451,13 +1496,21 @@ class UIController:
             overlay.setText("")
 
     def _update_match_percents(self):
-        """Update match percents or set them to blank."""
+        """Update match percents or set them to blank.
+
+        When self._show_reset_percents is True, shows the match percent for the
+        reset image instead of the current split image.
+        """
         decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
         format_str = f"{{:.{decimals}f}}"
         null_str = self._null_match_percent_string(decimals)
-        match_percent = self._splitter.match_percent
+        if self._show_reset_percents:
+            match_percent = self._splitter.match_reset_percent
+            high_percent = self._splitter.highest_reset_percent
+        else:
+            match_percent = self._splitter.match_percent
+            high_percent = self._splitter.highest_percent
         match_label = self._main_window.match_percent
-        high_percent = self._splitter.highest_percent
         high_label = self._main_window.highest_percent
         current_index = self._splitter.splits.current_image_index
         thresh_label = self._main_window.threshold_percent
@@ -1480,7 +1533,10 @@ class UIController:
 
         # Update threshold%
         else:
-            threshold = self._splitter.splits.list[current_index].threshold
+            if self._show_reset_percents:
+                threshold = self._splitter.splits.reset_image.threshold
+            else:
+                threshold = self._splitter.splits.list[current_index].threshold
             thresh_label.setText(format_str.format(threshold * 100))
 
     def _update_pause_button(self):
@@ -1821,6 +1877,22 @@ class UIController:
             )
             if len(key_code) == 0 or hotkey_not_caught:
                 self._request_next_split()
+
+        # Reset splits (press reset hotkey)
+        elif self._splitter.reset_split_action:
+            self._splitter.reset_split_action = False
+            key_code = settings.get_str("RESET_HOTKEY_CODE")
+            if len(key_code) > 0:
+                self._keyboard.press_and_release(key_code)
+            # If key didn't get pressed, OR if it did get pressed but global
+            # hotkeys are off and the app isn't in focus, go back to the first
+            # split image, since pressing the key on its own won't do that
+            hotkey_not_caught = (
+                self._application.focusWindow() is None
+                and not settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
+            )
+            if len(key_code) == 0 or hotkey_not_caught:
+                self._request_reset_splits()
 
     def _wake_display(self):
         """Keep the display awake when the splitter is active.
