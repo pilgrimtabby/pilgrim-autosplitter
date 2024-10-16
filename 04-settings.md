@@ -149,7 +149,7 @@ Go to the next split. This is the key Pilgrim Autosplitter presses when a split 
 
 ## Reset splits
 
-Go back to the first split. Also refreshes your split images, so pressing `reset` will load any new or modified images.
+Go back to the first split. Also refreshes your split images, so pressing `reset` will load any new or modified images. Pilgrim Autosplitter presses this when it finds a match to your reset image, if you have one.
 
 ## Pause timer
 

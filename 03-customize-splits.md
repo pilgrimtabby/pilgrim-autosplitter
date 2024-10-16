@@ -46,6 +46,8 @@ Override the [default pause]({% link 04-settings.md %}#default-pause) for this s
 
 The value is inserted between brackets: `[value]`.
 
+This setting has no effect for reset splits `{r}`.
+
 {: .example }
 `001_mysplit_[120].png` Don't look for the next split image for 2 minutes after this split.
 
@@ -55,6 +57,8 @@ Force a split to loop. Useful if consecutive splits use the same image.
 
 Insert the value between "at" signs: `@value@`.
 
+This setting has no effect for reset splits `{r}`.
+
 Default: `1`
 
 {: .example }
@@ -62,12 +66,12 @@ Default: `1`
 
 # Special Split Types
 
-You can tell Pilgrim Autosplitter to do special actions when matching a split. 
+You can tell Pilgrim Autosplitter to do special actions when matching a split.
 
 Specify a special split type by inserting its corresponding letter between curly braces: `{value}`. 
 
 {: .note }
-Special split types can be used together, but the dummy type `{d}` will always override the pause type `{p}`.
+Special split types can be used together, but the dummy type `{d}` will always override the pause type `{p}`. In addition, reset type splits `{r}` can't be used with any type except below type splits `{b}`.
 
 ## Pause type
 
@@ -97,3 +101,12 @@ Insert a `b` between curly braces: `{b}`.
 
 {: .example }
 `001_mysplit_{b}.png` After finding a match, wait until the video no longer matches before splitting.
+
+## Reset type
+
+Press the reset hotkey when a match is found. Only one reset split can exist per folder; if you have more than one, only one will be found and used. This split is always being checked in the background, and it doesn't appear in your splits list in-app. If you want to see it and/or see how much it matches with your video feed, click and hold on the split image on the right-hand side.
+
+Insert a `r` between curly braces: `{r}`.
+
+{: .example }
+`121_theend_{r}.png` The run is reset.
