@@ -147,6 +147,8 @@ class UIMainWindow(QMainWindow):
             show the split_display_txt.
         split_loop_label (QLabel): Informs the user about the current
             split's loop information.
+        split_loop_label_reset_txt (QLabel): Tells the user the currently
+            displayed image is the reset image.
         split_overlay (QLabel): Informs the user that a pre-split delay
             or post-split pause is taking place.
         split_name_label (QLabel): Shows the current split name.
@@ -256,9 +258,9 @@ class UIMainWindow(QMainWindow):
         self.video_live_txt = "Video feed"
         self.video_down_txt = ""
 
-        self.video_display = QLabel(self._container)
+        self.video_display = ClickableQLabel(self._container)
         self.video_display.setAlignment(Qt.AlignCenter)
-        self.video_display.setObjectName("image_label_inactive")
+        self.video_display.setObjectName("video_label")
         self.video_display_txt = "No video feed detected"
 
         #########################
@@ -280,10 +282,11 @@ class UIMainWindow(QMainWindow):
         self.split_loop_label_empty_txt = "Split does not loop"
         # Include placeholders for current and total loops
         self.split_loop_label_txt = "Loop {} of {}"
+        self.split_loop_label_reset_txt = "Reset image"
 
         self.split_display = ClickableQLabel(self._container)
         self.split_display.setAlignment(Qt.AlignCenter)
-        self.split_display.setObjectName("image_label_inactive")
+        self.split_display.setObjectName("image_label")
         self.split_display_txt = "No split images loaded"
 
         self.split_overlay = ClickableQLabel(self._container)
@@ -562,55 +565,100 @@ class UIMainWindow(QMainWindow):
 
 
 class ClickableQLabel(QLabel):
-    """QLineEdit subclass that sends a clicked signal when clicked and a
-    released signal when released.
+    """QLabel with additional flags indicating whether it is being clicked and/
+    or hovered by the mouse.
 
-    Drags are neutralized.
+    One known limitation is that this doesn't set self.hovered to True if the
+    mouse entered the widget while clicked. I'm fine with this -- it actually
+    gives the behavior I want -- but it is technically wrong.
 
     Attributes:
-        clicked (PyQt5.QtCore.pyqtSignal): Emitted when the label is left-
-            clicked.
-        released (PyQt5.QtCore.pyqtSignal): Emitted when the label is released
-            with the left mouse button.
+        adjusted (bool): Whether the widget has been set to an alternate state.
+            Can be used to keep track of widget modifications.
+        clicked (bool): Whether the mouse is currently clicked on this widget.
+        hovered (bool): Whether the mouse is currently hovered over this widget.
+            Will not reflect a mouse hover if the hover began while the mouse
+            was clicked on another widget and the mouse has not yet been
+            released from that click.
+        valid_click (pyqtSignal): Emitted when the widget is clicked and
+            released with the left mouse button while the mouse is over the
+            widget.
     """
 
-    clicked = pyqtSignal()
-    released = pyqtSignal()
+    valid_click = pyqtSignal()
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        """Inherit from QLabel and set attributes to None.
+        """Inherit from QLabel and set default attribute values.
 
         Args:
             parent (QLabel, optional): The parent class. Defaults to None.
         """
         QLabel.__init__(self, parent)
+        self.adjusted = False
+        self.clicked = False
+        self.hovered = False
 
-    def mousePressEvent(self, event):
-        """Emit self.clicked if the left mouse button is pressed.
+    def mousePressEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Set self.clicked to True when the left mouse button is pressed.
 
         Args:
             event: The mouse release event. See help(PyQt5.QtCore.QEvent).
         """
         if event.button() == Qt.LeftButton:
-            self.clicked.emit()
+            self.clicked = True
 
-    def mouseMoveEvent(self, a0: Optional[QMouseEvent]) -> None:
-        """Prevent the mouse moving from having any effect.
+    def mouseReleaseEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Set self.clicked to False when the left mouse button is released.
+
+        Also, emit valid_click if the mouse is released within the widget's
+        boundaries.
 
         Args:
-            a0 (QMouseEvent | None): The mouse drag event.
+            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.button() == Qt.LeftButton:
+            self.clicked = False
+            if event.pos() in self.rect():
+                self.valid_click.emit()
+
+    def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Track whether the clicked mouse is inside the widget's bounds.
+
+        This method only returns values when the mouse is clicked. Sets
+        self.hovered to True if the mouse is over the widget, False
+        otherwise.
+
+        Args:
+            event (QMouseEvent | None): The mouse drag event.
                 See help(PyQt5.QtGui.QMouseEvent).
         """
-        pass
+        self.hovered = event.pos() in self.rect()
 
-    def mouseReleaseEvent(self, event):
-        """Emit self.released if the left mouse button is released.
+    def enterEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Detect when the unclicked mouse enters the widget.
+
+        The enter and leave methods are needed because mouseMoveEvent only
+        works when the mouse isn't clicked, but we want to set hovered
+        regardless of whether the mouse is clicked or not.
 
         Args:
-            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+            event (QMouseEvent | None): The mouse enter event.
+                See help(PyQt5.QtGui.QMouseEvent).
         """
-        if event.button() == Qt.LeftButton:
-            self.released.emit()
+        self.hovered = True
+
+    def leaveEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Detect when the unclicked mouse leaves the widget.
+
+        The enter and leave methods are needed because mouseMoveEvent only
+        works when the mouse isn't clicked, but we want to set hovered
+        regardless of whether the mouse is clicked or not.
+
+        Args:
+            event (QMouseEvent | None): The mouse enter event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        self.hovered = False
 
 
 class ClickableLineEdit(QLineEdit):
@@ -640,7 +688,7 @@ class ClickableLineEdit(QLineEdit):
         """
         QLineEdit.__init__(self, parent)
 
-    def mouseMoveEvent(self, a0: Optional[QMouseEvent]) -> None:
+    def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
         """Prevent the mouse moving from having any effect.
 
         I override this method specifically to prevent selecting text by
@@ -653,7 +701,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseDoubleClickEvent(self, a0: Optional[QMouseEvent]) -> None:
+    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
         """Prevent a double click from having any effect.
 
         I override this method specifically to prevent double-clicking to
@@ -667,7 +715,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event: Optional[QMouseEvent]) -> None:
         """Emit self.clicked if the mouse was pressed and released.
 
         Args:

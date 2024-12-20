@@ -48,11 +48,11 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QAbstractButton, QApplication, QFileDialog
 
 import settings
-import ui.ui_style_sheet as style_sheet
 from splitter.splitter import Splitter
 from ui.ui_keyboard_controller import UIKeyboardController
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
+from ui.ui_style_sheet import style_sheet_light, style_sheet_dark
 
 
 class UIController:
@@ -90,9 +90,12 @@ class UIController:
         self._main_window = UIMainWindow()
         self._settings_window = UISettingsWindow()
 
-        theme = settings.get_str("THEME")
-        style_sheet.set_style(self._main_window, theme)
-        style_sheet.set_style(self._settings_window, theme)
+        if settings.get_str("THEME") == "light":
+            style = style_sheet_light
+        else:
+            style = style_sheet_dark
+        self._main_window.setStyleSheet(style)
+        self._settings_window.setStyleSheet(style)
 
         #########################
         #                       #
@@ -161,6 +164,13 @@ class UIController:
             lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR"))
         )
 
+        # Video feed
+        self._main_window.video_display.valid_click.connect(
+            lambda: settings.set_value(
+                "RECORD_CLIPS", not settings.get_bool("RECORD_CLIPS")
+            )
+        )
+
         # Split directory button
         self._main_window.split_dir_button.clicked.connect(self._set_split_dir_path)
 
@@ -189,14 +199,6 @@ class UIController:
             self._splitter.safe_exit_all_threads
         )
         self._main_window.reconnect_button.clicked.connect(self._splitter.start)
-
-        # Split image display (click and hold to show reset image)
-        self._main_window.split_overlay.clicked.connect(self._show_reset_image_display)
-        self._main_window.split_display.clicked.connect(self._show_reset_image_display)
-
-        # Split image display (release to hide reset image)
-        self._main_window.split_overlay.released.connect(self._hide_reset_image_display)
-        self._main_window.split_display.released.connect(self._hide_reset_image_display)
 
         # Pause comparison / unpause comparison button
         self._main_window.pause_button.clicked.connect(self._splitter.toggle_suspended)
@@ -519,23 +521,27 @@ class UIController:
         reset_image = self._splitter.splits.reset_image
         split_display = self._main_window.split_display
         match_percent_label = self._main_window.match_percent_label
-        aspect_ratio = settings.get_str("ASPECT_RATIO")
+        split_name_label = self._main_window.split_name_label
+        loop_label = self._main_window.split_loop_label
+        loop_label_reset_text = self._main_window.split_loop_label_reset_txt
 
-        if reset_image is not None:
-            split_display.setPixmap(reset_image.pixmap)
-            if aspect_ratio != "4:3 (320x240)":
-                match_percent_label.setText(self._main_window.match_reset_percent_txt)
+        # Set split name / loop label to reset image info
+        split_name_label.setText(reset_image.name)
+        loop_label.setText(loop_label_reset_text)
 
-            self._show_reset_percents = True
+        # Set split image to reset image
+        split_display.setPixmap(reset_image.pixmap)
+
+        # Show reset image match percents instead of current split
+        if settings.get_str("ASPECT_RATIO") != "4:3 (320x240)":
+            match_percent_label.setText(self._main_window.match_reset_percent_txt)
+        self._show_reset_percents = True
 
     def _hide_reset_image_display(self) -> None:
-        """Hides the reset image from the UI after it's been shown over the
-        split image.
-        """
+        """Remove reset image / info from UI."""
         match_percent_label = self._main_window.match_percent_label
-        aspect_ratio = settings.get_str("ASPECT_RATIO")
 
-        if aspect_ratio == "4:3 (320x240)":
+        if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
             match_percent_label.setText(self._main_window.match_percent_short_txt)
         else:
             match_percent_label.setText(self._main_window.match_percent_long_txt)
@@ -749,7 +755,7 @@ class UIController:
 
         # Comboboxes --
         # Only update these settings if the value changed, since calling
-        # resize_images, _set_main_window_layout, and set_style is expensive
+        # resize_images / _set_main_window_layout and setting style is expensive
         aspect_ratio = self._settings_window.aspect_ratio_combo_box.currentText()
         if aspect_ratio != settings.get_str("ASPECT_RATIO"):
             if aspect_ratio == "4:3 (480x360)":
@@ -773,12 +779,14 @@ class UIController:
 
         theme = self._settings_window.theme_combo_box.currentText()
         if theme != settings.get_str("THEME"):
-            if theme == "dark":
-                settings.set_value("THEME", "dark")
-            elif theme == "light":
+            if theme == "light":
                 settings.set_value("THEME", "light")
-            style_sheet.set_style(self._main_window, theme)
-            style_sheet.set_style(self._settings_window, theme)
+                style = style_sheet_light
+            else:
+                settings.set_value("THEME", "dark")
+                style = style_sheet_dark
+            self._main_window.setStyleSheet(style)
+            self._settings_window.setStyleSheet(style)
 
     def _take_screenshot(self) -> None:
         """Write `spltter.comparison_frame` to a file (and optionally open it
@@ -1352,6 +1360,7 @@ class UIController:
         """Read values from the splitter and use them to update the UI."""
         self._update_video_feed()
         self._update_video_title()
+        self._update_split_and_video_css()
         self._update_split_image_labels()
         self._update_split_delay_suspend()
         self._update_match_percents()
@@ -1399,11 +1408,138 @@ class UIController:
             elif not video_alive and label.text() != norm_down_txt:
                 label.setText(norm_down_txt)
 
+    def _update_split_and_video_css(self) -> None:
+        """Generate new style sheet based on mouse interation with video feed
+        and split image.
+        """
+        if settings.get_str("THEME") == "light":
+            base_style = style_sheet_light
+        else:
+            base_style = style_sheet_dark
+        style_sheet = self._update_video_feed_css(base_style)
+        style_sheet = self._update_split_image_css(style_sheet)
+        self._main_window.setStyleSheet(style_sheet)
+
+    def _update_video_feed_css(self, style_sheet: str) -> str:
+        """Generate new style sheet on mouse interaction with video feed.
+
+        Args:
+            style_sheet (str): The base style sheet to which new CSS is added.
+
+        Returns:
+            str: The style sheet with modified CSS for the video feed widget.
+        """
+        video_display = self._main_window.video_display
+
+        # Clicked and hovered
+        if video_display.clicked and video_display.hovered:
+            style_sheet += """
+                QLabel#video_label {
+                    border-width: 3px;
+                }
+            """
+            # Move image down / right a little bit to make it look clicked
+            if not video_display.adjusted:
+                video_display.move(video_display.x() + 1, video_display.y() + 1)
+                video_display.adjusted = True
+
+        # Clicked or hovered, but not both
+        elif (video_display.clicked and not video_display.hovered) or (
+            video_display.hovered and not video_display.clicked
+        ):
+            style_sheet += """
+                QLabel#video_label {
+                    border-width: 3px;
+                }
+            """
+            # Move the image back to its original spot
+            if video_display.adjusted:
+                video_display.move(video_display.x() - 1, video_display.y() - 1)
+                video_display.adjusted = False
+
+        # Not clicked or hovered (just move it back)
+        else:
+            if video_display.adjusted:
+                video_display.move(video_display.x() - 1, video_display.y() - 1)
+                video_display.adjusted = False
+
+        return style_sheet
+
+    def _update_split_image_css(self, style_sheet: str) -> str:
+        """Generate new style sheet on mouse interaction with video feed.
+
+        Args:
+            style_sheet (str): The base style sheet to which new CSS is added.
+
+        Returns:
+            str: The style sheet with modified CSS for the video feed widget.
+        """
+        reset_image = self._splitter.splits.reset_image
+        if reset_image is not None:
+
+            split_display = self._main_window.split_display
+            split_overlay = self._main_window.split_overlay
+            loop_label = self._main_window.split_loop_label
+            reset_label_txt = self._main_window.split_loop_label_reset_txt
+
+            # Combine flags from both split widgets
+            clicked = split_display.clicked or split_overlay.clicked
+            hovered = split_display.hovered or split_overlay.hovered
+
+            # Show or hide image depending on mouse click status
+            if clicked:
+                self._show_reset_image_display()
+            elif loop_label.text() == reset_label_txt:
+                self._hide_reset_image_display()
+
+            # Clicked and hovered
+            if clicked and hovered:
+                style_sheet += """
+                    QLabel#image_label {
+                        border-width: 3px;
+                    }
+                    QLabel#split_overlay {
+                        border-width: 3px;
+                    }
+                """
+                # Move image down / right a little bit to make it look clicked
+                if not split_display.adjusted:
+                    split_display.move(split_display.x() + 1, split_display.y() + 1)
+                    split_overlay.move(split_overlay.x() + 1, split_overlay.y() + 1)
+                    split_display.adjusted = True
+
+            # Clicked or hovered, but not both
+            elif (clicked and not hovered) or (hovered and not clicked):
+                style_sheet += """
+                    QLabel#image_label {
+                        border-width: 3px;
+                    }
+                    QLabel#split_overlay {
+                        border-width: 3px;
+                    }
+                """
+                # Move the image back to its original spot
+                if split_display.adjusted:
+                    split_display.move(split_display.x() - 1, split_display.y() - 1)
+                    split_overlay.move(split_overlay.x() - 1, split_overlay.y() - 1)
+                    split_display.adjusted = False
+
+            # Not clicked or hovered (just move image back)
+            else:
+                if split_display.adjusted:
+                    split_display.move(split_display.x() - 1, split_display.y() - 1)
+                    split_overlay.move(split_overlay.x() - 1, split_overlay.y() - 1)
+                    split_display.adjusted = False
+
+        return style_sheet
+
     def _update_split_image_labels(self) -> None:
         """Update split name, loops, and image."""
         current_index = self._splitter.splits.current_image_index
         current_loop = self._splitter.splits.current_loop
         split_display = self._main_window.split_display
+        split_overlay = self._main_window.split_overlay
+        reset_image = self._splitter.splits.reset_image
         split_label = self._main_window.split_name_label
         loop_label = self._main_window.split_loop_label
         splits_down_txt = self._main_window.split_display_txt
@@ -1412,9 +1548,15 @@ class UIController:
         # No splits loaded, but UI showing split image
         if current_index is None:
             if split_display.text() != splits_down_txt:
-                split_display.setText(splits_down_txt)
-                split_label.setText("")
-                loop_label.setText("")
+                # Only show splits down text if reset image isn't being viewed
+                if reset_image is None or not (
+                    split_display.clicked or split_overlay.clicked
+                ):
+                    split_display.setText(splits_down_txt)
+                    split_label.setText("")
+                    loop_label.setText("")
+
+                # Fix min view label
                 splits_min_label.setText(splits_down_txt)
                 splits_min_label.raise_()  # Make sure it's not being covered
 
@@ -1632,7 +1774,7 @@ class UIController:
 
         Returns:
             str: The null match percent string. Possible return values are
-            "--", "--.-", and "--.--".
+                "--", "--.-", and "--.--".
         """
         match_percent_string = "--"
         if decimals > 0:
@@ -1857,7 +1999,7 @@ class UIController:
                 self._keyboard.press_and_release(key_code)
             self._request_next_split()
 
-        # Dummy split (silently advance to next split)
+        # Dummy split (silently advance to next split image)
         elif self._splitter.dummy_split_action:
             self._splitter.dummy_split_action = False
             self._request_next_split()

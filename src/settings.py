@@ -165,6 +165,9 @@ def set_program_vals(settings: QSettings = settings) -> None:
         # Set hotkeys to default values
         unset_hotkey_bindings()
 
+        # Turn off recording splits as clips by default
+        set_value("RECORD_CLIPS", False, settings)
+
         # The default minimum match percent needed to force a split action
         set_value("DEFAULT_THRESHOLD", 0.90, settings)
 

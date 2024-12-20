@@ -354,6 +354,8 @@ class Splitter:
                     (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
                     interpolation=cv2.INTER_LINEAR,
                 )
+
+                # Generate ui_frame (if not in min view)
                 if settings.get_bool("SHOW_MIN_VIEW"):
                     ui_frame = None
                 else:
@@ -366,6 +368,7 @@ class Splitter:
                         interpolation=cv2.INTER_NEAREST,
                     )
 
+            # Convert ui_frame to pixmap
             self.frame_pixmap = self._frame_to_pixmap(ui_frame)
 
         self._cap.release()
@@ -512,6 +515,10 @@ class Splitter:
             if (
                 self.splits.reset_image is not None
                 and not match_found
+                # Since the first split image is presumed to be the "start
+                # image" (ie the run hasn't started yet if we're on the first
+                # split), don't look for the reset image if we're on the first
+                # split image
                 and self.splits.current_image_index != 0
             ):
                 match_found, above_reset_threshold = self._compare_with_reset_image(
@@ -521,11 +528,13 @@ class Splitter:
                     match_type = ImageType.RESET_IMAGE
                     break
 
-        # Setting these to None tells the ui_controller the splitter is down
+        # Setting these to None tells the ui_controller the splitter is down.
+        # But don't reset highest_reset_percent, since the hunt for the reset
+        # image continues across different split images.
         self.match_percent = None
         self.highest_percent = None
         self.match_reset_percent = None
-        # Don't reset highest_reset_percent
+
         return match_type
 
     def _compare_with_split_image(
