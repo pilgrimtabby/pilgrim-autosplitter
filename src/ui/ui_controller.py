@@ -1488,18 +1488,14 @@ class UIController:
             loop_label = self._main_window.split_loop_label
             reset_label_txt = self._main_window.split_loop_label_reset_txt
 
-            # Combine flags from both split widgets
-            clicked = split_display.clicked or split_overlay.clicked
-            hovered = split_display.hovered or split_overlay.hovered
-
             # Show or hide image depending on mouse click status
-            if clicked:
+            if split_display.clicked:
                 self._show_reset_image_display()
             elif loop_label.text() == reset_label_txt:
                 self._hide_reset_image_display()
 
             # Clicked and hovered
-            if clicked and hovered:
+            if split_display.clicked and split_display.hovered:
                 style_sheet += """
                     QLabel#image_label {
                         border-width: 3px;
@@ -1515,7 +1511,9 @@ class UIController:
                     split_display.adjusted = True
 
             # Clicked or hovered, but not both
-            elif (clicked and not hovered) or (hovered and not clicked):
+            elif (split_display.clicked and not split_display.hovered) or (
+                split_display.hovered and not split_display.clicked
+            ):
                 style_sheet += """
                     QLabel#image_label {
                         border-width: 3px;
@@ -1544,7 +1542,6 @@ class UIController:
         current_index = self._splitter.splits.current_image_index
         current_loop = self._splitter.splits.current_loop
         split_display = self._main_window.split_display
-        split_overlay = self._main_window.split_overlay
         reset_image = self._splitter.splits.reset_image
         split_label = self._main_window.split_name_label
         loop_label = self._main_window.split_loop_label
@@ -1555,9 +1552,7 @@ class UIController:
         if current_index is None:
             if split_display.text() != splits_down_txt:
                 # Only show splits down text if reset image isn't being viewed
-                if reset_image is None or not (
-                    split_display.clicked or split_overlay.clicked
-                ):
+                if reset_image is None or not split_display.clicked:
                     split_display.setText(splits_down_txt)
                     split_label.setText("")
                     loop_label.setText("")

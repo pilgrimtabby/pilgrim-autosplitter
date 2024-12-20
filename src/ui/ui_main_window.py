@@ -289,10 +289,11 @@ class UIMainWindow(QMainWindow):
         self.split_display.setObjectName("image_label")
         self.split_display_txt = "No split images loaded"
 
-        self.split_overlay = ClickableQLabel(self._container)
+        self.split_overlay = QLabel(self._container)
         self.split_overlay.setAlignment(Qt.AlignCenter)
         self.split_overlay.setObjectName("split_overlay")
         self.split_overlay.setVisible(False)
+        self.split_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
         self.overlay_delay_txt_secs = "Splitting in {:.1f} s"
         self.overlay_delay_txt_mins = "Splitting in {}"
