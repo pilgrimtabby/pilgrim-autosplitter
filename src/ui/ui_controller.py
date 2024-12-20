@@ -165,11 +165,7 @@ class UIController:
         )
 
         # Video feed
-        self._main_window.video_display.valid_click.connect(
-            lambda: settings.set_value(
-                "RECORD_CLIPS", not settings.get_bool("RECORD_CLIPS")
-            )
-        )
+        self._main_window.video_display.valid_click.connect(self._toggle_record_clips)
 
         # Split directory button
         self._main_window.split_dir_button.clicked.connect(self._set_split_dir_path)
@@ -897,6 +893,13 @@ class UIController:
             non_root_user = os.environ.get("SUDO_USER")
             subprocess.Popen(["xdg-open", url], user=non_root_user)
 
+    def _toggle_record_clips(self) -> None:
+        """Toggle "RECORD_CLIPS" in settings, but only if the video feed is
+        currently active.
+        """
+        if self._splitter.capture_thread.is_alive():
+            settings.set_value("RECORD_CLIPS", not settings.get_bool("RECORD_CLIPS"))
+
     def _set_main_window_layout(self) -> None:
         """Set the size, location, and visibility of the main window's widgets
         according to minimum view status and aspect ratio.
@@ -1429,39 +1432,42 @@ class UIController:
         Returns:
             str: The style sheet with modified CSS for the video feed widget.
         """
-        video_display = self._main_window.video_display
+        # Don't react to mouse if video is down
+        if self._splitter.capture_thread.is_alive():
 
-        # Clicked and hovered
-        if video_display.clicked and video_display.hovered:
-            style_sheet += """
-                QLabel#video_label {
-                    border-width: 3px;
-                }
-            """
-            # Move image down / right a little bit to make it look clicked
-            if not video_display.adjusted:
-                video_display.move(video_display.x() + 1, video_display.y() + 1)
-                video_display.adjusted = True
+            video_display = self._main_window.video_display
 
-        # Clicked or hovered, but not both
-        elif (video_display.clicked and not video_display.hovered) or (
-            video_display.hovered and not video_display.clicked
-        ):
-            style_sheet += """
-                QLabel#video_label {
-                    border-width: 3px;
-                }
-            """
-            # Move the image back to its original spot
-            if video_display.adjusted:
-                video_display.move(video_display.x() - 1, video_display.y() - 1)
-                video_display.adjusted = False
+            # Clicked and hovered
+            if video_display.clicked and video_display.hovered:
+                style_sheet += """
+                    QLabel#video_label {
+                        border-width: 3px;
+                    }
+                """
+                # Move image down / right a little bit to make it look clicked
+                if not video_display.adjusted:
+                    video_display.move(video_display.x() + 1, video_display.y() + 1)
+                    video_display.adjusted = True
 
-        # Not clicked or hovered (just move it back)
-        else:
-            if video_display.adjusted:
-                video_display.move(video_display.x() - 1, video_display.y() - 1)
-                video_display.adjusted = False
+            # Clicked or hovered, but not both
+            elif (video_display.clicked and not video_display.hovered) or (
+                video_display.hovered and not video_display.clicked
+            ):
+                style_sheet += """
+                    QLabel#video_label {
+                        border-width: 3px;
+                    }
+                """
+                # Move the image back to its original spot
+                if video_display.adjusted:
+                    video_display.move(video_display.x() - 1, video_display.y() - 1)
+                    video_display.adjusted = False
+
+            # Not clicked or hovered (just move it back)
+            else:
+                if video_display.adjusted:
+                    video_display.move(video_display.x() - 1, video_display.y() - 1)
+                    video_display.adjusted = False
 
         return style_sheet
 
