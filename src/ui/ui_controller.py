@@ -90,12 +90,18 @@ class UIController:
         self._main_window = UIMainWindow()
         self._settings_window = UISettingsWindow()
 
-        if settings.get_str("THEME") == "light":
-            style = style_sheet_light
-        else:
-            style = style_sheet_dark
+        style = self._get_style_sheet()
         self._main_window.setStyleSheet(style)
         self._settings_window.setStyleSheet(style)
+
+        # Check if there's an update available and show message if so
+        if settings.get_bool("CHECK_FOR_UPDATES"):
+            latest_version = settings.get_latest_version()
+            if not settings.version_ge(settings.VERSION_NUMBER, latest_version):
+                msg = self._main_window.update_available_msg
+                msg.setStyleSheet(style)
+                msg.show()
+                msg.raise_()  # Make sure msg isn't hidden behind app
 
         ########################
         #                      #
@@ -165,11 +171,12 @@ class UIController:
             lambda: self._open_file_or_dir(settings.get_str("LAST_IMAGE_DIR"))
         )
 
-        # Video feed
-        self._main_window.video_display.valid_click.connect(self._toggle_record_clips)
-
         # Split directory button
         self._main_window.split_dir_button.clicked.connect(self._set_split_dir_path)
+
+        # Video feed
+        self._main_window.video_display.valid_single_click.connect(self._toggle_record_clips)
+        self._main_window.video_display.valid_double_click.connect(self._set_record_dir_path)
 
         # Minimal view / full view button
         self._main_window.min_view_button.clicked.connect(
@@ -279,9 +286,9 @@ class UIController:
         about whether the settings window will block the hotkey flag
         from being set.
 
-        If this method is ever used to accomplish something
-        and it's not guaranteed that the program will be in focus, this may
-        need to be rethought.
+        If this method is ever used to accomplish something and it's not
+        guaranteed that the program will be in focus, this may need to be
+        rethought.
         """
         key_code = settings.get_str("UNDO_HOTKEY_CODE")
         if len(key_code) > 0:
@@ -465,12 +472,16 @@ class UIController:
         if len(path) > 1 and path != settings.get_str("LAST_IMAGE_DIR"):
             if not path.startswith(settings.get_home_dir()):
                 msg = self._main_window.err_invalid_dir_msg
-                msg.exec()
+                msg.setStyleSheet(self._get_style_sheet())
+                msg.show()
                 return self._set_split_dir_path()
 
             settings.set_value("LAST_IMAGE_DIR", path)
             self._set_split_directory_box_text()
             self._request_reset_splits()
+
+    def _set_record_dir_path(self) -> None:
+        pass
 
     def _set_split_directory_box_text(self) -> None:
         """Convert the split image directory path to an elided string,
@@ -497,6 +508,9 @@ class UIController:
         # "Open" was clicked -- open the GitHub releases page
         elif button.text() == self._main_window.open_button_txt:
             self._open_url(f"{settings.REPO_URL}releases/latest")
+
+        else:
+            self._main_window.update_available_msg.close()
 
     def _show_reset_image_display(self) -> None:
         """Show the reset image, if it exists, over the current split image.
@@ -781,6 +795,7 @@ class UIController:
         frame = self._splitter.comparison_frame
         if frame is None:
             msg = self._main_window.screenshot_err_no_video
+            msg.setStyleSheet(self._get_style_sheet())
             msg.show()
             # Close message box after 10 seconds
             QTimer.singleShot(10000, lambda: msg.done(0))
@@ -802,12 +817,14 @@ class UIController:
                 msg = self._main_window.screenshot_ok_msg
                 msg.setInformativeText(f"Screenshot saved to:\n{screenshot_path}")
                 msg.setIconPixmap(QPixmap(screenshot_path).scaledToWidth(150))
+                msg.setStyleSheet(self._get_style_sheet())
                 msg.show()
                 # Close message box after 10 seconds
                 QTimer.singleShot(10000, lambda: msg.done(0))
 
         else:  # File couldn't be written to the split image directory
-            msg = self._main_window.screenshot_error_no_file_message_box
+            msg = self._main_window.screenshot_err_no_file
+            msg.setStyleSheet(self._get_style_sheet())
             msg.show()
             # Close message box after 10 seconds
             QTimer.singleShot(10000, lambda: msg.done(0))
@@ -858,6 +875,7 @@ class UIController:
         """
         if not Path(path).exists():
             msg = self._main_window.err_not_found_msg
+            msg.setStyleSheet(self._get_style_sheet())
             msg.show()
             # Close message box after 10 seconds
             QTimer.singleShot(10000, lambda: msg.done(0))
@@ -883,12 +901,28 @@ class UIController:
             non_root_user = os.environ.get("SUDO_USER")
             subprocess.Popen(["xdg-open", url], user=non_root_user)
 
+    def _get_style_sheet(self) -> str:
+        """Retrieve the style sheet currently in use.
+        
+        Returns:
+            str: The style sheet.
+        """
+        if settings.get_str("THEME") == "light":
+            return style_sheet_light
+        else:
+            return style_sheet_dark
+
     def _toggle_record_clips(self) -> None:
         """Toggle "RECORD_CLIPS" in settings, but only if the video feed is
         currently active.
         """
         if self._splitter.capture_thread.is_alive():
-            settings.set_value("RECORD_CLIPS", not settings.get_bool("RECORD_CLIPS"))
+            old_setting = settings.get_bool("RECORD_CLIPS")
+            settings.set_value("RECORD_CLIPS", not old_setting)
+
+            # Show "double click for dest." msg if turning record on
+            if old_setting is False:
+                pass
 
     def _set_main_window_layout(self) -> None:
         """Set the size, location, and visibility of the main window's widgets
@@ -1037,7 +1071,7 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 480, 360)
         )
-        self._main_window.video_overlay.setGeometry(
+        self._main_window.video_record_overlay.setGeometry(
             QRect(497 + left, 329 + top, 24, 24)
         )
 
@@ -1120,7 +1154,7 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 320, 240)
         )
-        self._main_window.video_overlay.setGeometry(
+        self._main_window.video_record_overlay.setGeometry(
             QRect(351 + left, 323 + top, 16, 16)
         )
 
@@ -1203,7 +1237,7 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 512, 288)
         )
-        self._main_window.video_overlay.setGeometry(
+        self._main_window.video_record_overlay.setGeometry(
             QRect(542 + left, 321 + top, 19, 19)
         )
 
@@ -1286,7 +1320,7 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 432, 243)
         )
-        self._main_window.video_overlay.setGeometry(
+        self._main_window.video_record_overlay.setGeometry(
             QRect(467 + left, 319 + top, 16, 16)
         )
 
@@ -1372,7 +1406,8 @@ class UIController:
         is active.
         """
         self._update_video_feed()
-        self._update_video_overlay()
+        self._update_video_record_overlay()
+        self._update_video_info_overlay()
         self._update_video_title()
         self._update_split_and_video_css()
         self._update_split_image_labels()
@@ -1401,12 +1436,12 @@ class UIController:
         else:
             video.setPixmap(frame)
 
-    def _update_video_overlay(self) -> None:
+    def _update_video_record_overlay(self) -> None:
         """Set recording symbol visible when settings.RECORD_CLIPS is True."""
-        video_overlay = self._main_window.video_overlay
+        overlay = self._main_window.video_record_overlay
 
         if settings.get_bool("SHOW_MIN_VIEW"):
-            video_overlay.setVisible(False)
+            overlay.setVisible(False)
         else:
             program_directory = os.path.dirname(os.path.abspath(__file__))
             if self._record_clips_enabled:
@@ -1414,12 +1449,15 @@ class UIController:
             else:
                 image = f"{program_directory}/../../resources/record_idle.png"
             pixmap = QPixmap(image).scaled(
-                video_overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-            video_overlay.setPixmap(pixmap)
+            overlay.setPixmap(pixmap)
 
             visible = settings.get_bool("RECORD_CLIPS")
-            video_overlay.setVisible(visible)
+            overlay.setVisible(visible)
+
+    def _update_video_info_overlay(self) -> None:
+        overlay = self._main_window.video_info_overlay
 
     def _update_video_title(self) -> None:
         """Adjust video title depending on whether video is alive."""
@@ -1449,11 +1487,8 @@ class UIController:
     def _update_split_and_video_css(self) -> None:
         """Generate new style sheet based on mouse interation with video feed
         and split image.
-        """
-        if settings.get_str("THEME") == "light":
-            base_style = style_sheet_light
-        else:
-            base_style = style_sheet_dark
+        """     
+        base_style = self._get_style_sheet()
         style_sheet = self._update_video_feed_css(base_style)
         style_sheet = self._update_split_image_css(style_sheet)
         self._main_window.setStyleSheet(style_sheet)
@@ -1470,25 +1505,27 @@ class UIController:
         # Don't react to mouse if video is down
         if self._splitter.capture_thread.is_alive():
 
-            video_display = self._main_window.video_display
-            video_overlay = self._main_window.video_overlay
+            display = self._main_window.video_display
+            record_overlay = self._main_window.video_record_overlay
+            info_overlay = self._main_window.video_info_overlay
 
             # Clicked and hovered
-            if video_display.clicked and video_display.hovered:
+            if display.clicked and display.hovered:
                 style_sheet += """
                     QLabel#video_label {
                         border-width: 3px;
                     }
                 """
                 # Move image down / right a little bit to make it look clicked
-                if not video_display.adjusted:
-                    video_display.move(video_display.x() + 1, video_display.y() + 1)
-                    video_overlay.move(video_overlay.x() + 1, video_overlay.y() + 1)
-                    video_display.adjusted = True
+                if not display.adjusted:
+                    display.move(display.x() + 1, display.y() + 1)
+                    record_overlay.move(record_overlay.x() + 1, record_overlay.y() + 1)
+                    info_overlay.move(info_overlay.x() + 1, info_overlay.y() + 1)
+                    display.adjusted = True
 
             # Clicked or hovered, but not both
-            elif (video_display.clicked and not video_display.hovered) or (
-                video_display.hovered and not video_display.clicked
+            elif (display.clicked and not display.hovered) or (
+                display.hovered and not display.clicked
             ):
                 style_sheet += """
                     QLabel#video_label {
@@ -1496,17 +1533,19 @@ class UIController:
                     }
                 """
                 # Move the image back to its original spot
-                if video_display.adjusted:
-                    video_display.move(video_display.x() - 1, video_display.y() - 1)
-                    video_overlay.move(video_overlay.x() - 1, video_overlay.y() - 1)
-                    video_display.adjusted = False
+                if display.adjusted:
+                    display.move(display.x() - 1, display.y() - 1)
+                    record_overlay.move(record_overlay.x() - 1, record_overlay.y() - 1)
+                    info_overlay.move(info_overlay.x() - 1, info_overlay.y() - 1)
+                    display.adjusted = False
 
             # Not clicked or hovered (just move it back)
             else:
-                if video_display.adjusted:
-                    video_display.move(video_display.x() - 1, video_display.y() - 1)
-                    video_overlay.move(video_overlay.x() - 1, video_overlay.y() - 1)
-                    video_display.adjusted = False
+                if display.adjusted:
+                    display.move(display.x() - 1, display.y() - 1)
+                    record_overlay.move(record_overlay.x() - 1, record_overlay.y() - 1)
+                    info_overlay.move(info_overlay.x() - 1, info_overlay.y() - 1)
+                    display.adjusted = False
 
         return style_sheet
 

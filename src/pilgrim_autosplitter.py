@@ -31,6 +31,7 @@
 import os
 import platform
 import sys
+import time
 
 
 class PilgrimAutosplitter:
@@ -115,10 +116,14 @@ def main():
     pilgrim_autosplitter.app.aboutToQuit.connect(
         pilgrim_autosplitter.splitter.safe_exit_all_threads
     )
+    # Wait for any singleshot QTimers started by widgets to finish.
+    # Right now, this includes only the double click timer in some
+    # ui_main_window widgets. If we quit while a timer is running, it
+    # can cause a segfault, so we want to prevent that.
+    pilgrim_autosplitter.app.aboutToQuit.connect(lambda sec=0.2: time.sleep(sec))
 
     print("Starting...")
     pilgrim_autosplitter.app.exec()
-
 
 if __name__ == "__main__":
     main()

@@ -30,15 +30,14 @@
 should be provided in a controller class.
 """
 
-
-import os
 import platform
 from typing import Optional
 
-from PyQt5.QtCore import QRect, Qt, pyqtSignal
-from PyQt5.QtGui import QMouseEvent, QPixmap
+from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect, Qt, QTimer
+from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import (
     QAction,
+    QApplication,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -200,6 +199,8 @@ class UIMainWindow(QMainWindow):
 
         self.setWindowTitle(f"Pilgrim Autosplitter {VERSION_NUMBER}")
 
+        self._mouse_allowed = True  # For usage, see self.eventFilter
+
         # Menu bar
         self.settings_action = QAction("Open settings menu", self)
         self.settings_action.setShortcut("Ctrl+.")
@@ -262,13 +263,21 @@ class UIMainWindow(QMainWindow):
         self.video_display = ClickableQLabel(self._container)
         self.video_display.setAlignment(Qt.AlignCenter)
         self.video_display.setObjectName("video_label")
+        # Prevent clicking this widget when window is out of focus
+        # from having any effect (see self.eventFilter)
+        self.video_display.installEventFilter(self)
         self.video_display_txt = "No video feed detected"
 
-        self.video_overlay = QLabel(self._container)
-        self.video_overlay.setAlignment(Qt.AlignCenter)
-        self.video_overlay.setObjectName("video_overlay")
-        self.video_overlay.setVisible(False)
-        self.video_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.video_record_overlay = QLabel(self._container)
+        self.video_record_overlay.setAlignment(Qt.AlignCenter)
+        self.video_record_overlay.setObjectName("video_overlay")
+        self.video_record_overlay.setVisible(False)
+        self.video_record_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        self.video_info_overlay = QLabel(self._container)
+        self.video_info_overlay.setAlignment(Qt.AlignCenter)
+        self.video_info_overlay.setObjectName("video_overlay")
+        self.video_info_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
         #########################
         #                       #
@@ -294,6 +303,9 @@ class UIMainWindow(QMainWindow):
         self.split_display = ClickableQLabel(self._container)
         self.split_display.setAlignment(Qt.AlignCenter)
         self.split_display.setObjectName("image_label")
+        # Prevent clicking this widget when window is out of focus
+        # from having any effect (see self.eventFilter)
+        self.split_display.installEventFilter(self)
         self.split_display_txt = "No split images loaded"
 
         self.split_overlay = QLabel(self._container)
@@ -424,11 +436,13 @@ class UIMainWindow(QMainWindow):
         self.screenshot_button_long_txt = "Take screenshot"
 
         # Screenshot success message box
-        self.screenshot_ok_msg = QMessageBox(self)
+        # (No parent widget -- parent widget keeps it from closing)
+        self.screenshot_ok_msg = QMessageBox()
         self.screenshot_ok_msg.setText("Screenshot taken")
 
         # Screenshot error message box (no video)
-        self.screenshot_err_no_video = QMessageBox(self)
+        # (No parent widget -- parent widget keeps it from closing)
+        self.screenshot_err_no_video = QMessageBox()
         self.screenshot_err_no_video.setText("Could not take screenshot")
         self.screenshot_err_no_video.setInformativeText(
             "No video feed detected. Please make sure video feed is active and try again."
@@ -436,7 +450,8 @@ class UIMainWindow(QMainWindow):
         self.screenshot_err_no_video.setIcon(QMessageBox.Warning)
 
         # Screenshot error message box (file couldn't be saved)
-        self.screenshot_err_no_file = QMessageBox(self)
+        # (No parent widget -- parent widget keeps it from closing)
+        self.screenshot_err_no_file = QMessageBox()
         self.screenshot_err_no_file.setText("Could not save screenshot")
         self.screenshot_err_no_file.setInformativeText(
             "Pilgrim Autosplitter can't write files to this folder. Please select a different folder and try again."
@@ -499,7 +514,8 @@ class UIMainWindow(QMainWindow):
         ##################################
 
         # Update available message box
-        self.update_available_msg = QMessageBox(self._container)
+        # (Parent widget ok here since the signals are hooked up)
+        self.update_available_msg = QMessageBox()
         self.update_available_msg.setText("New update available!")
         self.update_available_msg.setInformativeText(
             "Pilgrim Autosplitter has been updated!\nShow new release?"
@@ -539,7 +555,7 @@ class UIMainWindow(QMainWindow):
         ##################
 
         # Couldn't find file or directory error message box
-        self.err_not_found_msg = QMessageBox(self)
+        self.err_not_found_msg = QMessageBox()
         self.err_not_found_msg.setText("File or folder not found")
         self.err_not_found_msg.setInformativeText(
             "The file or folder could not be found. Please try again."
@@ -547,29 +563,40 @@ class UIMainWindow(QMainWindow):
         self.err_not_found_msg.setIcon(QMessageBox.Warning)
 
         # Invalid image directory chosen message box
-        self.err_invalid_dir_msg = QMessageBox(self)
+        self.err_invalid_dir_msg = QMessageBox()
         self.err_invalid_dir_msg.setText("Invalid folder selection")
         self.err_invalid_dir_msg.setInformativeText(
             f"You must select your home folder ({settings.get_home_dir()}) or one of its subfolders."
         )
         self.err_invalid_dir_msg.setIcon(QMessageBox.Warning)
 
-        #####################
-        #                   #
-        # Check for updates #
-        #                   #
-        #####################
+    def eventFilter(self, obj: QObject, event: QEvent):
+        """Watch for QEvent.WindowActivate, which is triggered when the window
+        was not in focus and is brought into focus.
 
-        if settings.get_bool("CHECK_FOR_UPDATES"):
-            latest_version = settings.get_latest_version()
-            if not settings.version_ge(settings.VERSION_NUMBER, latest_version):
-                # Yes, I call both show and open. If you just call show, the
-                # box doesn't always appear centered over the window (it's way
-                # off to the side). If you just call show, then bafflingly, the
-                # wrong button is highlighted by default. Calling both makes
-                # everything work, for some reason.
-                self.update_available_msg.show()
-                self.update_available_msg.open()
+        This method disables mouse presses on a widget for 50 ms after the
+        window is brought into focus. It does this by setting _mouse_allowed to
+        False, then 50 ms later setting it True again. Mouse clicks only filter
+        through if _mouse_allowed is True.
+
+        Args:
+            obj (QObject): The watched QObject. Unused here.
+            event (QEvent): The event to filter out (or not).
+
+        Returns:
+            bool: Returning True stops the QEvent from propogating further
+                (basically neutralizes it). Returning False allows it to filter
+                through.
+        """
+        if event.type() == QEvent.WindowActivate:
+            self._mouse_allowed = False
+            QTimer.singleShot(50, lambda: setattr(self, "_mouse_allowed", True))
+
+        elif event.type() == QEvent.MouseButtonPress and not self._mouse_allowed:
+            self._mouse_allowed = True
+            return True
+
+        return False
 
 
 class ClickableQLabel(QLabel):
@@ -584,16 +611,24 @@ class ClickableQLabel(QLabel):
         adjusted (bool): Whether the widget has been set to an alternate state.
             Can be used to keep track of widget modifications.
         clicked (bool): Whether the mouse is currently clicked on this widget.
+        delayed_single_click (bool): Whether a single click was registered, but
+            hasn't yet been released. Useful if you want the effect of a single
+            click to take place after releasing the mouse, even if the user
+            holds the mouse for a long time.
+        double_click (bool): Whether the mouse was double-clicked.
         hovered (bool): Whether the mouse is currently hovered over this widget.
             Will not reflect a mouse hover if the hover began while the mouse
             was clicked on another widget and the mouse has not yet been
             released from that click.
-        valid_click (pyqtSignal): Emitted when the widget is clicked and
-            released with the left mouse button while the mouse is over the
-            widget.
+        valid_double_click (pyqtSignal): Emitted when the widget is clicked and
+            released twice within 200 ms while the mouse is over the widget.
+        valid_single_click (pyqtSignal): Emitted when the widget is clicked and
+            released just once with the left mouse button while the mouse is
+            over the widget.
     """
 
-    valid_click = pyqtSignal()
+    valid_single_click = pyqtSignal()
+    valid_double_click = pyqtSignal()
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         """Inherit from QLabel and set default attribute values.
@@ -604,30 +639,85 @@ class ClickableQLabel(QLabel):
         QLabel.__init__(self, parent)
         self.adjusted = False
         self.clicked = False
+        self.delayed_single_click = False
+        self.double_click = False
         self.hovered = False
 
     def mousePressEvent(self, event: Optional[QMouseEvent]) -> None:
         """Set self.clicked to True when the left mouse button is pressed.
 
+        Also start a 200 ms timer that calls mouseSingleClickEvent. If the
+        timer goes off and a double click hasn't occured, that method will
+        finish; otherwise, only the logic in mouseDoubleClickEvent will go
+        through. This allows a single click and a double click to do different
+        things.
+
+        Set double_click to False so that, absent a double-click, only
+        mouseSingleClickEvent will have any effect.
+
         Args:
-            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+            event: The mouse press event. See help(PyQt5.QtCore.QEvent).
         """
         if event.button() == Qt.LeftButton:
             self.clicked = True
+            self.double_click = False
+            QTimer.singleShot(QApplication.doubleClickInterval(), lambda event=event: self.mouseSingleClickEvent(event))
+
+    def mouseSingleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Emit valid_single_click if a single left mouse click is released
+        within the widget's boundaries.
+
+        If the mouse actually hasn't been released yet, set delayed_single_
+        click to True instead, so the single click action can occur during
+        mouseReleaseEvent.
+
+        If self.double_click is False (due to no double click), do nothing.
+
+        Args:
+            event: The mouse press event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.pos() in self.rect() and not self.double_click:
+            if self.clicked:
+                self.delayed_single_click = True
+            else:
+                self.valid_single_click.emit()
+
+    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+        """Set double_click to True when a double click is registered so the
+        double click action can occur during mouseReleaseEvent. This flag also
+        prevents mouseSingleClickEvent from doing anything.
+
+        Set clicked to True since the mouse is still clicked (this wouldn't be
+        reflected otherwise since mousePressEvent isn't called for a double
+        click).
+
+        Args:
+            event: The mouse press event. See help(PyQt5.QtCore.QEvent).
+        """
+        self.clicked = self.double_click = True
 
     def mouseReleaseEvent(self, event: Optional[QMouseEvent]) -> None:
         """Set self.clicked to False when the left mouse button is released.
 
-        Also, emit valid_click if the mouse is released within the widget's
-        boundaries.
+        If delayed_single_click was set in mouseSingleClickEvent, do the single
+        click action here and unset the flag.
+
+        Otherwise if double_click was set in mouseDoubleClickEvent, do the
+        double click action here.
 
         Args:
             event: The mouse release event. See help(PyQt5.QtCore.QEvent).
         """
         if event.button() == Qt.LeftButton:
             self.clicked = False
-            if event.pos() in self.rect():
-                self.valid_click.emit()
+
+            if self.delayed_single_click:
+                self.delayed_single_click = False
+                if event.pos() in self.rect():
+                    self.valid_single_click.emit()
+
+            elif self.double_click and event.pos() in self.rect():
+                    self.valid_double_click.emit()
 
     def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
         """Track whether the clicked mouse is inside the widget's bounds.
