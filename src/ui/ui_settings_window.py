@@ -360,7 +360,7 @@ class UISettingsWindow(QDialog):
         )
         self._check_for_updates_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._check_for_updates_label.setToolTip(
-            "Check for updates to Pilgrim Autosplitter on launch."
+            "Check for updates to Pilgrim Autosplitter on launch"
         )
 
         self.check_for_updates_checkbox = QCheckBox(self)
@@ -387,7 +387,7 @@ class UISettingsWindow(QDialog):
         )
         self._always_on_top_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._always_on_top_label.setToolTip(
-            "Check for updates to Pilgrim Autosplitter on launch."
+            "Keep Pilgrim Autosplitter on top of other programs"
         )
 
         self.always_on_top_checkbox = QCheckBox(self)
