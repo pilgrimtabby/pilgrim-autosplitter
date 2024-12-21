@@ -48,11 +48,11 @@ class Splitter:
 
     Video capture and image matching are both performed in their own dedicated
     threads, which means that thread safety is always a top priority when
-    working with this class. _capture_thread saves information about the
-    current frame to class attributes, which are in turn used by
-    _compare_thread to generate a probability of match with the current split
-    image. If a match is found, a flag is set indicating which type of split
-    (dummy, normal, or pause) should occur.
+    working with this class. capture_thread saves information about the
+    current frame to class attributes, which are in turn used by compare_thread
+    to generate a probability of match with the current split image. If a match
+    is found, a flag is set indicating which type of split (dummy, normal, or
+    pause) should occur.
 
     ui_controller is constantly accessing the public attributes of this class,
     whether or not the threads are active, which is why several of these
@@ -92,7 +92,7 @@ class Splitter:
         splits (SplitDir): The directory of split images currently in use.
         suspend_remaining (float): The amount of time left (in seconds) before
             the end of a pause after a split.
-        suspended (bool): Indicates whether _compare_thread is alive.
+        suspended (bool): Indicates whether compare_thread is alive.
         target_fps (int): The framerate set by the user.
         waiting_for_split_change (bool): Indicates to ui_controller that
             _look_for_match received its changing_splits request and is waiting
@@ -100,22 +100,22 @@ class Splitter:
     """
 
     def __init__(self) -> None:
-        """Set all flags and values needed to operate _capture_thread and
-        _compare_thread.
+        """Set all flags and values needed to operate capture_thread and
+        compare_thread.
         """
         self.target_fps = settings.get_int("FPS")
         self._capture_max_fps = 60
         self._fps_adjust_factor = 1.22  # Roughly the amount needed here; YMMV
         self._interval = self._get_interval()
 
-        # _capture_thread
+        # capture_thread
         self.comparison_frame = None
         self.frame_pixmap = None
         self.capture_thread = threading.Thread(target=self._capture)
         self._cap = None
         self._capture_thread_finished = False
 
-        # _compare_thread
+        # compare_thread
         self.splits = SplitDir()
         self.match_percent = None
         self.highest_percent = None
@@ -129,7 +129,7 @@ class Splitter:
         self.dummy_split_action = False
         self.normal_split_action = False
         self.reset_split_action = False
-        self._compare_thread = threading.Thread(target=self._compare)
+        self.compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
 
         self.changing_splits = False
@@ -142,42 +142,42 @@ class Splitter:
     ##################
 
     def start(self) -> None:
-        """Start _capture_thread and, if possible, start _compare_thread.
+        """Start capture_thread and, if possible, start compare_thread.
 
-        It is essential to ensure that all previous _capture_threads and
-        _compare_threads have been safely exited before calling this method.
+        It is essential to ensure that all previous capture_threads and
+        compare_threads have been safely exited before calling this method.
         """
         self._start_capture_thread()
         if len(self.splits.list) > 0:
             self.start_compare_thread()
 
     def safe_exit_all_threads(self) -> None:
-        """Safely kill _capture_thread.
+        """Safely kill capture_thread.
 
-        Because killing _capture_thread also kills _compare_thread, this will
-        always safely exit _compare_thread too.
+        Because killing capture_thread also kills compare_thread, this will
+        always safely exit compare_thread too.
         """
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
 
     def start_compare_thread(self) -> None:
-        """Safely start _compare_thread.
+        """Safely start compare_thread.
 
-        It is essential to ensure that all previous _compare_threads have been
+        It is essential to ensure that all previous compare_threads have been
         safely exited before calling this method.
         """
-        self._compare_thread = threading.Thread(target=self._compare)
+        self.compare_thread = threading.Thread(target=self._compare)
         self._compare_thread_finished = False
-        self._compare_thread.daemon = True
-        self._compare_thread.start()
+        self.compare_thread.daemon = True
+        self.compare_thread.start()
         self.suspended = False
 
     def safe_exit_compare_thread(self) -> None:
-        """Safely kill _compare_thread."""
-        if self._compare_thread.is_alive():
+        """Safely kill compare_thread."""
+        if self.compare_thread.is_alive():
             self._compare_thread_finished = True
-            self._compare_thread.join()
+            self.compare_thread.join()
         self.suspended = True
 
     def set_next_capture_index(self) -> bool:
@@ -215,7 +215,7 @@ class Splitter:
         return found_valid_source
 
     def toggle_suspended(self) -> None:
-        """Stop _compare_thread, then start it if the splitter was suspended
+        """Stop compare_thread, then start it if the splitter was suspended
         and there are splits.
 
         Use self.match_percent, since it will never be None if compare_thread
@@ -235,7 +235,7 @@ class Splitter:
     def _start_capture_thread(self) -> None:
         """Safely start capture_thread.
 
-        It is essential to ensure that all previous _capture_threads have been
+        It is essential to ensure that all previous capture_threads have been
         safely exited before calling this method.
         """
         self._cap = self._open_capture()
@@ -414,7 +414,7 @@ class Splitter:
 
     ###################################
     #                                 #
-    # Private _compare_thread Methods #
+    # Private compare_thread Methods #
     #                                 #
     ###################################
 

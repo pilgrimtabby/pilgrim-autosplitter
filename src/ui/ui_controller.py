@@ -59,8 +59,8 @@ class UIController:
     """Manage the passing of information from the splitter to the UI, and from
     user input to the UI and the splitter.
 
-    Perhaps the most important class method is _poller, which is ran once
-    per frame using a QTimer. This method updates the UI and handles all user
+    Perhaps the most important class method is _poll, which is ran once per
+    frame using a QTimer. This method updates the UI and handles all user
     inputs.
 
     UIController has no public attributes, as it is meant to operate after
@@ -73,9 +73,9 @@ class UIController:
 
         Creates each UI window and then shows the main window.
         Connects pyqtSignals from each UI window to their respective slots.
-        Sets initial flags and values used by _poller.
+        Sets initial flags and values used by poller.
         Starts the keyboard listener.
-        Starts _poller, which checks for user input and splitter outputs at
+        Starts poller, which checks for user input and splitter outputs at
         regular intervals.
 
         Args:
@@ -97,11 +97,11 @@ class UIController:
         self._main_window.setStyleSheet(style)
         self._settings_window.setStyleSheet(style)
 
-        #########################
-        #                       #
-        # _poller Values, Flags #
-        #                       #
-        #########################
+        ########################
+        #                      #
+        # Poller Values, Flags #
+        #                      #
+        ########################
 
         # Tell _update_ui to update split labels
         # Should be set whenever the split image is modified
@@ -118,10 +118,11 @@ class UIController:
         self._hotkey_box_key_name = None
         self._hotkey_box_lock = Lock()
 
-        # Flags to disable hotkeys
+        # Flags to disable hotkeys and recording
         self._split_hotkey_enabled = False
         self._undo_hotkey_enabled = False
         self._skip_hotkey_enabled = False
+        self._record_clips_enabled = False
 
         # Flags for detecting hotkey presses
         self._split_hotkey_pressed = False
@@ -240,11 +241,11 @@ class UIController:
         self._settings_window.save_button.clicked.connect(self._save_settings)
         self._settings_window.save_button.clicked.connect(close_settings)
 
-        #######################################
-        #                                     #
-        # Start Polling Keyboard and Splitter #
-        #                                     #
-        #######################################
+        #################
+        #               #
+        # Start Polling #
+        #               #
+        #################
 
         # Start keyboard listener
         self._keyboard = UIKeyboardController()
@@ -258,22 +259,11 @@ class UIController:
 
         self._main_window.show()
 
-    def _poll(self) -> None:
-        """Update the UI and splitter (should be called each frame).
-
-        Uses information from UI, splitter, and keyboard to update the UI
-        and splitter. Also keeps the computer's display awake if the splitter
-        is active.
-        """
-        self._update_from_splitter()
-        self._update_from_keyboard()
-        self._wake_display()
-
-    ###########################
-    #                         #
-    # Manage User Interaction #
-    #                         #
-    ###########################
+    ##################
+    #                #
+    # Helper Methods #
+    #                #
+    ##################
 
     def _attempt_undo_hotkey(self) -> None:
         """Try to press the undo split hotkey.
@@ -1047,6 +1037,9 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 480, 360)
         )
+        self._main_window.video_overlay.setGeometry(
+            QRect(497 + left, 329 + top, 24, 24)
+        )
 
         split_image_geometry = QRect(550 + left, 310 + top, 480, 360)
         self._main_window.split_display.setGeometry(split_image_geometry)
@@ -1126,6 +1119,9 @@ class UIController:
         )
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 320, 240)
+        )
+        self._main_window.video_overlay.setGeometry(
+            QRect(351 + left, 323 + top, 16, 16)
         )
 
         split_image_geometry = QRect(390 + left, 310 + top, 320, 240)
@@ -1207,6 +1203,9 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 512, 288)
         )
+        self._main_window.video_overlay.setGeometry(
+            QRect(542 + left, 321 + top, 19, 19)
+        )
 
         split_image_geometry = QRect(582 + left, 310 + top, 512, 288)
         self._main_window.split_display.setGeometry(split_image_geometry)
@@ -1287,6 +1286,9 @@ class UIController:
         self._main_window.video_display.setGeometry(
             QRect(60 + left, 310 + top, 432, 243)
         )
+        self._main_window.video_overlay.setGeometry(
+            QRect(467 + left, 319 + top, 16, 16)
+        )
 
         split_image_geometry = QRect(502 + left, 310 + top, 432, 243)
         self._main_window.split_display.setGeometry(split_image_geometry)
@@ -1339,6 +1341,9 @@ class UIController:
     def _set_nonessential_widgets_visible(self, visible: bool) -> None:
         """Set widget visibility according to minimal view status.
 
+        Widgets that are not affected by SHOW_MIN_VIEW alone may not be listed
+        here, but may still only appear when minimal view is off.
+
         Args:
             visible (bool): If True, show all non-minimal-view widgets. If
                 False, hide all non-minimal-view widgets.
@@ -1353,15 +1358,21 @@ class UIController:
         # Only display this when the other widgets are hidden
         self._main_window.split_info_min_label.setVisible(not visible)
 
-    ###########################
-    #                         #
-    # Update UI from Splitter #
-    #                         #
-    ###########################
+    ###########
+    #         #
+    # Polling #
+    #         #
+    ###########
 
-    def _update_from_splitter(self) -> None:
-        """Read values from the splitter and use them to update the UI."""
+    def _poll(self) -> None:
+        """Update the UI and splitter (should be called each frame).
+
+        Uses information from UI, splitter, mouse, and keyboard to update UI
+        and splitter. Also keeps the computer's display awake if the splitter
+        is active.
+        """
         self._update_video_feed()
+        self._update_video_overlay()
         self._update_video_title()
         self._update_split_and_video_css()
         self._update_split_image_labels()
@@ -1369,6 +1380,10 @@ class UIController:
         self._update_match_percents()
         self._update_pause_button()
         self._set_buttons_and_hotkeys_enabled()
+        self._react_to_hotkey_flags()
+        self._react_to_settings_menu_flags()
+        self._react_to_split_flags()
+        self._wake_display()
 
     def _update_video_feed(self) -> None:
         """Clear video if video is down; update video if video is alive."""
@@ -1385,6 +1400,26 @@ class UIController:
         # Video is connected, update it
         else:
             video.setPixmap(frame)
+
+    def _update_video_overlay(self) -> None:
+        """Set recording symbol visible when settings.RECORD_CLIPS is True."""
+        video_overlay = self._main_window.video_overlay
+
+        if settings.get_bool("SHOW_MIN_VIEW"):
+            video_overlay.setVisible(False)
+        else:
+            program_directory = os.path.dirname(os.path.abspath(__file__))
+            if self._record_clips_enabled:
+                image = f"{program_directory}/../../resources/record_active.png"
+            else:
+                image = f"{program_directory}/../../resources/record_idle.png"
+            pixmap = QPixmap(image).scaled(
+                video_overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            video_overlay.setPixmap(pixmap)
+
+            visible = settings.get_bool("RECORD_CLIPS")
+            video_overlay.setVisible(visible)
 
     def _update_video_title(self) -> None:
         """Adjust video title depending on whether video is alive."""
@@ -1436,6 +1471,7 @@ class UIController:
         if self._splitter.capture_thread.is_alive():
 
             video_display = self._main_window.video_display
+            video_overlay = self._main_window.video_overlay
 
             # Clicked and hovered
             if video_display.clicked and video_display.hovered:
@@ -1447,6 +1483,7 @@ class UIController:
                 # Move image down / right a little bit to make it look clicked
                 if not video_display.adjusted:
                     video_display.move(video_display.x() + 1, video_display.y() + 1)
+                    video_overlay.move(video_overlay.x() + 1, video_overlay.y() + 1)
                     video_display.adjusted = True
 
             # Clicked or hovered, but not both
@@ -1461,12 +1498,14 @@ class UIController:
                 # Move the image back to its original spot
                 if video_display.adjusted:
                     video_display.move(video_display.x() - 1, video_display.y() - 1)
+                    video_overlay.move(video_overlay.x() - 1, video_overlay.y() - 1)
                     video_display.adjusted = False
 
             # Not clicked or hovered (just move it back)
             else:
                 if video_display.adjusted:
                     video_display.move(video_display.x() - 1, video_display.y() - 1)
+                    video_overlay.move(video_overlay.x() - 1, video_overlay.y() - 1)
                     video_display.adjusted = False
 
         return style_sheet
@@ -1723,7 +1762,7 @@ class UIController:
             else:
                 self._main_window.screenshot_button.setEnabled(False)
 
-            # Disable split, undo, skip, previous, next split, pause
+            # Disable split, undo, skip, previous, next split, pause, record
             self._split_hotkey_enabled = False
             self._undo_hotkey_enabled = False
             self._skip_hotkey_enabled = False
@@ -1732,6 +1771,7 @@ class UIController:
             self._main_window.previous_button.setEnabled(False)
             self._main_window.next_button.setEnabled(False)
             self._main_window.pause_button.setEnabled(False)
+            self._record_clips_enabled = False
 
         else:
             loop = self._splitter.splits.current_loop
@@ -1769,6 +1809,15 @@ class UIController:
                 self._main_window.skip_button.setEnabled(True)
                 self._main_window.next_button.setEnabled(True)
 
+            # Enable record if we're not on the very first split image /
+            # finished with the last split
+            if self._splitter.compare_thread.is_alive() and not (
+                current_split_index == 0 and loop == 1
+            ):
+                self._record_clips_enabled = True
+            else:
+                self._record_clips_enabled = False
+
     def _null_match_percent_string(self, decimals: int) -> None:
         """Return a string representing a blank match percent with the number
         of decimal places the user chooses in settings.
@@ -1786,7 +1835,7 @@ class UIController:
         return match_percent_string
 
     def _get_interval(self) -> int:
-        """Calculate the rate at which _poller should poll.
+        """Calculate the rate at which poller should poll.
 
         The minimum is 20 Hz (represented by the 50 ms value below). Any
         slower than 20 Hz and the UI starts to look pretty bad.
@@ -1797,18 +1846,6 @@ class UIController:
             int: The amount of time in ms the poller waits between calls.
         """
         return min(1000 // settings.get_int("FPS"), 50)
-
-    ###########################
-    #                         #
-    # Update UI from Keyboard #
-    #                         #
-    ###########################
-
-    def _update_from_keyboard(self) -> None:
-        """Use flags set in _handle_key_press to split and do other actions."""
-        self._react_to_hotkey_flags()
-        self._react_to_settings_menu_flags()
-        self._react_to_split_flags()
 
     def _handle_key_press(
         self, key: Union["pynput.keyboard.key", "keyboard.KeyboardEvent"]

@@ -137,6 +137,9 @@ style_sheet_dark = Template(
         background: #555555;
         border: 1px solid $text_and_borders;
     }
+    QLabel#video_overlay {
+        background-color: transparent;
+    }
     QLabel#image_label {
         background: #555555;
         border: 1px solid $text_and_borders;
@@ -252,6 +255,9 @@ style_sheet_light = Template(
     QLabel#video_label {
         background: #bbbbbb;
         border: 1px solid $text_and_borders;
+    }
+    QLabel#video_overlay {
+        background-color: transparent;
     }
     QLabel#image_label {
         background: #bbbbbb;

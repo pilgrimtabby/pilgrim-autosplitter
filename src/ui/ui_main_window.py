@@ -31,11 +31,12 @@ should be provided in a controller class.
 """
 
 
+import os
 import platform
 from typing import Optional
 
 from PyQt5.QtCore import QRect, Qt, pyqtSignal
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtGui import QMouseEvent, QPixmap
 from PyQt5.QtWidgets import (
     QAction,
     QLabel,
@@ -262,6 +263,12 @@ class UIMainWindow(QMainWindow):
         self.video_display.setAlignment(Qt.AlignCenter)
         self.video_display.setObjectName("video_label")
         self.video_display_txt = "No video feed detected"
+
+        self.video_overlay = QLabel(self._container)
+        self.video_overlay.setAlignment(Qt.AlignCenter)
+        self.video_overlay.setObjectName("video_overlay")
+        self.video_overlay.setVisible(False)
+        self.video_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
         #########################
         #                       #
