@@ -1476,10 +1476,13 @@ class UIController:
             video.setPixmap(frame)
 
     def _update_video_record_overlay(self) -> None:
-        """Set recording symbol visible when settings.RECORD_CLIPS is True."""
+        """Set recording symbol visible when settings.RECORD_CLIPS is True and
+        video is on.
+        """
         overlay = self._main_window.video_record_overlay
+        video_on = self._splitter.capture_thread.is_alive()
 
-        if settings.get_bool("SHOW_MIN_VIEW"):
+        if settings.get_bool("SHOW_MIN_VIEW") or not video_on:
             overlay.setVisible(False)
         else:
             program_directory = os.path.dirname(os.path.abspath(__file__))
