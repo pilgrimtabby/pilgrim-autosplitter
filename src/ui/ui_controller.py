@@ -175,8 +175,12 @@ class UIController:
         self._main_window.split_dir_button.clicked.connect(self._set_split_dir_path)
 
         # Video feed
-        self._main_window.video_display.valid_single_click.connect(self._toggle_record_clips)
-        self._main_window.video_display.valid_double_click.connect(self._set_record_dir_path)
+        self._main_window.video_display.valid_single_click.connect(
+            self._toggle_record_clips
+        )
+        self._main_window.video_display.valid_double_click.connect(
+            self._set_record_dir_path
+        )
 
         # Minimal view / full view button
         self._main_window.min_view_button.clicked.connect(
@@ -481,7 +485,27 @@ class UIController:
             self._request_reset_splits()
 
     def _set_record_dir_path(self) -> None:
-        pass
+        """Prompt the user to select a recordings directory.
+
+        If the directory exists and is different from the last one, check if
+        the dir is within the user's home directory. If not, show an error msg
+        and re-run the method.
+
+        Otherwise, change `LAST_RECORD_DIR` to the new choice.
+        """
+        path = QFileDialog.getExistingDirectory(
+            self._main_window,
+            "Select recordings folder",
+            settings.get_str("LAST_RECORD_DIR"),
+        )
+        if len(path) > 1 and path != settings.get_str("LAST_RECORD_DIR"):
+            if not path.startswith(settings.get_home_dir()):
+                msg = self._main_window.err_invalid_dir_msg
+                msg.setStyleSheet(self._get_style_sheet())
+                msg.show()
+                return self._set_record_dir_path()
+
+            settings.set_value("LAST_RECORD_DIR", path)
 
     def _set_split_directory_box_text(self) -> None:
         """Convert the split image directory path to an elided string,
@@ -903,7 +927,7 @@ class UIController:
 
     def _get_style_sheet(self) -> str:
         """Retrieve the style sheet currently in use.
-        
+
         Returns:
             str: The style sheet.
         """
@@ -920,9 +944,11 @@ class UIController:
             old_setting = settings.get_bool("RECORD_CLIPS")
             settings.set_value("RECORD_CLIPS", not old_setting)
 
-            # Show "double click for dest." msg if turning record on
+            # Show recordings dest. hint when turned on
             if old_setting is False:
-                pass
+                self._main_window.video_info_overlay.set_text(
+                    "Double click to change recordings folder"
+                )
 
     def _set_main_window_layout(self) -> None:
         """Set the size, location, and visibility of the main window's widgets
@@ -1074,6 +1100,9 @@ class UIController:
         self._main_window.video_record_overlay.setGeometry(
             QRect(497 + left, 329 + top, 24, 24)
         )
+        self._main_window.video_info_overlay.setGeometry(
+            QRect(65 + left, 633 + top, 455, 30)
+        )
 
         split_image_geometry = QRect(550 + left, 310 + top, 480, 360)
         self._main_window.split_display.setGeometry(split_image_geometry)
@@ -1156,6 +1185,9 @@ class UIController:
         )
         self._main_window.video_record_overlay.setGeometry(
             QRect(351 + left, 323 + top, 16, 16)
+        )
+        self._main_window.video_info_overlay.setGeometry(
+            QRect(62 + left, 515 + top, 310, 30)
         )
 
         split_image_geometry = QRect(390 + left, 310 + top, 320, 240)
@@ -1240,6 +1272,9 @@ class UIController:
         self._main_window.video_record_overlay.setGeometry(
             QRect(542 + left, 321 + top, 19, 19)
         )
+        self._main_window.video_info_overlay.setGeometry(
+            QRect(65 + left, 561 + top, 493, 30)
+        )
 
         split_image_geometry = QRect(582 + left, 310 + top, 512, 288)
         self._main_window.split_display.setGeometry(split_image_geometry)
@@ -1323,6 +1358,9 @@ class UIController:
         self._main_window.video_record_overlay.setGeometry(
             QRect(467 + left, 319 + top, 16, 16)
         )
+        self._main_window.video_info_overlay.setGeometry(
+            QRect(62 + left, 519 + top, 422, 30)
+        )
 
         split_image_geometry = QRect(502 + left, 310 + top, 432, 243)
         self._main_window.split_display.setGeometry(split_image_geometry)
@@ -1388,6 +1426,7 @@ class UIController:
         self._main_window.screenshot_button.setVisible(visible)
         self._main_window.reconnect_button.setVisible(visible)
         self._main_window.video_display.setVisible(visible)
+        self._main_window.video_info_overlay.setVisible(visible)
         self._main_window.split_display.setVisible(visible)
         # Only display this when the other widgets are hidden
         self._main_window.split_info_min_label.setVisible(not visible)
@@ -1487,7 +1526,7 @@ class UIController:
     def _update_split_and_video_css(self) -> None:
         """Generate new style sheet based on mouse interation with video feed
         and split image.
-        """     
+        """
         base_style = self._get_style_sheet()
         style_sheet = self._update_video_feed_css(base_style)
         style_sheet = self._update_split_image_css(style_sheet)

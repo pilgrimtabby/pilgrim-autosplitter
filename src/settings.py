@@ -141,7 +141,7 @@ def set_program_vals(settings: QSettings = settings) -> None:
 
     Populates settings with default values if they have not yet been set.
 
-    Ensures that LAST_IMAGE_DIR points to an existing path.
+    Ensures that LAST_IMAGE_DIR and LAST_RECORD_DIR point to existing paths.
 
     Ensures that the program starts in full view if START_WITH_VIDEO is false,
     since the user would have to exit minimal view to turn the video on anyway.
@@ -183,6 +183,9 @@ def set_program_vals(settings: QSettings = settings) -> None:
         # The location of split images
         set_value("LAST_IMAGE_DIR", home_dir, settings)
 
+        # The location of recordings
+        set_value("LAST_RECORD_DIR", home_dir, settings)
+
         # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
         set_value("OPEN_SCREENSHOT_ON_CAPTURE", False, settings)
@@ -223,6 +226,12 @@ def set_program_vals(settings: QSettings = settings) -> None:
     last_image_dir = get_str("LAST_IMAGE_DIR", settings)
     if not last_image_dir.startswith(home_dir) or not Path(last_image_dir).is_dir():
         set_value("LAST_IMAGE_DIR", home_dir, settings)
+
+    # Make sure recordings dir exists and is within the user's home dir
+    # (This limits i/o to user-controlled areas)
+    last_record_dir = get_str("LAST_RECORD_DIR", settings)
+    if not last_record_dir.startswith(home_dir) or not Path(last_record_dir).is_dir():
+        set_value("LAST_RECORD_DIR", home_dir, settings)
 
     # Always start in full view if video doesn't come on automatically
     if not get_bool("START_WITH_VIDEO", settings):

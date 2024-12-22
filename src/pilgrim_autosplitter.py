@@ -125,5 +125,6 @@ def main():
     print("Starting...")
     pilgrim_autosplitter.app.exec()
 
+
 if __name__ == "__main__":
     main()

@@ -33,11 +33,20 @@ should be provided in a controller class.
 import platform
 from typing import Optional
 
-from PyQt5.QtCore import pyqtSignal, QEvent, QObject, QRect, Qt, QTimer
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtCore import (
+    pyqtSignal,
+    QEvent,
+    QObject,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QTimer,
+)
+from PyQt5.QtGui import QColor, QMouseEvent, QPaintEvent, QPainter, QPen, QPainterPath
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
+    QGraphicsOpacityEffect,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -274,8 +283,8 @@ class UIMainWindow(QMainWindow):
         self.video_record_overlay.setVisible(False)
         self.video_record_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
-        self.video_info_overlay = QLabel(self._container)
-        self.video_info_overlay.setAlignment(Qt.AlignCenter)
+        self.video_info_overlay = PaintedQLabel(self._container)
+        self.video_info_overlay.setAlignment(Qt.AlignLeft)
         self.video_info_overlay.setObjectName("video_overlay")
         self.video_info_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
@@ -599,6 +608,89 @@ class UIMainWindow(QMainWindow):
         return False
 
 
+class PaintedQLabel(QLabel):
+    """QLabel whose text is outlined in black and fades after 3 seconds.
+
+    Attributes:
+        fade_effect (QGraphicsOpacityEffect): Allows changing the widget's
+            opacity. Set to 0.7 by default, so we need to manually set it to 1
+            (completely opaque).
+        fade_animation (QPropertyAnimation): Animation that, when started,
+            fades the text out.
+        fade_timer (QTimer): Used to fade out the text 3 seconds after the most
+            recent text is set.
+    """
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Inherit from QLabel and set up the attributes.
+
+        Args:
+            parent (QLabel, optional): The parent class. Defaults to None.
+        """
+        QLabel.__init__(self, parent)
+
+        self._fade_effect = QGraphicsOpacityEffect()
+        self._fade_effect.setOpacity(1)
+        self.setGraphicsEffect(self._fade_effect)
+
+        self._fade_animation = QPropertyAnimation(self._fade_effect, b"opacity")
+        self._fade_animation.setDuration(1000)
+        self._fade_animation.setStartValue(1)
+        self._fade_animation.setEndValue(0)
+
+        self._fade_timer = QTimer()
+        self._fade_timer.setSingleShot(True)
+        self._fade_timer.setInterval(3000)
+        self._fade_timer.timeout.connect(self._fade_animation.start)
+
+    def paintEvent(self, event: Optional[QPaintEvent]):
+        """Paint a black outline around this widget's (white) text.
+
+        Args:
+            event (Optional[QPaintEvent]): The paint event.
+        """
+        # Initialize painter
+        painter = QPainter()
+        painter.begin(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Create path and add current text
+        painter_path = QPainterPath()
+        painter_path.addText(
+            10, self.height() - 10, self.font(), self._get_elided_text()
+        )
+
+        # Paint around text (black), then draw the text inside (white).
+        # The "5" value refers to the thickness of the outline.
+        painter.strokePath(painter_path, QPen(QColor(0, 0, 0), 5))
+        painter.fillPath(painter_path, QColor(255, 255, 255))
+
+    def set_text(self, text) -> None:
+        """Call setText while also stopping fade and restarting the timer.
+
+        Args:
+            text (str): The text to put into this widget.
+        """
+        # Stop fading and make the text opaque
+        self._fade_timer.stop()
+        self._fade_animation.stop()
+        self._fade_effect.setOpacity(1)
+
+        # Set the text and restart the fade timer
+        self.setText(text)
+        self._fade_timer.start()
+
+    def _get_elided_text(self) -> str:
+        """Right-elide text to the width of this widget.
+
+        Returns:
+            str: The elided text.
+        """
+        return self.fontMetrics().elidedText(
+            self.text(), Qt.ElideRight, self.width() - 10
+        )
+
+
 class ClickableQLabel(QLabel):
     """QLabel with additional flags indicating whether it is being clicked and/
     or hovered by the mouse.
@@ -661,7 +753,10 @@ class ClickableQLabel(QLabel):
         if event.button() == Qt.LeftButton:
             self.clicked = True
             self.double_click = False
-            QTimer.singleShot(QApplication.doubleClickInterval(), lambda event=event: self.mouseSingleClickEvent(event))
+            QTimer.singleShot(
+                QApplication.doubleClickInterval(),
+                lambda event=event: self.mouseSingleClickEvent(event),
+            )
 
     def mouseSingleClickEvent(self, event: Optional[QMouseEvent]) -> None:
         """Emit valid_single_click if a single left mouse click is released
@@ -717,7 +812,7 @@ class ClickableQLabel(QLabel):
                     self.valid_single_click.emit()
 
             elif self.double_click and event.pos() in self.rect():
-                    self.valid_double_click.emit()
+                self.valid_double_click.emit()
 
     def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
         """Track whether the clicked mouse is inside the widget's bounds.
