@@ -132,11 +132,10 @@ class UIController:
         self._hotkey_box_key_name = None
         self._hotkey_box_lock = Lock()
 
-        # Flags to disable hotkeys and recording
+        # Flags to disable hotkeys
         self._split_hotkey_enabled = False
         self._undo_hotkey_enabled = False
         self._skip_hotkey_enabled = False
-        self._record_clips_enabled = False
 
         # Flags for detecting hotkey presses
         self._split_hotkey_pressed = False
@@ -366,6 +365,9 @@ class UIController:
         the split image, then unset changing_splits, which signals to splitter
         it can reset its flags.
         """
+        # Kill recording
+        self._splitter.safe_exit_record_thread()
+
         self._redraw_split_labels = True  # Make sure UI image is updated
 
         # Go to next split, no need to worry about flags / thread safety
@@ -383,6 +385,9 @@ class UIController:
                 time.sleep(0.001)
             self._splitter.splits.previous_split_image()
             self._splitter.changing_splits = False
+
+        # Restart recording
+        self._splitter.restart_record_thread()
 
     def _request_next_split(self) -> None:
         """Tell splitter.splits to call next_split_image, and ask
@@ -409,7 +414,11 @@ class UIController:
         the thread down on accident, so we also check if this method is being
         called as the result of a hotkey press.
         """
-        # Kill splitter threads instead if we're on the last split
+        # Kill recording (if not going to next split because of dummy image)
+        if not self._splitter.continue_recording:
+            self._splitter.safe_exit_record_thread()
+
+        # Kill splitter threads if we're on the last split
         # (This call must be the result of a split key hotpress)
         # (See docstring)
         split_index = self._splitter.splits.current_image_index
@@ -443,6 +452,12 @@ class UIController:
             self._splitter.splits.next_split_image()
             self._splitter.changing_splits = False
 
+        # Restart recording (if not going to next split because of dummy image)
+        if self._splitter.continue_recording:
+            self._splitter.continue_recording = False
+        else:
+            self._splitter.restart_record_thread()
+
     def _request_reset_splits(self) -> None:
         """Tell splitter.splits to call reset_split_images, and ask
         splitter._look_for_split to reset its flags if necessary.
@@ -452,6 +467,9 @@ class UIController:
         directory, for example). Restarts the threads if the split list isn't
         empty and if video is running.
         """
+        # Kill recording
+        self._splitter.safe_exit_record_thread()
+
         self._redraw_split_labels = True
         self._splitter.safe_exit_record_thread()
         self._splitter.safe_exit_compare_split_thread()
@@ -461,10 +479,13 @@ class UIController:
             len(self._splitter.splits.list) > 0
             and self._splitter.capture_thread.is_alive()
         ):
-            self._splitter.start_record_thread()
-            self._splitter.start_compare_split_thread()
+            self._splitter.restart_record_thread()
+            self._splitter.restart_compare_split_thread()
             if self._splitter.splits.reset_image is not None:
-                self._splitter.start_compare_reset_thread()
+                self._splitter.restart_compare_reset_thread()
+
+        # Restart recording
+        self._splitter.restart_record_thread()
 
     def _set_split_dir_path(self) -> None:
         """Prompt the user to select a split image directory, then open the new
@@ -1510,7 +1531,7 @@ class UIController:
                     overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
                 )
 
-            if self._record_clips_enabled:
+            if self._splitter.recording_enabled:
                 pixmap = self._record_active_pixmap
             else:
                 pixmap = self._record_idle_pixmap
@@ -1876,7 +1897,7 @@ class UIController:
             self._main_window.previous_button.setEnabled(False)
             self._main_window.next_button.setEnabled(False)
             self._main_window.pause_button.setEnabled(False)
-            self._record_clips_enabled = False
+            self._splitter.recording_enabled = False
 
         else:
             loop = self._splitter.splits.current_loop
@@ -1919,9 +1940,9 @@ class UIController:
             if self._splitter.compare_split_thread.is_alive() and not (
                 current_split_index == 0 and loop == 1
             ):
-                self._record_clips_enabled = True
+                self._splitter.recording_enabled = True
             else:
-                self._record_clips_enabled = False
+                self._splitter.recording_enabled = False
 
     def _null_match_percent_string(self, decimals: int) -> None:
         """Return a string representing a blank match percent with the number
@@ -2047,6 +2068,9 @@ class UIController:
         it is always enabled, even when global hotkeys are disabled and the
         program isn't in focus. This is to make it easy for the user to enable/
         disable global hotkeys without having to click the app back in focus.
+
+        Pressing the split hotkey also sets a flag telling _record to save its
+        current recording.
         """
         global_hotkeys_enabled = settings.get_bool("GLOBAL_HOTKEYS_ENABLED")
         hotkey_presses_allowed = (
@@ -2059,6 +2083,7 @@ class UIController:
 
         elif self._split_hotkey_pressed:
             if self._split_hotkey_enabled and hotkey_presses_allowed:
+                self._splitter.save_recording = True
                 self._request_next_split()
             self._split_hotkey_pressed = False
 

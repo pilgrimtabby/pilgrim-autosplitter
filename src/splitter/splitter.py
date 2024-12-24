@@ -28,6 +28,8 @@
 
 """Capture video and compare it to a template image."""
 
+from datetime import datetime
+import pathlib
 import platform
 from queue import Full, Queue
 import threading
@@ -121,6 +123,9 @@ class Splitter:
         self._record_queue = Queue(10)  # Number doesn't matter, should be small
         self.record_thread = threading.Thread(target=self._record)
         self._record_thread_finished = False
+        self.save_recording = False
+        self.continue_recording = False
+        self.recording_enabled = False
 
         # compare_split_thread
         self._compare_split_queue = Queue(10)
@@ -157,14 +162,14 @@ class Splitter:
         """Start capture_thread and try to start the other threads, killing all
         other instances of those threads first.
         """
-        self._start_capture_thread()
+        self._restart_capture_thread()
 
         if len(self.splits.list) > 0:
-            self.start_record_thread()
-            self.start_compare_split_thread()
+            self.restart_record_thread()
+            self.restart_compare_split_thread()
 
             if self.splits.reset_image is not None:
-                self.start_compare_reset_thread()
+                self.restart_compare_reset_thread()
 
     def safe_exit_all_threads(self) -> None:
         """Safely kill capture_thread.
@@ -175,7 +180,7 @@ class Splitter:
         if self.capture_thread.is_alive():
             self.capture_thread.join()
 
-    def start_record_thread(self) -> None:
+    def restart_record_thread(self) -> None:
         """Safely start record_thread (killing all other instances first)."""
         self.safe_exit_record_thread()
 
@@ -187,7 +192,7 @@ class Splitter:
         self.record_thread.daemon = True
         self.record_thread.start()
 
-    def start_compare_split_thread(self) -> None:
+    def restart_compare_split_thread(self) -> None:
         """Safely start compare_split_thread (killing all other instances
         first).
         """
@@ -202,7 +207,7 @@ class Splitter:
         self.compare_split_thread.daemon = True
         self.compare_split_thread.start()
 
-    def start_compare_reset_thread(self) -> None:
+    def restart_compare_reset_thread(self) -> None:
         """Safely start compare_reset_thread (killing all other instances
         first).
         """
@@ -297,8 +302,8 @@ class Splitter:
         return found_valid_source
 
     def toggle_suspended(self) -> None:
-        """Stop the compare and record threads, then start them if the splitter
-        was suspended and there are splits.
+        """Stop the compare threads, then start them if the splitter was
+        suspended and there are splits.
 
         Use self.match_percent, since it will never be None if
         compare_split_thread is alive AND not suspended, which is the condition
@@ -306,15 +311,13 @@ class Splitter:
         """
         current_match_percent = self.match_percent
 
-        self.safe_exit_record_thread()
         self.safe_exit_compare_split_thread()
         self.safe_exit_compare_reset_thread()
 
         if current_match_percent is None and len(self.splits.list) > 0:
-            self.start_compare_split_thread()
-            self.start_record_thread()
+            self.restart_compare_split_thread()
             if self.splits.reset_image is not None:
-                self.start_compare_reset_thread()
+                self.restart_compare_reset_thread()
 
     ##################################
     #                                #
@@ -322,7 +325,7 @@ class Splitter:
     #                                #
     ##################################
 
-    def _start_capture_thread(self) -> None:
+    def _restart_capture_thread(self) -> None:
         """Safely start capture_thread (killing all other instances first)."""
         self.safe_exit_all_threads()
 
@@ -585,8 +588,103 @@ class Splitter:
     #                               #
     #################################
 
-    def _record(self) -> None:
-        pass
+    def _record(
+        self,
+        output_path: Optional[str] = None,
+        fps: Optional[float] = None,
+        recordings_dir: Optional[str] = None,
+    ) -> None:
+        """Record and save clips of each completed split.
+
+        When this method ends, it erases the recording it made unless flags are
+        set somewhere else.
+
+        If no arguments are supplied, those arguments are generated in the
+        method. They should only be supplied when continuing, not restarting, a
+        recording.
+
+        Framerate used is necessarily somewhat of a guess.
+
+        Args:
+            output_path (str, optional): The path to write the video to.
+                Defaults to None.
+            fps (float, optional): The FPS at which to save the video. Defaults
+                to None.
+            recordings_dir (str, optional): The directory that holds the
+                recordings. Defaults to None.
+        """
+        # Wait for recording to become enabled
+        while not (self.recording_enabled and settings.get_bool("RECORD_CLIPS")):
+            time.sleep(0.01)
+            if self._record_thread_finished:
+                return
+
+        # Unset flags
+        self.save_recording = False
+        self.continue_recording = False
+
+        # Create output if none supplied
+        if output_path is None:
+            fps = min(self._cap.get(cv2.CAP_PROP_FPS), self.target_fps)
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            recordings_dir = settings.get_str("LAST_RECORD_DIR")
+            timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
+            output_path = f"{recordings_dir}/{timestamp}.mp4"
+            output = cv2.VideoWriter(
+                output_path,
+                fourcc,
+                fps,
+                (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
+            )
+
+            # Get rid of (potentially very old) images
+            self._record_queue = Queue(10)
+
+        # Record each frame
+        while not self._record_thread_finished:
+
+            # Delete + restart recording if:
+            # Recording isn't enabled anymore
+            # FPS has changed (messes with saving)
+            # Output path has changed
+            if (
+                not (self.recording_enabled and settings.get_bool("RECORD_CLIPS"))
+                or fps != min(self._cap.get(cv2.CAP_PROP_FPS), self.target_fps)
+                or recordings_dir != settings.get_str("LAST_RECORD_DIR")
+            ):
+                self._delete_video(output_path)
+                return self._record()
+
+            # Save the frame
+            frame = self._record_queue.get()
+            if frame is not None:
+                output.write(frame)
+
+        # Broken loop caused by normal or pause split / split hotkey
+        # (end recording, don't delete)
+        if self.save_recording:
+            self.save_recording = False
+
+        # Broken loop caused by dummy split (keep recording same video)
+        elif self.continue_recording:
+            self.continue_recording = False
+            self._record(output_path, fps, recordings_dir)
+
+        # Broken loop caused by any other split image change, program closing,
+        # or anything else (end recording, delete video)
+        else:
+            self._delete_video(output_path)
+
+    def _delete_video(self, video_path: str) -> None:
+        """Delete the video file at video_path.
+
+        No error is thrown if the video file doesn't exist.
+
+        Args:
+            video_path (str): Path to the video.
+        """
+        video = pathlib.Path(video_path)
+        video.unlink(missing_ok=True)
 
     ########################################
     #                                      #
@@ -750,7 +848,8 @@ class Splitter:
         """Handle the events immediately before, during, and after a split.
 
         The various flags set by this method are read by ui_controller, which
-        references them to update the UI and send hotkey presses.
+        references them to update the UI and send hotkey presses. Flags for
+        _record are also set.
 
         Returns:
             bool: True if the thread wasn't killed / if this isn't the last
@@ -792,11 +891,20 @@ class Splitter:
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
+
+        # Pause split; make sure recording is saved
         if split_image.pause_flag:
+            self.save_recording = True
             self.pause_split_action = True
+
+        # Dummy split; make sure recording doesn't stop
         elif split_image.dummy_flag:
+            self.continue_recording = True
             self.dummy_split_action = True
+
+        # Normal split; make sure recording is saved
         else:
+            self.save_recording = True
             self.normal_split_action = True
 
         # Don't pause splitter after very last split, just exit
