@@ -117,6 +117,14 @@ class UIController:
         # match percent
         self._show_reset_percents = False
 
+        # Only update main_window's style sheet when it has changed
+        self._most_recent_style_sheet = None
+
+        # Only resize record icon when aspect ratio changes
+        self._resize_record_icon = False
+        self._record_active_pixmap = None
+        self._record_idle_pixmap = None
+
         # Values for updating hotkeys in settings menu
         # (see _react_to_settings_menu_flags)
         self._hotkey_box_to_change = None
@@ -194,19 +202,13 @@ class UIController:
         self._main_window.next_source_button.clicked.connect(
             self._splitter.set_next_capture_index
         )
-        self._main_window.next_source_button.clicked.connect(
-            self._splitter.safe_exit_all_threads
-        )
-        self._main_window.next_source_button.clicked.connect(self._splitter.start)
+        self._main_window.next_source_button.clicked.connect(self._splitter.restart)
 
         # Screenshot button
         self._main_window.screenshot_button.clicked.connect(self._take_screenshot)
 
         # Reload video button
-        self._main_window.reconnect_button.clicked.connect(
-            self._splitter.safe_exit_all_threads
-        )
-        self._main_window.reconnect_button.clicked.connect(self._splitter.start)
+        self._main_window.reconnect_button.clicked.connect(self._splitter.restart)
 
         # Pause comparison / unpause comparison button
         self._main_window.pause_button.clicked.connect(self._splitter.toggle_suspended)
@@ -349,16 +351,16 @@ class UIController:
             self._request_reset_splits()
 
     def _request_previous_split(self) -> None:
-        """Tell `splitter.splits` to call `previous_split_image`, and ask
-        splitter._look_for_match to reset its flags if needed.
+        """Tell splitter.splits to call previous_split_image and ask
+        splitter._look_for_split to reset its flags if needed.
 
         If self._splitter.match_percent is None, this means that
-        splitter.look_for_match isn't active, and we can move to the next split
-        image without causing a segmentation error or breaking splitter flags.
+        splitter.look_for_split isn't active, and we can move to the next split
+        image without causing a segmentation fault or breaking splitter flags.
 
-        Otherwise, we know look_for_match is active, and we need to (1) pause
+        Otherwise, we know look_for_split is active, and we need to (1) pause
         it while we change split images for thread safety, then (2) reset its
-        flags. We do this (or at least try to for 1 second) by by setting the
+        flags. We do this (or at least try to for 1 second) by setting the
         splitter.changing_splits flag, waiting for splitter to confirm it's
         paused (splitter sets its waiting_for_split_change flag). We change
         the split image, then unset changing_splits, which signals to splitter
@@ -370,7 +372,7 @@ class UIController:
         if self._splitter.match_percent is None:
             self._splitter.splits.previous_split_image()
 
-        # Pause splitter._look_for_match before getting next split
+        # Pause splitter._look_for_split before getting next split
         else:
             start_time = time.perf_counter()
             self._splitter.changing_splits = True
@@ -383,14 +385,14 @@ class UIController:
             self._splitter.changing_splits = False
 
     def _request_next_split(self) -> None:
-        """Tell `splitter.splits` to call `next_split_image`, and ask
-        splitter._look_for_match to reset its flags if needed.
+        """Tell splitter.splits to call next_split_image, and ask
+        splitter._look_for_split to reset its flags if needed.
 
         If self._splitter.match_percent is None, this means that
-        splitter.look_for_match isn't active, and we can move to the next split
-        image without causing a segmentation error or breaking splitter flags.
+        splitter.look_for_split isn't active, and we can move to the next split
+        image without causing a segmentation fault or breaking splitter flags.
 
-        Otherwise, we know look_for_match is active, and we need to (1) pause
+        Otherwise, we know look_for_split is active, and we need to (1) pause
         it while we change split images for thread safety, then (2) reset its
         flags. We do this (or at least try to for 1 second) by by setting the
         splitter.changing_splits flag, waiting for splitter to confirm it's
@@ -398,16 +400,16 @@ class UIController:
         the split image, then unset changing_splits, which signals to splitter
         it can reset its flags.
 
-        This method also kills compare_thread if we're on the last loop of the
-        last split when this method is called. The idea is that when the run is
-        over, the comparer stops until the user presses reset or unpauses.
-        However, this only should happen if the last split is accessed by
-        pressing the split hotkey or if the program found a match, so that
+        This method also kills the splitter's non-capture threads if we're on the
+        last loop of the last split when this method is called, because if the
+        run is over, the comparer stops until the user presses reset or
+        unpauses. However, this only should happen if the last split is accessed
+        by pressing the split hotkey or if the program found a match, so that
         users can still scroll back and forth between splits without shutting
         the thread down on accident, so we also check if this method is being
         called as the result of a hotkey press.
         """
-        # Kill compare_thread instead if we're on the last split
+        # Kill splitter threads instead if we're on the last split
         # (This call must be the result of a split key hotpress)
         # (See docstring)
         split_index = self._splitter.splits.current_image_index
@@ -419,7 +421,9 @@ class UIController:
             and loop == total_loops
             and self._split_hotkey_pressed
         ):
-            self._splitter.safe_exit_compare_thread()
+            self._splitter.safe_exit_record_thread()
+            self._splitter.safe_exit_compare_split_thread()
+            self._splitter.safe_exit_compare_reset_thread()
             return
 
         self._redraw_split_labels = True  # Make sure UI image is updated
@@ -427,7 +431,7 @@ class UIController:
         if self._splitter.match_percent is None:
             self._splitter.splits.next_split_image()
 
-        # Pause splitter._look_for_match before getting next split
+        # Pause splitter._look_for_split before getting next split
         else:
             start_time = time.perf_counter()
             self._splitter.changing_splits = True
@@ -440,22 +444,27 @@ class UIController:
             self._splitter.changing_splits = False
 
     def _request_reset_splits(self) -> None:
-        """Tell `splitter.splits` to call `reset_split_images`, and ask
-        splitter._look_for_match to reset its flags if necessary.
+        """Tell splitter.splits to call reset_split_images, and ask
+        splitter._look_for_split to reset its flags if necessary.
 
-        Kills `splitter.compare_thread` (this allows the splitter to exit
+        Kill splitter's non-capture threads (this allows the splitter to exit
         gracefully if the split image directory has changed to an empty
-        directory, for example). Restarts the thread if the split list isn't
+        directory, for example). Restarts the threads if the split list isn't
         empty and if video is running.
         """
         self._redraw_split_labels = True
-        self._splitter.safe_exit_compare_thread()
+        self._splitter.safe_exit_record_thread()
+        self._splitter.safe_exit_compare_split_thread()
+        self._splitter.safe_exit_compare_reset_thread()
         self._splitter.splits.reset_split_images()
         if (
             len(self._splitter.splits.list) > 0
             and self._splitter.capture_thread.is_alive()
         ):
-            self._splitter.start_compare_thread()
+            self._splitter.start_record_thread()
+            self._splitter.start_compare_split_thread()
+            if self._splitter.splits.reset_image is not None:
+                self._splitter.start_compare_reset_thread()
 
     def _set_split_dir_path(self) -> None:
         """Prompt the user to select a split image directory, then open the new
@@ -969,6 +978,8 @@ class UIController:
 
         # Split labels will be refreshed after this call finishes
         self._redraw_split_labels = True
+        # Video overlay icon will be resized after this call finishes
+        self._resize_record_icon = True
         # Refresh the split directory text so it elides correctly
         self._set_split_directory_box_text()
 
@@ -1101,7 +1112,7 @@ class UIController:
             QRect(497 + left, 329 + top, 24, 24)
         )
         self._main_window.video_info_overlay.setGeometry(
-            QRect(65 + left, 633 + top, 455, 30)
+            QRect(75 + left, 638 + top, 455, 30)
         )
 
         split_image_geometry = QRect(550 + left, 310 + top, 480, 360)
@@ -1187,7 +1198,7 @@ class UIController:
             QRect(351 + left, 323 + top, 16, 16)
         )
         self._main_window.video_info_overlay.setGeometry(
-            QRect(62 + left, 515 + top, 310, 30)
+            QRect(72 + left, 520 + top, 310, 30)
         )
 
         split_image_geometry = QRect(390 + left, 310 + top, 320, 240)
@@ -1273,7 +1284,7 @@ class UIController:
             QRect(542 + left, 321 + top, 19, 19)
         )
         self._main_window.video_info_overlay.setGeometry(
-            QRect(65 + left, 561 + top, 493, 30)
+            QRect(75 + left, 566 + top, 493, 30)
         )
 
         split_image_geometry = QRect(582 + left, 310 + top, 512, 288)
@@ -1359,7 +1370,7 @@ class UIController:
             QRect(467 + left, 319 + top, 16, 16)
         )
         self._main_window.video_info_overlay.setGeometry(
-            QRect(62 + left, 519 + top, 422, 30)
+            QRect(72 + left, 524 + top, 422, 30)
         )
 
         split_image_geometry = QRect(502 + left, 310 + top, 432, 243)
@@ -1446,7 +1457,6 @@ class UIController:
         """
         self._update_video_feed()
         self._update_video_record_overlay()
-        self._update_video_info_overlay()
         self._update_video_title()
         self._update_split_and_video_css()
         self._update_split_image_labels()
@@ -1476,30 +1486,38 @@ class UIController:
             video.setPixmap(frame)
 
     def _update_video_record_overlay(self) -> None:
-        """Set recording symbol visible when settings.RECORD_CLIPS is True and
-        video is on.
-        """
+        """Show recording symbol when RECORD_CLIPS is True and video's on."""
         overlay = self._main_window.video_record_overlay
         video_on = self._splitter.capture_thread.is_alive()
 
         if settings.get_bool("SHOW_MIN_VIEW") or not video_on:
             overlay.setVisible(False)
+
         else:
-            program_directory = os.path.dirname(os.path.abspath(__file__))
+
+            # Resizing the pixmap is expensive, so only do it when
+            # aspect ratio changes
+            if self._resize_record_icon:
+                self._resize_record_icon = False
+
+                active_img = self._main_window.record_active_img
+                idle_img = self._main_window.record_idle_img
+
+                self._record_active_pixmap = QPixmap(active_img).scaled(
+                    overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+                self._record_idle_pixmap = QPixmap(idle_img).scaled(
+                    overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+
             if self._record_clips_enabled:
-                image = f"{program_directory}/../../resources/record_active.png"
+                pixmap = self._record_active_pixmap
             else:
-                image = f"{program_directory}/../../resources/record_idle.png"
-            pixmap = QPixmap(image).scaled(
-                overlay.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
+                pixmap = self._record_idle_pixmap
             overlay.setPixmap(pixmap)
 
             visible = settings.get_bool("RECORD_CLIPS")
             overlay.setVisible(visible)
-
-    def _update_video_info_overlay(self) -> None:
-        overlay = self._main_window.video_info_overlay
 
     def _update_video_title(self) -> None:
         """Adjust video title depending on whether video is alive."""
@@ -1529,11 +1547,17 @@ class UIController:
     def _update_split_and_video_css(self) -> None:
         """Generate new style sheet based on mouse interation with video feed
         and split image.
+
+        Updating the style sheet ONLY when it has changed saves a ton of CPU,
+        so we do that.
         """
         base_style = self._get_style_sheet()
         style_sheet = self._update_video_feed_css(base_style)
         style_sheet = self._update_split_image_css(style_sheet)
-        self._main_window.setStyleSheet(style_sheet)
+
+        if style_sheet != self._most_recent_style_sheet:
+            self._most_recent_style_sheet = style_sheet
+            self._main_window.setStyleSheet(style_sheet)
 
     def _update_video_feed_css(self, style_sheet: str) -> str:
         """Generate new style sheet on mouse interaction with video feed.
@@ -1891,8 +1915,8 @@ class UIController:
                 self._main_window.next_button.setEnabled(True)
 
             # Enable record if we're not on the very first split image /
-            # finished with the last split
-            if self._splitter.compare_thread.is_alive() and not (
+            # finished with the last split, and we're comparing splits
+            if self._splitter.compare_split_thread.is_alive() and not (
                 current_split_index == 0 and loop == 1
             ):
                 self._record_clips_enabled = True
@@ -1923,8 +1947,13 @@ class UIController:
 
         1000 is used because that is the number of ms in a second.
 
+        Normally it would make sense to keep the UI at a constant 60 FPS, but
+        we're letting the user throttle the framerate anyway, and throttling
+        this value can save CPU -- not a ton, but around 10% on my machine when
+        dropping from 60FPS to 20FPS for the UI loop.
+
         Returns:
-            int: The amount of time in ms the poller waits between calls.
+            int: The amount of time (ms) the poller waits between calls.
         """
         return min(1000 // settings.get_int("FPS"), 50)
 

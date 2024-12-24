@@ -30,6 +30,7 @@
 should be provided in a controller class.
 """
 
+import os
 import platform
 from typing import Optional
 
@@ -42,7 +43,7 @@ from PyQt5.QtCore import (
     Qt,
     QTimer,
 )
-from PyQt5.QtGui import QColor, QMouseEvent, QPaintEvent, QPainter, QPen, QPainterPath
+from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -283,10 +284,16 @@ class UIMainWindow(QMainWindow):
         self.video_record_overlay.setVisible(False)
         self.video_record_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
-        self.video_info_overlay = PaintedQLabel(self._container)
+        program_dir = os.path.dirname(os.path.abspath(__file__))
+        self.record_active_img = f"{program_dir}/../../resources/record_active.png"
+        self.record_idle_img = f"{program_dir}/../../resources/record_idle.png"
+
+        self.video_info_overlay = ShadowFadeQLabel(self._container)
         self.video_info_overlay.setAlignment(Qt.AlignLeft)
         self.video_info_overlay.setObjectName("video_overlay")
         self.video_info_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.video_info_overlay.set_text_color("white")
+        self.video_info_overlay.set_shadow_color("black")
 
         #########################
         #                       #
@@ -608,87 +615,148 @@ class UIMainWindow(QMainWindow):
         return False
 
 
-class PaintedQLabel(QLabel):
-    """QLabel whose text is outlined in black and fades after 3 seconds.
+class ShadowFadeQLabel(QWidget):
+    """QWidget containing 2 QLabels, both with identical text, but with
+    (optionally) different text colors to produce a drop shadow effect. Any
+    text set fades out after _text_duration ms, with an animation length of
+    _fade_duration ms.
 
-    Attributes:
-        fade_effect (QGraphicsOpacityEffect): Allows changing the widget's
-            opacity. Set to 0.7 by default, so we need to manually set it to 1
-            (completely opaque).
-        fade_animation (QPropertyAnimation): Animation that, when started,
-            fades the text out.
-        fade_timer (QTimer): Used to fade out the text 3 seconds after the most
-            recent text is set.
+    This is done because it's not natively possible to use a drop shadow effect
+    and a fade effect together for some reason.
     """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
-        """Inherit from QLabel and set up the attributes.
+        """Inherit from QWidget and set up the attributes.
 
         Args:
-            parent (QLabel, optional): The parent class. Defaults to None.
+            parent (QWidget, optional): The parent class. Defaults to None.
         """
-        QLabel.__init__(self, parent)
+        QWidget.__init__(self, parent)
 
+        # Create the two widgets that hold the text
+        self._lower_txt = QLabel(self)
+        self._upper_txt = QLabel(self)  # This one's last so it's on top
+
+        # How long the text stays on screen (ms)
+        self._text_duration = 3000
+
+        # How long the text takes to fade out (ms)
+        self._fade_duration = 1000
+
+        # Create the fade effect and animation and a timer to start it
         self._fade_effect = QGraphicsOpacityEffect()
         self._fade_effect.setOpacity(1)
         self.setGraphicsEffect(self._fade_effect)
 
         self._fade_animation = QPropertyAnimation(self._fade_effect, b"opacity")
-        self._fade_animation.setDuration(1000)
+        self._fade_animation.setDuration(self._fade_duration)
         self._fade_animation.setStartValue(1)
         self._fade_animation.setEndValue(0)
 
         self._fade_timer = QTimer()
         self._fade_timer.setSingleShot(True)
-        self._fade_timer.setInterval(3000)
+        self._fade_timer.setInterval(self._text_duration)
         self._fade_timer.timeout.connect(self._fade_animation.start)
 
-    def paintEvent(self, event: Optional[QPaintEvent]):
-        """Paint a black outline around this widget's (white) text.
+    def setAlignment(self, flag: Qt.Alignment) -> None:
+        """Make sure text alignment for the two text labels match.
 
         Args:
-            event (Optional[QPaintEvent]): The paint event.
+            flag (Qt.Alignment): The alignment flag.
         """
-        # Initialize painter
-        painter = QPainter()
-        painter.begin(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+        self._upper_txt.setAlignment(flag)
+        self._lower_txt.setAlignment(flag)
 
-        # Create path and add current text
-        painter_path = QPainterPath()
-        painter_path.addText(
-            10, self.height() - 10, self.font(), self._get_elided_text()
-        )
-
-        # Paint around text (black), then draw the text inside (white).
-        # The "5" value refers to the thickness of the outline.
-        painter.strokePath(painter_path, QPen(QColor(0, 0, 0), 5))
-        painter.fillPath(painter_path, QColor(255, 255, 255))
-
-    def set_text(self, text) -> None:
-        """Call setText while also stopping fade and restarting the timer.
+    def setObjectName(self, name: str) -> None:
+        """Make sure the object names for both parent and children match.
 
         Args:
-            text (str): The text to put into this widget.
+            name (str): The object name.
+        """
+        self._upper_txt.setObjectName(name)
+        self._lower_txt.setObjectName(name)
+        super().setObjectName(name)
+
+    def setAttribute(self, attribute: Qt.WidgetAttribute, on: bool = True) -> None:
+        """Make sure the attributes of both parent and children match.
+
+        Args:
+            attribute (Qt.WidgetAttribute): The attribute to set.
+            on (bool, optional): Whether the attribute is actually enabled.
+                Defaults to True.
+        """
+        self._upper_txt.setAttribute(attribute, on)
+        self._lower_txt.setAttribute(attribute, on)
+        super().setAttribute(attribute, on)
+
+    def setGeometry(self, geometry: QRect) -> None:
+        """Move the child widgets and make sure _lower_txt is positioned down
+        right of upper text to produce a drop shadow effect.
+
+        For some reason, adjusting the geometry of the parent makes the child
+        widgets disappear, so it's not affected here.
+
+        Args:
+            geometry (QRect): The geometry to apply.
+        """
+        self._upper_txt.setGeometry(geometry)
+        self._lower_txt.setGeometry(geometry)
+        self._lower_txt.move(self._lower_txt.x() + 2, self._lower_txt.y() + 2)
+
+    def set_text_color(self, color: str) -> None:
+        """Set the color of the widget's text.
+
+        Args:
+            color (str): The color to set. Any string accepted by CSS is fine.
+        """
+        style = self._upper_txt.styleSheet()
+        style += f"""
+            * {{
+                color: {color};
+            }}
+        """
+        self._upper_txt.setStyleSheet(style)
+
+    def set_shadow_color(self, color: str) -> None:
+        """Set the color of the widget's drop shadow.
+
+        Args:
+            color (str): The color to set. Any string accepted by CSS is fine.
+        """
+        style = self._lower_txt.styleSheet()
+        style += f"""
+            * {{
+                color: {color};
+            }}
+        """
+        self._lower_txt.setStyleSheet(style)
+
+    def set_text(self, text: str) -> None:
+        """Set (right-elided) text to both labels and restart the fade timer.
+
+        Args:
+            text (str): The text to set.
         """
         # Stop fading and make the text opaque
         self._fade_timer.stop()
         self._fade_animation.stop()
         self._fade_effect.setOpacity(1)
 
-        # Set the text and restart the fade timer
-        self.setText(text)
+        # Set the text
+        elided_text = self._get_elided_text(text)
+        self._upper_txt.setText(elided_text)
+        self._lower_txt.setText(elided_text)
+
+        # Restart the timer
         self._fade_timer.start()
 
-    def _get_elided_text(self) -> str:
-        """Right-elide text to the width of this widget.
+    def _get_elided_text(self, text: str) -> str:
+        """Right-elide text to the width of the widget.
 
         Returns:
             str: The elided text.
         """
-        return self.fontMetrics().elidedText(
-            self.text(), Qt.ElideRight, self.width() - 10
-        )
+        return self.fontMetrics().elidedText(text, Qt.ElideRight, self.width() - 10)
 
 
 class ClickableQLabel(QLabel):
@@ -735,7 +803,7 @@ class ClickableQLabel(QLabel):
         self.double_click = False
         self.hovered = False
 
-    def mousePressEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Set self.clicked to True when the left mouse button is pressed.
 
         Also start a 200 ms timer that calls mouseSingleClickEvent. If the
@@ -758,7 +826,7 @@ class ClickableQLabel(QLabel):
                 lambda event=event: self.mouseSingleClickEvent(event),
             )
 
-    def mouseSingleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseSingleClickEvent(self, event: QMouseEvent) -> None:
         """Emit valid_single_click if a single left mouse click is released
         within the widget's boundaries.
 
@@ -777,7 +845,7 @@ class ClickableQLabel(QLabel):
             else:
                 self.valid_single_click.emit()
 
-    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         """Set double_click to True when a double click is registered so the
         double click action can occur during mouseReleaseEvent. This flag also
         prevents mouseSingleClickEvent from doing anything.
@@ -791,7 +859,7 @@ class ClickableQLabel(QLabel):
         """
         self.clicked = self.double_click = True
 
-    def mouseReleaseEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Set self.clicked to False when the left mouse button is released.
 
         If delayed_single_click was set in mouseSingleClickEvent, do the single
@@ -814,7 +882,7 @@ class ClickableQLabel(QLabel):
             elif self.double_click and event.pos() in self.rect():
                 self.valid_double_click.emit()
 
-    def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Track whether the clicked mouse is inside the widget's bounds.
 
         This method only returns values when the mouse is clicked. Sets
@@ -827,7 +895,7 @@ class ClickableQLabel(QLabel):
         """
         self.hovered = event.pos() in self.rect()
 
-    def enterEvent(self, event: Optional[QMouseEvent]) -> None:
+    def enterEvent(self, event: QMouseEvent) -> None:
         """Detect when the unclicked mouse enters the widget.
 
         The enter and leave methods are needed because mouseMoveEvent only
@@ -840,7 +908,7 @@ class ClickableQLabel(QLabel):
         """
         self.hovered = True
 
-    def leaveEvent(self, event: Optional[QMouseEvent]) -> None:
+    def leaveEvent(self, event: QMouseEvent) -> None:
         """Detect when the unclicked mouse leaves the widget.
 
         The enter and leave methods are needed because mouseMoveEvent only
@@ -881,7 +949,7 @@ class ClickableLineEdit(QLineEdit):
         """
         QLineEdit.__init__(self, parent)
 
-    def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Prevent the mouse moving from having any effect.
 
         I override this method specifically to prevent selecting text by
@@ -894,7 +962,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         """Prevent a double click from having any effect.
 
         I override this method specifically to prevent double-clicking to
@@ -908,7 +976,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseReleaseEvent(self, event: Optional[QMouseEvent]) -> None:
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Emit self.clicked if the mouse was pressed and released.
 
         Args:

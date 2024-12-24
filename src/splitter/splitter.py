@@ -28,8 +28,8 @@
 
 """Capture video and compare it to a template image."""
 
-from enum import auto, Enum
 import platform
+from queue import Full, Queue
 import threading
 import time
 from typing import Optional, Tuple
@@ -44,19 +44,22 @@ from splitter.split_dir import SplitDir
 
 
 class Splitter:
-    """Capture video and compare it to a split image.
+    """Capture video frame-by-frame and use it to split.
 
-    Video capture and image matching are both performed in their own dedicated
-    threads, which means that thread safety is always a top priority when
-    working with this class. capture_thread saves information about the
-    current frame to class attributes, which are in turn used by compare_thread
-    to generate a probability of match with the current split image. If a match
-    is found, a flag is set indicating which type of split (dummy, normal, or
-    pause) should occur.
+    This class makes use of four threads:
+    - capture_thread: Captures video frame-by-frame and feeds it in three
+        dedicated queues to the other three threads for processing.
+    - record_thread: When recording is enabled (see ui_controller), writes each
+        frame to an .mp4 file. Saves this file on each normal and pause split
+        action.
+    - compare_split_thread: Compares each frame to the current split image.
+        If a match is found, performs a split action.
+    - compare_reset_thread: Compares each frame to the reset image, if it
+        exists. If a match is found, performs a reset action.
 
     ui_controller is constantly accessing the public attributes of this class,
     whether or not the threads are active, which is why several of these
-    attributes are set to None after use.
+    attributes are set to None when their threads go down.
 
     Attributes:
         capture_thread (threading.Thread): Thread instance that reads and
@@ -92,35 +95,40 @@ class Splitter:
         splits (SplitDir): The directory of split images currently in use.
         suspend_remaining (float): The amount of time left (in seconds) before
             the end of a pause after a split.
-        suspended (bool): Indicates whether compare_thread is alive.
+        suspended (bool): Indicates whether compare_split_thread is currently
+            comparing images.
         target_fps (int): The framerate set by the user.
         waiting_for_split_change (bool): Indicates to ui_controller that
-            _look_for_match received its changing_splits request and is waiting
+            _look_for_split received its changing_splits request and is waiting
             for the new split.
     """
 
     def __init__(self) -> None:
-        """Set all flags and values needed to operate capture_thread and
-        compare_thread.
-        """
+        """Set all flags and values needed to run the threads."""
         self.target_fps = settings.get_int("FPS")
         self._capture_max_fps = 60
         self._fps_adjust_factor = 1.22  # Roughly the amount needed here; YMMV
         self._interval = self._get_interval()
 
         # capture_thread
+        self.capture_thread = threading.Thread(target=self._capture)
+        self._capture_thread_finished = False
         self.comparison_frame = None
         self.frame_pixmap = None
-        self.capture_thread = threading.Thread(target=self._capture)
         self._cap = None
-        self._capture_thread_finished = False
 
-        # compare_thread
+        # record_thread
+        self._record_queue = Queue(10)  # Number doesn't matter, should be small
+        self.record_thread = threading.Thread(target=self._record)
+        self._record_thread_finished = False
+
+        # compare_split_thread
+        self._compare_split_queue = Queue(10)
+        self.compare_split_thread = threading.Thread(target=self._compare_split)
+        self._compare_split_thread_finished = False
         self.splits = SplitDir()
         self.match_percent = None
         self.highest_percent = None
-        self.match_reset_percent = None
-        self.highest_reset_percent = None
         self.delaying = False
         self.delay_remaining = None
         self.suspended = True
@@ -128,12 +136,16 @@ class Splitter:
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
-        self.reset_split_action = False
-        self.compare_thread = threading.Thread(target=self._compare)
-        self._compare_thread_finished = False
-
         self.changing_splits = False
         self.waiting_for_split_change = False
+
+        # compare_reset_thread
+        self._compare_reset_queue = Queue(10)
+        self.compare_reset_thread = threading.Thread(target=self._compare_reset)
+        self._compare_reset_thread_finished = False
+        self.match_reset_percent = None
+        self.highest_reset_percent = None
+        self.reset_split_action = False
 
     ##################
     #                #
@@ -141,51 +153,118 @@ class Splitter:
     #                #
     ##################
 
-    def start(self) -> None:
-        """Start capture_thread and, if possible, start compare_thread.
-
-        It is essential to ensure that all previous capture_threads and
-        compare_threads have been safely exited before calling this method.
+    def restart(self) -> None:
+        """Start capture_thread and try to start the other threads, killing all
+        other instances of those threads first.
         """
         self._start_capture_thread()
+
         if len(self.splits.list) > 0:
-            self.start_compare_thread()
+            self.start_record_thread()
+            self.start_compare_split_thread()
+
+            if self.splits.reset_image is not None:
+                self.start_compare_reset_thread()
 
     def safe_exit_all_threads(self) -> None:
         """Safely kill capture_thread.
 
-        Because killing capture_thread also kills compare_thread, this will
-        always safely exit compare_thread too.
+        The logic at end of _capture ensures this kills all other threads too.
         """
         self._capture_thread_finished = True
         if self.capture_thread.is_alive():
             self.capture_thread.join()
 
-    def start_compare_thread(self) -> None:
-        """Safely start compare_thread.
+    def start_record_thread(self) -> None:
+        """Safely start record_thread (killing all other instances first)."""
+        self.safe_exit_record_thread()
 
-        It is essential to ensure that all previous compare_threads have been
-        safely exited before calling this method.
+        self._record_queue = Queue(10)  # Clear queue of old images
+        self._record_thread_finished = False
+
+        # Re-instantiate and start thread
+        self.record_thread = threading.Thread(target=self._record)
+        self.record_thread.daemon = True
+        self.record_thread.start()
+
+    def start_compare_split_thread(self) -> None:
+        """Safely start compare_split_thread (killing all other instances
+        first).
         """
-        self.compare_thread = threading.Thread(target=self._compare)
-        self._compare_thread_finished = False
-        self.compare_thread.daemon = True
-        self.compare_thread.start()
+        self.safe_exit_compare_split_thread()
+
+        self._compare_split_queue = Queue(10)  # Clear queue
+        self._compare_split_thread_finished = False
         self.suspended = False
 
-    def safe_exit_compare_thread(self) -> None:
-        """Safely kill compare_thread."""
-        if self.compare_thread.is_alive():
-            self._compare_thread_finished = True
-            self.compare_thread.join()
+        # Re-instantiate and start thread
+        self.compare_split_thread = threading.Thread(target=self._compare_split)
+        self.compare_split_thread.daemon = True
+        self.compare_split_thread.start()
+
+    def start_compare_reset_thread(self) -> None:
+        """Safely start compare_reset_thread (killing all other instances
+        first).
+        """
+        self.safe_exit_compare_reset_thread()
+
+        self._compare_reset_queue = Queue(10)  # Clear queue
+        self._compare_reset_thread_finished = False
+
+        # Re-instantiate and start thread
+        self.compare_reset_thread = threading.Thread(target=self._compare_reset)
+        self.compare_reset_thread.daemon = True
+        self.compare_reset_thread.start()
+
+    def safe_exit_record_thread(self) -> None:
+        """Safely kill record_thread.
+
+        Put None into the queue so that get() doesn't block indefinitely in the
+        loop if the queue is empty.
+        """
+        if self.record_thread.is_alive():
+            self._record_thread_finished = True
+            try:
+                self._record_queue.put_nowait(None)
+            except Full:
+                pass
+            self.record_thread.join()
+
+    def safe_exit_compare_split_thread(self) -> None:
+        """Safely kill compare_split_thread.
+
+        Put None into the queue so that get() doesn't block indefinitely in the
+        loop.
+        """
+        if self.compare_split_thread.is_alive():
+            self._compare_split_thread_finished = True
+            try:
+                self._compare_split_queue.put_nowait(None)
+            except Full:
+                pass
+            self.compare_split_thread.join()
         self.suspended = True
+
+    def safe_exit_compare_reset_thread(self) -> None:
+        """Safely kill compare_reset_thread.
+
+        Put None into the queue so that get() doesn't block indefinitely in the
+        loop.
+        """
+        if self.compare_reset_thread.is_alive():
+            self._compare_reset_thread_finished = True
+            try:
+                self._compare_reset_queue.put_nowait(None)
+            except Full:
+                pass
+            self.compare_reset_thread.join()
 
     def set_next_capture_index(self) -> bool:
         """Try to find the next valid cv2 capture index, if it exists.
 
         cv2 capture indexes can be separated by invalid indexes (for example, 0
         and 2 could be valid indexes but not 1). To account for this, this
-        method will try 3 invalid indexes before returning to index 0.
+        method tries 3 invalid indexes before returning to index 0.
 
         Saves the new index to settings, has no return value.
 
@@ -195,6 +274,7 @@ class Splitter:
         source = settings.get_int("LAST_CAPTURE_SOURCE_INDEX") + 1
         found_valid_source = False
         tries = 0
+
         while tries < 3:
             if platform.system() == "Windows":
                 # Using CAP_DSHOW greatly boosts performance on Windows.
@@ -208,40 +288,48 @@ class Splitter:
             else:
                 source += 1
                 tries += 1
+
         if not found_valid_source:
             source = 0  # Give up, go back to first possible index
+
         settings.set_value("LAST_CAPTURE_SOURCE_INDEX", source)
 
         return found_valid_source
 
     def toggle_suspended(self) -> None:
-        """Stop compare_thread, then start it if the splitter was suspended
-        and there are splits.
+        """Stop the compare and record threads, then start them if the splitter
+        was suspended and there are splits.
 
-        Use self.match_percent, since it will never be None if compare_thread
-        is alive AND not suspended, which is the condition we're looking for.
+        Use self.match_percent, since it will never be None if
+        compare_split_thread is alive AND not suspended, which is the condition
+        we're looking for.
         """
         current_match_percent = self.match_percent
-        self.safe_exit_compare_thread()
-        if current_match_percent is None and len(self.splits.list) > 0:
-            self.start_compare_thread()
 
-    ###################################
-    #                                 #
-    # Private _capture_thread Methods #
-    #                                 #
-    ###################################
+        self.safe_exit_record_thread()
+        self.safe_exit_compare_split_thread()
+        self.safe_exit_compare_reset_thread()
+
+        if current_match_percent is None and len(self.splits.list) > 0:
+            self.start_compare_split_thread()
+            self.start_record_thread()
+            if self.splits.reset_image is not None:
+                self.start_compare_reset_thread()
+
+    ##################################
+    #                                #
+    # Private capture_thread Methods #
+    #                                #
+    ##################################
 
     def _start_capture_thread(self) -> None:
-        """Safely start capture_thread.
+        """Safely start capture_thread (killing all other instances first)."""
+        self.safe_exit_all_threads()
 
-        It is essential to ensure that all previous capture_threads have been
-        safely exited before calling this method.
-        """
         self._cap = self._open_capture()
         self._capture_max_fps = self._get_max_fps(self._cap)
-        self.capture_thread = threading.Thread(target=self._capture)
         self._capture_thread_finished = False
+        self.capture_thread = threading.Thread(target=self._capture)
         self.capture_thread.daemon = True
         self.capture_thread.start()
 
@@ -266,10 +354,147 @@ class Splitter:
             )
         else:
             cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
+
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, COMPARISON_FRAME_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, COMPARISON_FRAME_HEIGHT)
         return cap
+
+    def _capture(self) -> None:
+        """Read frames from a capture source, resize them, and expose them to
+        the other three threads in dedicated queues.
+
+        self.comparison_frame should always be 320x240. This helps with results
+        consistency when matching split images; it also saves a lot of time and
+        CPU power when making comparisons in _compare, and saves users space
+        because they don't have to store dozens of massive image files. The
+        ui_frame, on the other hand, is designed to be the size the user
+        chooses, so it is resized accordingly and converted into a QPixmap.
+
+        The choices of cv2.INTER_LINEAR and cv2.INTER_NEAREST are deliberate.
+        cv2.INTER_NEAREST provides the fastest method, by far, for downscaling
+        images, but the quality is much worse and can throw off comparisons.
+        For that reason, I use it when reading the ui_frame, but stick to
+        cv2.INTER_LINEAR for the comparison_frame.
+
+        cv2.INTER_LINEAR is the next fastest setting after cv2.INTER_NEAREST.
+        Its quality is significantly better for only a minor performance cost,
+        which makes it a good choice for image matching.
+
+        This method continues indefinitely until self._capture_thread_finished
+        is set to True.
+        """
+        frames_this_second = 0
+        start_time = frame_counter_start_time = time.perf_counter()
+
+        while not self._capture_thread_finished:
+
+            # We don't need to wait if we are hitting the max capture fps,
+            # since cap.read() blocks until the next frame is available anyway.
+            # So we only wait on the interval if we are targeting a framerate
+            # that is lower than the max fps.
+            if self.target_fps < self._capture_max_fps:
+                start_time = self._wait_for_interval(start_time)
+
+                # Update self._interval to better track target framerate
+                frames_this_second, frame_counter_start_time = self._update_fps_factor(
+                    frames_this_second, frame_counter_start_time
+                )
+
+            frame = self._cap.read()[1]
+            if frame is None:  # Video feed is down, kill the thread
+                self._capture_thread_finished = True
+                break
+
+            if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
+                self.comparison_frame = cv2.resize(
+                    frame,
+                    (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                # Don't need to generate a separate ui_frame -- the
+                # comparison_frame is already the right size
+                if settings.get_bool("SHOW_MIN_VIEW"):
+                    ui_frame = None
+                else:
+                    ui_frame = self.comparison_frame
+
+            else:
+                self.comparison_frame = cv2.resize(
+                    frame,
+                    (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                # Generate ui_frame (if not in min view)
+                if settings.get_bool("SHOW_MIN_VIEW"):
+                    ui_frame = None
+                else:
+                    ui_frame = cv2.resize(
+                        frame,
+                        (
+                            settings.get_int("FRAME_WIDTH"),
+                            settings.get_int("FRAME_HEIGHT"),
+                        ),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+
+            # Convert ui_frame to pixmap
+            self.frame_pixmap = self._frame_to_pixmap(ui_frame)
+
+            # Place comparison frame in recording / comparison queues
+            for queue in [
+                self._record_queue,
+                self._compare_reset_queue,
+                self._compare_split_queue,
+            ]:
+                try:
+                    queue.put_nowait(self.comparison_frame)
+                except Full:
+                    pass
+
+        self._cap.release()
+
+        # Setting these to None tells ui_controller the capture isn't active
+        self.comparison_frame = None
+        self.frame_pixmap = None
+
+        # Kill all other splitter threads if capture goes down
+        self.safe_exit_record_thread()
+        self.safe_exit_compare_split_thread()
+        self.safe_exit_compare_reset_thread()
+
+    def _frame_to_pixmap(self, frame: Optional[numpy.ndarray]) -> QPixmap:
+        """Generate a QPixmap instance from a 3-channel image stored as a numpy
+        array.
+
+        Args:
+            frame (numpy.ndarray): The source image.
+
+        Returns:
+            QPixmap: The converted image. Returns a plain QPixmap instance is
+                frame is None.
+        """
+        if frame is None:
+            return QPixmap()
+
+        # Use Format_BGR888 because images generated with cv2 are in BGR format
+        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_BGR888)
+        return QPixmap.fromImage(frame_img)
+
+    def _get_interval(self) -> float:
+        """Return the amount of time loops in this class should sleep before
+        each round.
+
+        Calculated using the maximum fps available to the splitter multiplied
+        by some adjustment factor, which is dynamically tweaked by
+        _update_fps_factor.
+
+        Returns:
+            float: The time.
+        """
+        return 1 / (
+            min(self.target_fps, self._capture_max_fps) * self._fps_adjust_factor
+        )
 
     def _get_max_fps(self, cap: cv2.VideoCapture) -> int:
         """Get the max FPS of a capture source.
@@ -294,329 +519,6 @@ class Splitter:
             max_fps = 60
 
         return max_fps
-
-    def _capture(self) -> None:
-        """Read frames from a capture source, resize them, and expose them to
-        _compare and ui_controller in a loop.
-
-        self.comparison_frame should always be 320x240. This helps with results
-        consistency when matching split images; it also saves a lot of time and
-        CPU power when making comparisons in _compare, and saves users space
-        because they don't have to store dozens of massive image files. The
-        ui_frame, on the other hand, is designed to be the size the user
-        chooses, so it is resized accordingly and converted into a QPixmap.
-
-        The choices of cv2.INTER_LINEAR and cv2.INTER_NEAREST are deliberate.
-        cv2.INTER_NEAREST provides the fastest method, by far, for downscaling
-        images, but the quality is much worse and can throw off comparisons.
-        For that reason, I use it when reading the ui_frame, but stick to
-        cv2.INTER_LINEAR for the comparison_frame.
-
-        cv2.INTER_LINEAR is the next fastest setting after cv2.INTER_NEAREST.
-        Its quality is significantly better for only a minor performance cost,
-        which makes it a good choice for image matching.
-
-        This method continues indefinitely until self._capture_thread_finished
-        is set to True.
-        """
-        start_time = time.perf_counter()
-        while not self._capture_thread_finished:
-
-            # We don't need to wait if we are hitting the max capture fps,
-            # since cap.read() blocks until the next frame is available anyway.
-            # So we only wait on the interval if we are targeting a framerate
-            # that is lower than the max fps.
-            if self.target_fps < self._capture_max_fps:
-                start_time = self._wait_for_interval(start_time)
-
-            frame = self._cap.read()[1]
-            if frame is None:  # Video feed is down, kill the thread
-                self._capture_thread_finished = True
-                break
-
-            if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
-                self.comparison_frame = cv2.resize(
-                    frame,
-                    (settings.get_int("FRAME_WIDTH"), settings.get_int("FRAME_HEIGHT")),
-                    interpolation=cv2.INTER_LINEAR,
-                )
-
-                # Don't need to generate a separate ui_frame -- the
-                # comparison_frame is already the right size
-                if settings.get_bool("SHOW_MIN_VIEW"):
-                    ui_frame = None
-                else:
-                    ui_frame = self.comparison_frame
-
-            else:
-                self.comparison_frame = cv2.resize(
-                    frame,
-                    (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
-                    interpolation=cv2.INTER_LINEAR,
-                )
-
-                # Generate ui_frame (if not in min view)
-                if settings.get_bool("SHOW_MIN_VIEW"):
-                    ui_frame = None
-                else:
-                    ui_frame = cv2.resize(
-                        frame,
-                        (
-                            settings.get_int("FRAME_WIDTH"),
-                            settings.get_int("FRAME_HEIGHT"),
-                        ),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-            # Convert ui_frame to pixmap
-            self.frame_pixmap = self._frame_to_pixmap(ui_frame)
-
-        self._cap.release()
-
-        # Setting these to None tells ui_controller the capture isn't active
-        self.comparison_frame = None
-        self.frame_pixmap = None
-
-        # Kill comparer if capture goes down
-        self.safe_exit_compare_thread()
-
-    def _frame_to_pixmap(self, frame: Optional[numpy.ndarray]) -> QPixmap:
-        """Generate a QPixmap instance from a 3-channel image stored as a numpy
-        array.
-
-        Args:
-            frame (numpy.ndarray): The source image.
-
-        Returns:
-            QPixmap: The converted image. Returns a plain QPixmap instance is
-                frame is None.
-        """
-        if frame is None:
-            return QPixmap()
-
-        # Use Format_BGR888 because images generated with cv2 are in BGR format
-        frame_img = QImage(frame, frame.shape[1], frame.shape[0], QImage.Format_BGR888)
-        return QPixmap.fromImage(frame_img)
-
-    def _wait_for_interval(self, start_time: float):
-        """Sleep until self._interval seconds has passed since start_time.
-
-        Args:
-            start_time (float): The starting time.
-
-        Returns:
-            float: The current time after sleeping.
-        """
-        current_time = time.perf_counter()
-        if current_time - start_time < self._interval:
-            time.sleep(self._interval - (current_time - start_time))
-        return time.perf_counter()
-
-    ###################################
-    #                                 #
-    # Private compare_thread Methods #
-    #                                 #
-    ###################################
-
-    def _compare(self) -> None:
-        """Look for matches for each split image and reset image, if applicable,
-        splitting when matches are found, and quitting on the last split /
-        when the thread is killed.
-        """
-        keep_going = True
-        while keep_going:
-            split_type = self._look_for_match()
-            if split_type is None:
-                keep_going = False
-            elif split_type == ImageType.SPLIT_IMAGE:
-                keep_going = self._split()
-            else:
-                keep_going = self._reset()
-
-    def _look_for_match(self) -> Optional["ImageType"]:
-        """Compare each frame generated by _capture with the current split
-        image and with the reset image, if applicable.
-
-        The block beginning with "if self.changing_split" is used to let the
-        ui_controller pause and restart this method without killing the thread.
-        Changing the split image while this method is running is theoretically
-        thread-safe, but it can lead to odd side effects if the flags at the
-        top aren't reset.
-
-        The following flags are used to determine when to return a value:
-            match_found: False until one of three conditions is met--
-                1) The split image's below_flag is False, and
-                    match_percent >= threshold_percent
-                2) above_split_threshold is True and match_percent
-                    < threshold_percent
-                3) Either of the above is satisfied for the reset image
-            above_split_threshold: False until the split image's below_flag
-                is True, and match_percent >= threshold_percent
-            above_reset_threshold: Identical to above_split_threshold, but for
-                the reset image.
-
-        Returns:
-            ImageType | None: SPLIT_IMAGE if a match to a split image is found,
-                RESET_IMAGE if a match to the reset image is found, and None if
-                the thread is killed.
-        """
-        self.match_percent = 0
-        self.highest_percent = 0
-
-        # The reset image isn't checked during the first split. This is to
-        # prevent problems when the first split is the same as the reset split.
-        if self.splits.current_image_index == 0:
-            self.match_reset_percent = None
-            self.highest_reset_percent = None
-        else:
-            self.match_reset_percent = 0
-            # Don't reset the highest match percent to 0 unless the thread dies.
-            # This allows users to track the reset image's match percent
-            # throughout a run.
-            if self.highest_reset_percent is None:
-                self.highest_reset_percent = 0
-
-        match_type = None
-        above_split_threshold = False
-        above_reset_threshold = False
-        frames_this_second = 0
-        start_time = frame_counter_start_time = time.perf_counter()
-
-        while not self._compare_thread_finished:
-            start_time = self._wait_for_interval(start_time)
-
-            # Update self._interval to better track target framerate
-            frames_this_second, frame_counter_start_time = self._update_fps_factor(
-                frames_this_second, frame_counter_start_time
-            )
-
-            # Restart if the current split image is changed mid-run
-            if self.changing_splits:
-                self.waiting_for_split_change = True
-                while self.changing_splits:
-                    time.sleep(self._interval)
-                self.waiting_for_split_change = False
-                return self._look_for_match()
-
-            # Use a snapshot of comparison_frame for thread safety
-            frame = self.comparison_frame
-            if frame is None:
-                continue
-
-            # Check image against split image
-            match_found, above_split_threshold = self._compare_with_split_image(
-                frame, above_split_threshold
-            )
-            if match_found:
-                match_type = ImageType.SPLIT_IMAGE
-                break
-
-            # Check image against reset image
-            if (
-                self.splits.reset_image is not None
-                and not match_found
-                # Since the first split image is presumed to be the "start
-                # image" (ie the run hasn't started yet if we're on the first
-                # split), don't look for the reset image if we're on the first
-                # split image
-                and self.splits.current_image_index != 0
-            ):
-                match_found, above_reset_threshold = self._compare_with_reset_image(
-                    frame, above_reset_threshold
-                )
-                if match_found:
-                    match_type = ImageType.RESET_IMAGE
-                    break
-
-        # Setting these to None tells the ui_controller the splitter is down.
-        # But don't reset highest_reset_percent, since the hunt for the reset
-        # image continues across different split images.
-        self.match_percent = None
-        self.highest_percent = None
-        self.match_reset_percent = None
-
-        return match_type
-
-    def _compare_with_split_image(
-        self, frame: numpy.ndarray, above_split_threshold: bool
-    ) -> Tuple[bool, bool]:
-        """Check if a frame matches a template split image.
-
-        First, checks the match percentage between the frame and the template.
-        If the image is a match, returns True unless the image is a {b} image.
-        In that case, wait until the match percent falls back beneath the
-        threshold.
-
-        Args:
-            frame (numpy.ndarray): The sample frame for comparison.
-            above_split_threshold (bool): Whether the threshold has previously
-                been met (useful for executing {b} flags).
-
-        Returns:
-            Tuple[bool, bool]: match_found and above_split_threshold,
-                respectively. If match_found is True, the image is a match. If
-                above_split_threshold is a match, the image is a match, but we
-                wait until frames fall below the matching threshold before
-                returning true for match_found (this is a {b} flag scenario).
-        """
-        self.match_percent = self._get_match_percent(
-            frame, self.splits.list[self.splits.current_image_index]
-        )
-        if self.match_percent > self.highest_percent:
-            self.highest_percent = self.match_percent
-
-        if (
-            self.match_percent
-            >= self.splits.list[self.splits.current_image_index].threshold
-        ):
-            if self.splits.list[self.splits.current_image_index].below_flag:
-                return False, True
-            else:
-                return True, True
-
-        elif above_split_threshold:
-            return True, True
-
-        return False, False
-
-    def _compare_with_reset_image(
-        self, frame: numpy.ndarray, above_reset_threshold: bool
-    ) -> Tuple[bool, bool]:
-        """Check if a frame matches the reset image.
-
-        First, checks the match percentage between the frame and the reset
-        image. If the image is a match, returns True unless the reset image is
-        a {b} image. In that case, wait until the match percent falls back
-        beneath the threshold.
-
-        Args:
-            frame (numpy.ndarray): The sample frame for comparison.
-            above_reset_threshold (bool): Whether the threshold has previously
-                been met (useful for executing {b} flags).
-
-        Returns:
-            Tuple[bool, bool]: match_found and above_reset_threshold,
-                respectively. If match_found is True, the image is a match. If
-                above_reset_threshold is a match, the image is a match, but we
-                wait until frames fall below the matching threshold before
-                returning true for match_found (this is a {b} flag scenario).
-        """
-        self.match_reset_percent = self._get_match_percent(
-            frame, self.splits.reset_image
-        )
-        if self.match_reset_percent > self.highest_reset_percent:
-            self.highest_reset_percent = self.match_reset_percent
-
-        if self.match_reset_percent >= self.splits.reset_image.threshold:
-            if self.splits.reset_image.below_flag:
-                return False, True
-            else:
-                return True, False
-
-        elif above_reset_threshold:
-            return True, True
-
-        return False, False
 
     def _update_fps_factor(
         self, frames_this_second: int, frame_counter_start_time: float
@@ -649,6 +551,8 @@ class Splitter:
                 frame_counter_start_time values.
         """
         if time.perf_counter() - frame_counter_start_time >= 1:
+            # print(frames_this_second)  # For debug
+
             fps = min(self.target_fps, self._capture_max_fps)
             if frames_this_second != fps:
                 difference = fps - frames_this_second
@@ -661,20 +565,147 @@ class Splitter:
 
         return frames_this_second, frame_counter_start_time
 
-    def _get_interval(self) -> float:
-        """Return the amount of time loops in this class should sleep before
-        each round.
+    def _wait_for_interval(self, start_time: float):
+        """Sleep until self._interval seconds has passed since start_time.
 
-        Calculated using the maximum fps available to the splitter multiplied
-        by some adjustment factor, which is dynamically tweaked by
-        _update_fps_factor.
+        Args:
+            start_time (float): The starting time.
 
         Returns:
-            float: The time.
+            float: The current time after sleeping.
         """
-        return 1 / (
-            min(self.target_fps, self._capture_max_fps) * self._fps_adjust_factor
+        current_time = time.perf_counter()
+        if current_time - start_time < self._interval:
+            time.sleep(self._interval - (current_time - start_time))
+        return time.perf_counter()
+
+    #################################
+    #                               #
+    # Private record_thread Methods #
+    #                               #
+    #################################
+
+    def _record(self) -> None:
+        pass
+
+    ########################################
+    #                                      #
+    # Private compare_split_thread Methods #
+    #                                      #
+    ########################################
+
+    def _compare_split(self) -> None:
+        """Look for matches for each split image, splitting when matches are
+        found, and quitting on the last split or when the thread is killed.
+        """
+        while self._look_for_split() and self._split():
+            continue
+
+    def _look_for_split(self) -> bool:
+        """Compare each frame from _capture with the current split image.
+
+        The block beginning with "if self.changing_split" is used to let the
+        ui_controller pause and restart this method without killing the thread.
+        Changing the split image while this method is running is probably
+        thread-safe, but it can lead to odd side effects if the flags at the
+        top aren't reset.
+
+        The following flags are used to determine when to return a value:
+            match_found: False until one of three conditions is met--
+                1) The split image's below_flag is False, and
+                    match_percent >= threshold_percent
+                2) above_split_threshold is True and match_percent
+                    < threshold_percent
+                3) Either of the above is satisfied for the reset image
+            above_split_threshold: False until the split image's below_flag
+                is True, and match_percent >= threshold_percent
+
+        Returns:
+            bool: True if a match was found, False otherwise.
+        """
+        above_split_threshold = False
+        match_found = False
+        self.match_percent = 0
+        self.highest_percent = 0
+        self._compare_split_queue = Queue(10)  # Get rid of old images
+
+        while not self._compare_split_thread_finished:
+
+            # Restart if the current split image is changed mid-run
+            if self.changing_splits:
+                self.waiting_for_split_change = True
+                while self.changing_splits:
+                    time.sleep(0.005)
+                self.waiting_for_split_change = False
+                return self._look_for_split()
+
+            # Get current image
+            frame = self._compare_split_queue.get()
+            if frame is None:
+                continue
+
+            # Check image against split image
+            match_found, above_split_threshold = self._compare_with_split_image(
+                frame, above_split_threshold
+            )
+            if match_found:
+                break
+
+        # Tell the ui_controller not to display match percents
+        self.match_percent = None
+        self.highest_percent = None
+
+        return match_found
+
+    def _compare_with_split_image(
+        self, frame: numpy.ndarray, above_split_threshold: bool
+    ) -> Tuple[bool, bool]:
+        """Check if a frame matches the split image.
+
+        First, check the match percentage between the frame and the image. If
+        it's a match, return True unless the image is a {b} image. In that case,
+        wait until the match percent falls back beneath the threshold.
+
+        Args:
+            frame (numpy.ndarray): The sample frame for comparison.
+            above_split_threshold (bool): Whether the threshold has previously
+                been met (used to execute {b} flags).
+
+        Returns:
+            Tuple[bool, bool]: match_found and above_split_threshold,
+                respectively. If match_found is True, the image is a match. If
+                above_split_threshold is a match, the image is a match, but we
+                wait until frames fall below the matching threshold before
+                returning true for match_found (this is a {b} flag scenario).
+        """
+        # Set match and highest percents
+        self.match_percent = self._get_match_percent(
+            frame, self.splits.list[self.splits.current_image_index]
         )
+        if self.match_percent > self.highest_percent:
+            self.highest_percent = self.match_percent
+
+        # Image match is above threshold
+        if (
+            self.match_percent
+            >= self.splits.list[self.splits.current_image_index].threshold
+        ):
+
+            # {b} image -- show that the threshold was met, but no "match" yet
+            if self.splits.list[self.splits.current_image_index].below_flag:
+                return False, True
+
+            # Not a {b} image -- match found
+            else:
+                return True, True
+
+        # {b} image -- we are below the threshold now and the threshold has
+        # previously been met. It's a match
+        elif above_split_threshold:
+            return True, True
+
+        # Threshold never met
+        return False, False
 
     def _get_match_percent(
         self, curr_frame: numpy.ndarray, template: SplitDir._SplitImage
@@ -737,7 +768,7 @@ class Splitter:
             self.delaying = True
             # Save total_delay because if the user changes default delay in
             # settings during this method, we don't want the delay remaining
-            # to be updated accordingly.
+            # for this split to change
             self.delay_remaining = total_delay = split_image.delay_duration
             start_time = time.perf_counter()
 
@@ -747,17 +778,17 @@ class Splitter:
             # block below.
             while (
                 time.perf_counter() - start_time < total_delay
-                and not self._compare_thread_finished
+                and not self._compare_split_thread_finished
             ):
                 self.delay_remaining = total_delay - (time.perf_counter() - start_time)
-                time.sleep(self._interval)
+                time.sleep(0.01)
             self.delaying = False
             self.delay_remaining = None
 
-            if self._compare_thread_finished:
+            if self._compare_split_thread_finished:
                 return False
 
-        # Handle split
+        # Set split flag
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
@@ -768,7 +799,7 @@ class Splitter:
         else:
             self.normal_split_action = True
 
-        # Don't pause splitter after very last split
+        # Don't pause splitter after very last split, just exit
         if index == len(self.splits.list) - 1 and loop == split_image.loops:
             return False
 
@@ -777,21 +808,132 @@ class Splitter:
             self.suspended = True
             # Save total_suspend because if the user changes default suspend in
             # settings during this method, we don't want the suspend remaining
-            # to be updated accordingly.
+            # for this split to change
             self.suspend_remaining = total_suspend = split_image.pause_duration
             start_time = time.perf_counter()
             while (
                 time.perf_counter() - start_time < total_suspend
-                and not self._compare_thread_finished
+                and not self._compare_split_thread_finished
             ):
                 self.suspend_remaining = total_suspend - (
                     time.perf_counter() - start_time
                 )
-                time.sleep(self._interval)
+                time.sleep(0.01)
             self.suspended = False
             self.suspend_remaining = None
 
         return True
+
+    ########################################
+    #                                      #
+    # Private compare_reset_thread Methods #
+    #                                      #
+    ########################################
+
+    def _compare_reset(self) -> None:
+        """Look for the reset image until a match is found, then reset."""
+        while self._look_for_reset() and self._reset():
+            continue
+
+    def _look_for_reset(self) -> bool:
+        """Compare each frame from _capture with the reset image.
+
+        The following flags are used to determine when to return a value:
+            match_found: False until one of three conditions is met--
+                1) The reset image's below_flag is False, and
+                    match_percent >= threshold_percent
+                2) above_reset_threshold is True and match_percent
+                    < threshold_percent
+                3) Either of the above is satisfied for the reset image
+            above_reset_threshold: False until the reset image's below_flag
+                is True, and match_percent >= threshold_percent
+
+        Returns:
+            bool: True if a match was found, False otherwise.
+        """
+        above_reset_threshold = False
+        match_found = False
+        self.match_reset_percent = None
+        self.highest_reset_percent = None
+
+        # Don't do anything on the first loop of the first split image.
+        # This first split is considered the de facto "start image."
+        while (
+            self.splits.current_image_index == 0
+            and self.splits.current_loop == 1
+            and not self._compare_reset_thread_finished
+        ):
+            time.sleep(0.01)
+
+        # Start displaying match percents
+        self.match_reset_percent = 0
+        self.highest_reset_percent = 0
+        self._compare_reset_queue = Queue(10)  # Get rid of old images
+
+        while not self._compare_reset_thread_finished:
+
+            # Restart method if we're back to first split and loop
+            # (e.g. if user hit back button)
+            if self.splits.current_image_index == 0 and self.splits.current_loop == 1:
+                return self._look_for_reset()
+
+            # Get current image
+            frame = self._compare_reset_queue.get()
+            if frame is None:
+                continue
+
+            # Check image against reset image
+            match_found, above_reset_threshold = self._compare_with_reset_image(
+                frame, above_reset_threshold
+            )
+            if match_found:
+                break
+
+        # Tell ui_controller not to display match percents
+        self.match_reset_percent = None
+        self.highest_reset_percent = None
+
+        return match_found
+
+    def _compare_with_reset_image(
+        self, frame: numpy.ndarray, above_reset_threshold: bool
+    ) -> Tuple[bool, bool]:
+        """Check if a frame matches the reset image.
+
+        First, checks the match percentage between the frame and the reset
+        image. If the image is a match, returns True unless the reset image is
+        a {b} image. In that case, wait until the match percent falls back
+        beneath the threshold.
+
+        Args:
+            frame (numpy.ndarray): The sample frame for comparison.
+            above_reset_threshold (bool): Whether the threshold has previously
+                been met (useful for executing {b} flags).
+
+        Returns:
+            Tuple[bool, bool]: match_found and above_reset_threshold,
+                respectively. If match_found is True, the image is a match. If
+                above_reset_threshold is a match, the image is a match, but we
+                wait until frames fall below the matching threshold before
+                returning true for match_found (this is a {b} flag scenario).
+        """
+        # See _compare_with_split_image for comments -- logic is basically same
+        self.match_reset_percent = self._get_match_percent(
+            frame, self.splits.reset_image
+        )
+        if self.match_reset_percent > self.highest_reset_percent:
+            self.highest_reset_percent = self.match_reset_percent
+
+        if self.match_reset_percent >= self.splits.reset_image.threshold:
+            if self.splits.reset_image.below_flag:
+                return False, True
+            else:
+                return True, False
+
+        elif above_reset_threshold:
+            return True, True
+
+        return False, False
 
     def _reset(self):
         """Handle the events immediately before, during, and after a reset.
@@ -807,7 +949,7 @@ class Splitter:
             self.delaying = True
             # Save total_delay because if the user changes default delay in
             # settings during this method, we don't want the delay remaining
-            # to be updated accordingly.
+            # to actually change until we're done here
             self.delay_remaining = total_delay = self.splits.reset_image.delay_duration
             start_time = time.perf_counter()
 
@@ -817,23 +959,16 @@ class Splitter:
             # block below.
             while (
                 time.perf_counter() - start_time < total_delay
-                and not self._compare_thread_finished
+                and not self._compare_reset_thread_finished
             ):
                 self.delay_remaining = total_delay - (time.perf_counter() - start_time)
-                time.sleep(self._interval)
+                time.sleep(0.01)
             self.delaying = False
             self.delay_remaining = None
 
-            if self._compare_thread_finished:
+            if self._compare_reset_thread_finished:
                 return False
 
         # Handle reset
         self.reset_split_action = True
         return True
-
-
-class ImageType(Enum):
-    """Classify the type of image that causes a split (see _look_for_match)."""
-
-    SPLIT_IMAGE = auto()
-    RESET_IMAGE = auto()

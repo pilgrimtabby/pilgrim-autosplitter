@@ -94,7 +94,7 @@ class PilgrimAutosplitter:
 
         self.splitter = Splitter()
         if settings.get_bool("START_WITH_VIDEO"):
-            self.splitter.start()
+            self.splitter.restart()
 
         self.ui_controller = UIController(self.app, self.splitter)
 
