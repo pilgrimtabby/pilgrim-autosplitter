@@ -1478,6 +1478,7 @@ class UIController:
         """
         self._update_video_feed()
         self._update_video_record_overlay()
+        self._update_video_info_overlay()
         self._update_video_title()
         self._update_split_and_video_css()
         self._update_split_image_labels()
@@ -1539,6 +1540,13 @@ class UIController:
 
             visible = settings.get_bool("RECORD_CLIPS")
             overlay.setVisible(visible)
+
+    def _update_video_info_overlay(self) -> None:
+        """Update video info overlay text using output from _record."""
+        text = self._splitter.result_text
+        if text is not None:
+            self._main_window.video_info_overlay.set_text(text)
+            self._splitter.result_text = None
 
     def _update_video_title(self) -> None:
         """Adjust video title depending on whether video is alive."""

@@ -126,6 +126,7 @@ class Splitter:
         self.save_recording = False
         self.continue_recording = False
         self.recording_enabled = False
+        self.result_text = None
 
         # compare_split_thread
         self._compare_split_queue = Queue(10)
@@ -664,6 +665,7 @@ class Splitter:
         # (end recording, don't delete)
         if self.save_recording:
             self.save_recording = False
+            self.result_text = "Split recording saved!"
 
         # Broken loop caused by dummy split (keep recording same video)
         elif self.continue_recording:
