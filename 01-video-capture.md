@@ -9,7 +9,7 @@ nav_order: 2
 
 # Connect Video
 
-There are two main ways to connect your video game feed to Pilgrim Autosplitter.
+There are two main ways to connect your video game feed to Pilgrim Autosplitter. You can also capture clips of completed splits (see [Record Clips](#record-clips) below).
 
 ## Method 1: Capture Card
 
@@ -32,3 +32,10 @@ If you're not using a capture card, the recommended capture method is via [OBS](
 </figure>
 
 Click the gear icon to the right of the "Start Virtual Camera" button to configure your capture window. Once OBS Virtual Camera is open, click the [Next Source](#method-1-capture-card) button until your game feed appears.
+
+## Record clips
+
+Optionally, you can save clips of completed splits each time a split image is detected or you press the split hotkey. To enable this setting, click on the video feed itself. To choose the folder where recordings are saved, double-click on the video feed.
+
+{: .note }
+> Clips of the first split image are not saved.

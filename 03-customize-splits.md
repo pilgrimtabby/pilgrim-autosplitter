@@ -104,9 +104,11 @@ Insert a `b` between curly braces: `{b}`.
 
 ## Reset type
 
-Press the reset hotkey when a match is found. Only one reset split can exist per folder; if you have more than one, only one will be found and used. This split is always being checked in the background, and it doesn't appear in your splits list in-app. If you want to see it and/or see how much it matches with your video feed, click and hold on the split image on the right-hand side.
+Press the reset hotkey when a match is found. Only one reset split can exist per folder; if you have more than one, only one will be found and used. This split is always being checked in the background, and it doesn't appear in your splits list in-app. If you want to see it and/or see how much it matches with your video feed, click and hold on the split image display on the right-hand side.
+
+Even if you have a reset split, nothing will happen if it is triggered on the first split image. The first split image should be used as a "start split" -- after this split has been found, the run has begun.
 
 Insert a `r` between curly braces: `{r}`.
 
 {: .example }
-`121_theend_{r}.png` The run is reset.
+`121_theend_{r}.png` After finding a match, the run and splits are reset.
