@@ -297,6 +297,7 @@ class SplitDir:
             self._raw_image = self._get_raw_image()
             self.last_modified = os.path.getmtime(self._path)
             self.name = pathlib.Path(image_path).stem
+            self.stripped_name = self._get_stripped_name()
             self.image, self.mask = self.get_image_and_mask()
             self.max_dist = self._get_max_dist()
             self.pixmap = self.get_pixmap()
@@ -410,6 +411,33 @@ class SplitDir:
                 numpy.ndarray: The cv2 image.
             """
             return cv2.imread(self._path, cv2.IMREAD_UNCHANGED)
+
+        def _get_stripped_name(self) -> None:
+            """Get the text name of the split minus all flags and settings.
+
+            Returns:
+                str: The name without any flags or settings.
+            """
+            # Find all flags and settings in the name
+            flags = re.findall(r"\{.*?\}", self.name)
+            delays = re.findall(r"\#.*?\#", self.name)
+            pauses = re.findall(r"\[.*?\]", self.name)
+            thresholds = re.findall(r"\(.*?\)", self.name)
+            loops = re.findall(r"\@.*?\@", self.name)
+
+            non_name_text = [flags, delays, pauses, thresholds, loops]
+            stripped_name = self.name
+
+            # Remove the extra text
+            for category in non_name_text:
+                for entry in category:
+                    stripped_name = stripped_name.replace(entry, "")
+
+            # Remove any trailing leftover underscores
+            while stripped_name.endswith("_"):
+                stripped_name = stripped_name[:-1]
+
+            return stripped_name
 
         def _get_max_dist(self) -> float:
             """Calculate the maximum possible Euclidean distance from an image.

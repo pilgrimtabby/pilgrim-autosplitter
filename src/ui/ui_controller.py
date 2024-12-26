@@ -364,11 +364,19 @@ class UIController:
         paused (splitter sets its waiting_for_split_change flag). We change
         the split image, then unset changing_splits, which signals to splitter
         it can reset its flags.
+
+        In this method and the next two, we also kill the recording before
+        changing splits so, if recording is on, the recording has the chance
+        to save, continue, or erase itself. Then at the end of the method, we
+        restart the recording thread so we can do the next one (or in the case
+        of request_next_split, so we can await the restarting of compare_split
+        _thread and start recording when the next split becomes available).
         """
         # Kill recording
         self._splitter.safe_exit_record_thread()
 
-        self._redraw_split_labels = True  # Make sure UI image is updated
+        # Make sure UI image is updated
+        self._redraw_split_labels = True
 
         # Go to next split, no need to worry about flags / thread safety
         if self._splitter.match_percent is None:
@@ -414,9 +422,8 @@ class UIController:
         the thread down on accident, so we also check if this method is being
         called as the result of a hotkey press.
         """
-        # Kill recording (if not going to next split because of dummy image)
-        if not self._splitter.continue_recording:
-            self._splitter.safe_exit_record_thread()
+        # Kill recording
+        self._splitter.safe_exit_record_thread()
 
         # Kill splitter threads if we're on the last split
         # (This call must be the result of a split key hotpress)
@@ -430,33 +437,34 @@ class UIController:
             and loop == total_loops
             and self._split_hotkey_pressed
         ):
-            self._splitter.safe_exit_record_thread()
             self._splitter.safe_exit_compare_split_thread()
             self._splitter.safe_exit_compare_reset_thread()
-            return
 
-        self._redraw_split_labels = True  # Make sure UI image is updated
-        # Go to next split, no need to worry about flags / thread safety
-        if self._splitter.match_percent is None:
-            self._splitter.splits.next_split_image()
-
-        # Pause splitter._look_for_split before getting next split
+        # Not on last split, or method not called by hotkey press
         else:
-            start_time = time.perf_counter()
-            self._splitter.changing_splits = True
-            while (
-                time.perf_counter() - start_time < 1
-                and not self._splitter.waiting_for_split_change
-            ):
-                time.sleep(0.001)
-            self._splitter.splits.next_split_image()
-            self._splitter.changing_splits = False
 
-        # Restart recording (if not going to next split because of dummy image)
-        if self._splitter.continue_recording:
-            self._splitter.continue_recording = False
-        else:
-            self._splitter.restart_record_thread()
+            # Make sure UI image is updated
+            self._redraw_split_labels = True
+
+            # Go to next split, no need to worry about flags / thread safety
+            if self._splitter.match_percent is None:
+                self._splitter.splits.next_split_image()
+
+            # Pause splitter._look_for_split before getting next split
+            else:
+                start_time = time.perf_counter()
+                self._splitter.changing_splits = True
+                while (
+                    time.perf_counter() - start_time < 1
+                    and not self._splitter.waiting_for_split_change
+                ):
+                    time.sleep(0.001)
+
+                self._splitter.splits.next_split_image()
+                self._splitter.changing_splits = False
+
+        # Restart recording
+        self._splitter.restart_record_thread()
 
     def _request_reset_splits(self) -> None:
         """Tell splitter.splits to call reset_split_images, and ask
@@ -2091,7 +2099,19 @@ class UIController:
 
         elif self._split_hotkey_pressed:
             if self._split_hotkey_enabled and hotkey_presses_allowed:
-                self._splitter.save_recording = True
+
+                # Set appropriate flag for splitter._record. This is redundant
+                # if _split_hotkey_pressed was set as the result of normal_
+                # split_action being set, but not if this flag was set as the
+                # result of an actual hotkey press, which is why we need this.
+                split_index = self._splitter.splits.current_image_index
+                if split_index is not None:
+                    split = self._splitter.splits.list[split_index]
+                    if split.dummy_flag:
+                        self._splitter.continue_recording = True
+                    else:
+                        self._splitter.save_recording = True
+
                 self._request_next_split()
             self._split_hotkey_pressed = False
 

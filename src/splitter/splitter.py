@@ -661,13 +661,15 @@ class Splitter:
             if frame is not None:
                 output.write(frame)
 
-        # Broken loop caused by normal or pause split / split hotkey
-        # (end recording, don't delete)
+        # Broken loop caused by normal or pause split / split hotkey on
+        # non-dummy split (end recording, don't delete)
         if self.save_recording:
             self.save_recording = False
+            self._rename_video(output_path)
             self.result_text = "Split recording saved!"
 
-        # Broken loop caused by dummy split (keep recording same video)
+        # Broken loop caused by dummy split / split hotkey on dummy split
+        # (keep recording same video)
         elif self.continue_recording:
             self.continue_recording = False
             self._record(output_path, fps, recordings_dir)
@@ -687,6 +689,36 @@ class Splitter:
         """
         video = pathlib.Path(video_path)
         video.unlink(missing_ok=True)
+
+    def _rename_video(self, current_path: str) -> None:
+        """Place simplified name of split image into the recording name.
+
+        We don't put the simplified name into output_path in the first instance
+        because it might not be the name of the actual last split (e.g. if
+        dummy splits are used). The idea is for the clip name to be the same as
+        the name of the actual split name.
+
+        Args:
+            output_path (str): The current name of the video.
+        """
+        # Get simplified name of current split
+        current_index = self.splits.current_image_index
+        current_split_image = self.splits.list[current_index]
+        stripped_name = current_split_image.stripped_name
+
+        # Get loop and total loops of current split
+        loop = self.splits.current_loop
+        total_loops = current_split_image.loops
+
+        # Get new video name
+        video = pathlib.Path(current_path)
+        if total_loops == 1:
+            new_name = f"{stripped_name}-{video.stem}.mp4"
+        else:
+            new_name = f"{stripped_name}-loop_{loop}-{video.stem}.mp4"
+
+        # Rename video
+        video.rename(pathlib.Path(video.parent, new_name))
 
     ########################################
     #                                      #
@@ -911,6 +943,20 @@ class Splitter:
 
         # Don't pause splitter after very last split, just exit
         if index == len(self.splits.list) - 1 and loop == split_image.loops:
+
+            # Wait for main thread to kill record_thread before returning.
+            # Do this, because if this thread exits before ui_controller calls
+            # safe_exit_record_thread, recording_enabled will be unset, and
+            # record_thread won't save the recording properly.
+            # The quick and dirty workaround is to prevent this thread from
+            # exiting if recordings are active AND a save or continue flag has
+            # been set. Once record_thread exits, those flags, if previously
+            # set, will have been unset, terminating this loop.
+            while self.record_thread.is_alive() and (
+                self.save_recording or self.continue_recording
+            ):
+                time.sleep(0.01)
+
             return False
 
         # Handle post-split pause
