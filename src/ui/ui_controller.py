@@ -479,7 +479,6 @@ class UIController:
         self._splitter.safe_exit_record_thread()
 
         self._redraw_split_labels = True
-        self._splitter.safe_exit_record_thread()
         self._splitter.safe_exit_compare_split_thread()
         self._splitter.safe_exit_compare_reset_thread()
         self._splitter.splits.reset_split_images()
@@ -487,7 +486,6 @@ class UIController:
             len(self._splitter.splits.list) > 0
             and self._splitter.capture_thread.is_alive()
         ):
-            self._splitter.restart_record_thread()
             self._splitter.restart_compare_split_thread()
             if self._splitter.splits.reset_image is not None:
                 self._splitter.restart_compare_reset_thread()
@@ -1768,51 +1766,70 @@ class UIController:
     def _update_split_delay_suspend(self) -> None:
         """Display remaining delay or suspend time on the split image overlay."""
         overlay = self._main_window.split_overlay
-        delay = self._splitter.delay_remaining
+        split_delay = self._splitter.split_delay_remaining
+        reset_delay = self._splitter.reset_delay_remaining
         suspend = self._splitter.suspend_remaining
         min_view = settings.get_bool("SHOW_MIN_VIEW")
 
         # Splitter is delaying pre-split
-        if self._splitter.delaying and delay is not None:
-            if not min_view:
-                overlay.setVisible(True)
-                if delay < 60:  # Less than 1 minute, so we show special text.
-                    # Round high values down to 59.94 and low values up to 0.06
-                    # so that the string formatter in main_window doesn't show
-                    # 60.0 and 0.0 on the overlay.
-                    delay_txt = self._main_window.overlay_delay_txt_secs
-                    overlay.setText(delay_txt.format(max(min(delay, 59.94), 0.06)))
-                else:
-                    delta = datetime.timedelta(seconds=delay)
-                    delay_txt = self._main_window.overlay_delay_txt_mins
-                    if delay < 600:  # Less than 10 minutes -- remove leading 0
-                        # Split call strips decimals from the second
-                        overlay.setText(delay_txt.format(str(delta)[3:]).split(".")[0])
-                    elif delay < 3600:  # Less than 1 hr -- remove hour info
-                        overlay.setText(delay_txt.format(str(delta)[2:]).split(".")[0])
-                    else:  # At least 1 hour, show the whole thing
-                        overlay.setText(delay_txt.format(str(delta)).split(".")[0])
+        if split_delay is not None and not min_view:
+            overlay.setVisible(True)
+            if split_delay < 60:  # Less than 1 minute, so we show special text.
+                # Round high values down to 59.94 and low values up to 0.06
+                # so that the string formatter in main_window doesn't show
+                # 60.0 and 0.0 on the overlay.
+                delay_txt = self._main_window.overlay_split_delay_txt_secs
+                overlay.setText(delay_txt.format(max(min(split_delay, 59.94), 0.06)))
+            else:
+                delta = datetime.timedelta(seconds=split_delay)
+                delay_txt = self._main_window.overlay_split_delay_txt_mins
+                if split_delay < 600:  # Less than 10 minutes -- remove leading 0
+                    # Split call strips decimals from the second
+                    overlay.setText(delay_txt.format(str(delta)[3:]).split(".")[0])
+                elif split_delay < 3600:  # Less than 1 hr -- remove hour info
+                    overlay.setText(delay_txt.format(str(delta)[2:]).split(".")[0])
+                else:  # At least 1 hour, show the whole thing
+                    overlay.setText(delay_txt.format(str(delta)).split(".")[0])
+
+        # Splitter is delaying pre-reset
+        elif reset_delay is not None and not min_view:
+            overlay.setVisible(True)
+            if reset_delay < 60:  # Less than 1 minute, so we show special text.
+                # Round high values down to 59.94 and low values up to 0.06
+                # so that the string formatter in main_window doesn't show
+                # 60.0 and 0.0 on the overlay.
+                delay_txt = self._main_window.overlay_reset_delay_txt_secs
+                overlay.setText(delay_txt.format(max(min(reset_delay, 59.94), 0.06)))
+            else:
+                delta = datetime.timedelta(seconds=reset_delay)
+                delay_txt = self._main_window.overlay_reset_delay_txt_mins
+                if reset_delay < 600:  # Less than 10 minutes -- remove leading 0
+                    # Split call strips decimals from the second
+                    overlay.setText(delay_txt.format(str(delta)[3:]).split(".")[0])
+                elif reset_delay < 3600:  # Less than 1 hr -- remove hour info
+                    overlay.setText(delay_txt.format(str(delta)[2:]).split(".")[0])
+                else:  # At least 1 hour, show the whole thing
+                    overlay.setText(delay_txt.format(str(delta)).split(".")[0])
 
         # Splitter is pausing post-split
-        elif self._splitter.suspended and suspend is not None:
-            if not min_view:
-                overlay.setVisible(True)
-                if suspend < 60:  # Less than 1 minute, so we show special txt.
-                    # Round high values down to 59.94 and low values up to 0.06
-                    # so that the string formatter in main_window doesn't show
-                    # 60.0 and 0.0 on the overlay.
-                    pause_txt = self._main_window.overlay_pause_txt_secs
-                    overlay.setText(pause_txt.format(max(min(suspend, 59.94), 0.06)))
-                else:
-                    delta = datetime.timedelta(seconds=suspend)
-                    pause_txt = self._main_window.overlay_pause_txt_mins
-                    if suspend < 600:  # Less than 10 minutes -- remove leading 0
-                        # Split call strips decimals from the second
-                        overlay.setText(pause_txt.format(str(delta)[3:]).split(".")[0])
-                    elif suspend < 3600:  # Less than 1 hr -- remove hour info
-                        overlay.setText(pause_txt.format(str(delta)[2:]).split(".")[0])
-                    else:  # At least 1 hour, show the whole thing
-                        overlay.setText(pause_txt.format(str(delta)).split(".")[0])
+        elif suspend is not None and not min_view:
+            overlay.setVisible(True)
+            if suspend < 60:  # Less than 1 minute, so we show special txt.
+                # Round high values down to 59.94 and low values up to 0.06
+                # so that the string formatter in main_window doesn't show
+                # 60.0 and 0.0 on the overlay.
+                pause_txt = self._main_window.overlay_pause_txt_secs
+                overlay.setText(pause_txt.format(max(min(suspend, 59.94), 0.06)))
+            else:
+                delta = datetime.timedelta(seconds=suspend)
+                pause_txt = self._main_window.overlay_pause_txt_mins
+                if suspend < 600:  # Less than 10 minutes -- remove leading 0
+                    # Split call strips decimals from the second
+                    overlay.setText(pause_txt.format(str(delta)[3:]).split(".")[0])
+                elif suspend < 3600:  # Less than 1 hr -- remove hour info
+                    overlay.setText(pause_txt.format(str(delta)[2:]).split(".")[0])
+                else:  # At least 1 hour, show the whole thing
+                    overlay.setText(pause_txt.format(str(delta)).split(".")[0])
 
         # Splitter isn't pausing or delaying, but the overlay is showing
         elif overlay.text() != "":
@@ -2274,13 +2291,7 @@ class UIController:
         """
         if time.perf_counter() - self._last_wake_time >= self._wake_interval:
             self._last_wake_time = time.perf_counter()
-            suspend = self._splitter.suspend_remaining
-            delay = self._splitter.delay_remaining
-            splitter_active = (
-                not self._splitter.suspended
-                or (self._splitter.suspended and suspend is not None)
-                or (self._splitter.delaying and delay is not None)
-            )
+            splitter_active = self._splitter.compare_split_thread.is_alive()
 
             # Key should be alphanumeric to work cross platform; beyond that it
             # doesn't matter, since the user won't detect its release

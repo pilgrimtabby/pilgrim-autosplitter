@@ -72,8 +72,6 @@ class Splitter:
             comparison with a split image.
         delay_remaining (float): The amount of time left (in seconds) until a
             planned split occurs.
-        delaying (bool): Indicates whether _split is waiting before setting a
-            split action flag.
         dummy_split_action (bool): When True, tells ui_controller to perform a
             dummy split action.
         frame_pixmap (QPixmap): QPixmap used to show video feed on UI.
@@ -97,8 +95,6 @@ class Splitter:
         splits (SplitDir): The directory of split images currently in use.
         suspend_remaining (float): The amount of time left (in seconds) before
             the end of a pause after a split.
-        suspended (bool): Indicates whether compare_split_thread is currently
-            comparing images.
         target_fps (int): The framerate set by the user.
         waiting_for_split_change (bool): Indicates to ui_controller that
             _look_for_split received its changing_splits request and is waiting
@@ -135,9 +131,8 @@ class Splitter:
         self.splits = SplitDir()
         self.match_percent = None
         self.highest_percent = None
-        self.delaying = False
-        self.delay_remaining = None
-        self.suspended = True
+        self.split_delay_remaining = None
+        self.reset_delay_remaining = None
         self.suspend_remaining = None
         self.pause_split_action = False
         self.dummy_split_action = False
@@ -201,7 +196,6 @@ class Splitter:
 
         self._compare_split_queue = Queue(10)  # Clear queue
         self._compare_split_thread_finished = False
-        self.suspended = False
 
         # Re-instantiate and start thread
         self.compare_split_thread = threading.Thread(target=self._compare_split)
@@ -249,7 +243,6 @@ class Splitter:
             except Full:
                 pass
             self.compare_split_thread.join()
-        self.suspended = True
 
     def safe_exit_compare_reset_thread(self) -> None:
         """Safely kill compare_reset_thread.
@@ -898,14 +891,13 @@ class Splitter:
 
         # Handle delay
         if split_image.delay_duration > 0:
-            self.delaying = True
             # Save total_delay because if the user changes default delay in
             # settings during this method, we don't want the delay remaining
             # for this split to change
-            self.delay_remaining = total_delay = split_image.delay_duration
+            self.split_delay_remaining = total_delay = split_image.delay_duration
             start_time = time.perf_counter()
 
-            # Poll at regular intervals, both to update self.delay_remaining,
+            # Poll periodically, both to update self.split_delay_remaining,
             # which is read by ui_controller, and also to allow the user to
             # kill the thread. The same thing is done in the suspend_duration
             # block below.
@@ -913,10 +905,11 @@ class Splitter:
                 time.perf_counter() - start_time < total_delay
                 and not self._compare_split_thread_finished
             ):
-                self.delay_remaining = total_delay - (time.perf_counter() - start_time)
+                self.split_delay_remaining = total_delay - (
+                    time.perf_counter() - start_time
+                )
                 time.sleep(0.01)
-            self.delaying = False
-            self.delay_remaining = None
+            self.split_delay_remaining = None
 
             if self._compare_split_thread_finished:
                 return False
@@ -961,7 +954,6 @@ class Splitter:
 
         # Handle post-split pause
         elif split_image.pause_duration > 0:
-            self.suspended = True
             # Save total_suspend because if the user changes default suspend in
             # settings during this method, we don't want the suspend remaining
             # for this split to change
@@ -975,7 +967,6 @@ class Splitter:
                     time.perf_counter() - start_time
                 )
                 time.sleep(0.01)
-            self.suspended = False
             self.suspend_remaining = None
 
         return True
@@ -988,8 +979,8 @@ class Splitter:
 
     def _compare_reset(self) -> None:
         """Look for the reset image until a match is found, then reset."""
-        while self._look_for_reset() and self._reset():
-            continue
+        if self._look_for_reset():
+            self._reset()
 
     def _look_for_reset(self) -> bool:
         """Compare each frame from _capture with the reset image.
@@ -1091,25 +1082,26 @@ class Splitter:
 
         return False, False
 
-    def _reset(self):
+    def _reset(self) -> None:
         """Handle the events immediately before, during, and after a reset.
 
         The various flags set by this method are read by ui_controller, which
         references them to update the UI and send hotkey presses.
-
-        Returns:
-            bool: True if the thread wasn't killed, otherwise False.
         """
+        # Kill compare_split_thread so that if there's a split currently
+        # delaying, the reset image takes precedence
+        self.safe_exit_compare_split_thread()
+
         # Handle delay
         if self.splits.reset_image.delay_duration > 0:
-            self.delaying = True
             # Save total_delay because if the user changes default delay in
             # settings during this method, we don't want the delay remaining
             # to actually change until we're done here
-            self.delay_remaining = total_delay = self.splits.reset_image.delay_duration
+            total_delay = self.splits.reset_image.delay_duration
+            self.reset_delay_remaining = total_delay
             start_time = time.perf_counter()
 
-            # Poll at regular intervals, both to update self.delay_remaining,
+            # Poll periodically, both to update self.reset_delay_remaining,
             # which is read by ui_controller, and also to allow the user to
             # kill the thread. The same thing is done in the suspend_duration
             # block below.
@@ -1117,14 +1109,15 @@ class Splitter:
                 time.perf_counter() - start_time < total_delay
                 and not self._compare_reset_thread_finished
             ):
-                self.delay_remaining = total_delay - (time.perf_counter() - start_time)
+                self.reset_delay_remaining = total_delay - (
+                    time.perf_counter() - start_time
+                )
                 time.sleep(0.01)
-            self.delaying = False
-            self.delay_remaining = None
+            self.reset_delay_remaining = None
 
+            # Cancel reset if killing thread early
             if self._compare_reset_thread_finished:
-                return False
+                return
 
         # Handle reset
         self.reset_split_action = True
-        return True

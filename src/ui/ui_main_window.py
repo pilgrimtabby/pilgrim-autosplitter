@@ -330,8 +330,10 @@ class UIMainWindow(QMainWindow):
         self.split_overlay.setVisible(False)
         self.split_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
-        self.overlay_delay_txt_secs = "Splitting in {:.1f} s"
-        self.overlay_delay_txt_mins = "Splitting in {}"
+        self.overlay_split_delay_txt_secs = "Splitting in {:.1f} s"
+        self.overlay_split_delay_txt_mins = "Splitting in {}"
+        self.overlay_reset_delay_txt_secs = "Resetting in {:.1f} s"
+        self.overlay_reset_delay_txt_mins = "Resetting in {}"
         self.overlay_pause_txt_secs = "Paused for {:.1f} s"
         self.overlay_pause_txt_mins = "Paused for {}"
 
