@@ -37,7 +37,7 @@ Click the gear icon to the right of the "Start Virtual Camera" button to configu
 
 Optionally, you can save clips of completed splits each time a split image is detected or you press the split hotkey. To enable this setting, click on the video feed itself. To choose the folder where recordings are saved, double-click on the video feed.
 
-If you find that clips are sped up or too slow, this is likely because your [FPS setting]({% link 04-settings.md %}#frames-per-second) is higher than your capture source can output. Try reducing your FPS setting, then restarting Pilgrim Autosplitter.
+If you find that clips are sped up or too slow, this is likely because your [FPS setting]({% link 04-settings.md %}#frames-per-second) is higher than your capture source can output. Try reducing your FPS setting, then clicking the `Reconnect Video` button.
 
 {: .note }
 > Clips of the first split image are not saved.
