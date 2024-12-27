@@ -95,7 +95,6 @@ class Splitter:
         splits (SplitDir): The directory of split images currently in use.
         suspend_remaining (float): The amount of time left (in seconds) before
             the end of a pause after a split.
-        target_fps (int): The framerate set by the user.
         waiting_for_split_change (bool): Indicates to ui_controller that
             _look_for_split received its changing_splits request and is waiting
             for the new split.
@@ -103,17 +102,14 @@ class Splitter:
 
     def __init__(self) -> None:
         """Set all flags and values needed to run the threads."""
-        self.target_fps = settings.get_int("FPS")
-        self._capture_max_fps = 60
-        self._fps_adjust_factor = 1.22  # Roughly the amount needed here; YMMV
-        self._interval = self._get_interval()
-
         # capture_thread
         self.capture_thread = threading.Thread(target=self._capture)
         self._capture_thread_finished = False
         self.comparison_frame = None
         self.frame_pixmap = None
         self._cap = None
+        self._fps_adjust_factor = 1.22  # Roughly the amount needed here; YMMV
+        self._interval = self._get_interval()
 
         # record_thread
         self._record_queue = Queue(10)  # Number doesn't matter, should be small
@@ -324,7 +320,6 @@ class Splitter:
         self.safe_exit_all_threads()
 
         self._cap = self._open_capture()
-        self._capture_max_fps = self._get_max_fps(self._cap)
         self._capture_thread_finished = False
         self.capture_thread = threading.Thread(target=self._capture)
         self.capture_thread.daemon = True
@@ -386,17 +381,14 @@ class Splitter:
 
         while not self._capture_thread_finished:
 
-            # We don't need to wait if we are hitting the max capture fps,
-            # since cap.read() blocks until the next frame is available anyway.
-            # So we only wait on the interval if we are targeting a framerate
-            # that is lower than the max fps.
-            if self.target_fps < self._capture_max_fps:
-                start_time = self._wait_for_interval(start_time)
+            # Wait until next frame (this throttles FPS when user sets
+            # lower FPS than card output in settings)
+            start_time = self._wait_for_interval(start_time)
 
-                # Update self._interval to better track target framerate
-                frames_this_second, frame_counter_start_time = self._update_fps_factor(
-                    frames_this_second, frame_counter_start_time
-                )
+            # Update self._interval to better track target framerate
+            frames_this_second, frame_counter_start_time = self._update_fps_factor(
+                frames_this_second, frame_counter_start_time
+            )
 
             frame = self._cap.read()[1]
             if frame is None:  # Video feed is down, kill the thread
@@ -482,40 +474,13 @@ class Splitter:
         """Return the amount of time loops in this class should sleep before
         each round.
 
-        Calculated using the maximum fps available to the splitter multiplied
-        by some adjustment factor, which is dynamically tweaked by
-        _update_fps_factor.
+        Calculated using the current FPS setting multiplied by the adjustment
+        factor, which is dynamically tweaked by _update_fps_factor.
 
         Returns:
             float: The time.
         """
-        return 1 / (
-            min(self.target_fps, self._capture_max_fps) * self._fps_adjust_factor
-        )
-
-    def _get_max_fps(self, cap: cv2.VideoCapture) -> int:
-        """Get the max FPS of a capture source.
-
-        Set self._capture_max_fps to the capture's maximum FPS on platforms
-        where this is supported. This is done to prevent unnecessary
-        comparisons from being generated in _compare due to a mismatch between
-        the user's selected framerate and a capture-imposed cap which is lower.
-        This also saves CPU.
-
-        Args:
-            cap (cv2.VideoCapture): The capture source to check.
-
-        Returns:
-            int: The max frames per second.
-        """
-        try:
-            max_fps = cap.get(cv2.CAP_PROP_FPS)
-            if max_fps == 0:
-                max_fps = 60
-        except cv2.error:
-            max_fps = 60
-
-        return max_fps
+        return 1 / (settings.get_int("FPS") * self._fps_adjust_factor)
 
     def _update_fps_factor(
         self, frames_this_second: int, frame_counter_start_time: float
@@ -550,7 +515,7 @@ class Splitter:
         if time.perf_counter() - frame_counter_start_time >= 1:
             # print(frames_this_second)  # For debug
 
-            fps = min(self.target_fps, self._capture_max_fps)
+            fps = settings.get_int("FPS")
             if frames_this_second != fps:
                 difference = fps - frames_this_second
                 self._fps_adjust_factor += difference * 0.002
@@ -619,7 +584,7 @@ class Splitter:
 
         # Create output if none supplied
         if output_path is None:
-            fps = self.target_fps
+            fps = settings.get_int("FPS")
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             recordings_dir = settings.get_str("LAST_RECORD_DIR")
             timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
@@ -643,7 +608,7 @@ class Splitter:
             # Output path has changed
             if (
                 not (self.recording_enabled and settings.get_bool("RECORD_CLIPS"))
-                or fps != self.target_fps
+                or fps != settings.get_int("FPS")
                 or recordings_dir != settings.get_str("LAST_RECORD_DIR")
             ):
                 self._delete_video(output_path)
@@ -998,33 +963,22 @@ class Splitter:
         Returns:
             bool: True if a match was found, False otherwise.
         """
-        above_reset_threshold = False
-        match_found = False
+        # Don't display match percents yet
         self.match_reset_percent = None
         self.highest_reset_percent = None
 
-        # Don't do anything on the first loop of the first split image.
-        # This first split is considered the de facto "start image."
-        while (
-            self.splits.current_image_index == 0
-            and self.splits.current_loop == 1
-            and not self._compare_reset_thread_finished
-        ):
-            time.sleep(0.01)
-
-        # Wait the reset wait duration before beginning comparisons
-        start_time = time.perf_counter()
-        while (
-            time.perf_counter() - start_time < self.splits.reset_image.reset_wait_duration
-            and not self._compare_reset_thread_finished
-        ):
-            time.sleep(0.01)
+        # Handle special cases (first + second splits)
+        if not self._handle_compare_reset_special_cases():
+            return False
 
         # Start displaying match percents
         self.match_reset_percent = 0
         self.highest_reset_percent = 0
         self._compare_reset_queue = Queue(10)  # Get rid of old images
+        above_reset_threshold = False
+        match_found = False
 
+        # Start comparing video with reset image
         while not self._compare_reset_thread_finished:
 
             # Restart method if we're back to first split and loop
@@ -1050,6 +1004,54 @@ class Splitter:
 
         return match_found
 
+    def _handle_compare_reset_special_cases(self) -> bool:
+        """Handle special cases for compare_reset (first and second splits).
+
+        Wait while on the first split (no comparisons). On the second split,
+        we wait reset_wait_duration before beginning comparisons.
+
+        One benefit of handling this before we set the match_percents to 0 in
+        compare_reset is that the match percents don't flicker on, then off,
+        when one of the conditions that would return False here is present and
+        the thread would otherwise be killed.
+
+        Returns:
+            bool: True if the thread has been killed externally, False otherwise.
+        """
+        # Don't look for reset image on first split
+        while (
+            self.splits.current_image_index == 0
+            and self.splits.current_loop == 1
+            and not self._compare_reset_thread_finished
+        ):
+            time.sleep(0.01)
+
+        # Get no. of loops of first split
+        try:
+            first_split_loop_count = self.splits.list[0].loops
+
+        # If there is no first split, kill thread
+        except IndexError:
+            return False
+
+        # Set conditions for current split being the second split
+        if first_split_loop_count == 1:
+            is_second_split = self.splits.current_image_index == 1 and self.splits.current_loop == 1
+        else:
+            is_second_split = self.splits.current_image_index == 0 and self.splits.current_loop == 2
+
+        # Wait split image's reset_wait_duration if this is the second split
+        if is_second_split:
+            start_time = time.perf_counter()
+            while (
+                time.perf_counter() - start_time < self.splits.reset_image.reset_wait_duration
+                and not self._compare_reset_thread_finished
+            ):
+                time.sleep(0.01)
+
+        # Return True if thread should continue (ie it's not finished)
+        return not self._compare_reset_thread_finished
+        
     def _compare_with_reset_image(
         self, frame: numpy.ndarray, above_reset_threshold: bool
     ) -> Tuple[bool, bool]:
