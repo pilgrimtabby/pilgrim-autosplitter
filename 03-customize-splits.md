@@ -46,14 +46,33 @@ Override the [default pause]({% link 04-settings.md %}#default-pause) for this s
 
 The value is inserted between brackets: `[value]`.
 
+This setting has no effect for reset splits `{r}`.
+
 {: .example }
 `001_mysplit_[120].png` Don't look for the next split image for 2 minutes after this split.
+
+## Reset Wait
+
+Force the splitter not to look for the [reset image](#reset-type) for `value` seconds after the first split. This value MUST be in the reset image's filename -- putting it into the filename of another image won't do anything.
+
+This is useful if, for example, your reset image is the same as your start image and you want to make sure you don't reset immediately after starting.
+
+Insert the value between percent signs: `%value%`.
+
+This setting ONLY works with reset splits `{r}`.
+
+Default: `0`
+
+{: .example }
+`100_my_reset_split_%10%_{r}.png` The reset image won't be looked for or triggered for ten seconds after the first split image is found.
 
 ## Loops
 
 Force a split to loop. Useful if consecutive splits use the same image.
 
 Insert the value between "at" signs: `@value@`.
+
+This setting has no effect for reset splits `{r}`.
 
 Default: `1`
 
@@ -62,12 +81,12 @@ Default: `1`
 
 # Special Split Types
 
-You can tell Pilgrim Autosplitter to do special actions when matching a split. 
+You can tell Pilgrim Autosplitter to do special actions when matching a split.
 
 Specify a special split type by inserting its corresponding letter between curly braces: `{value}`. 
 
 {: .note }
-Special split types can be used together, but the dummy type `{d}` will always override the pause type `{p}`.
+Special split types can be used together, but the dummy type `{d}` will always override the pause type `{p}`. In addition, reset type splits `{r}` can't be used with any type except below type splits `{b}`.
 
 ## Pause type
 
@@ -97,3 +116,14 @@ Insert a `b` between curly braces: `{b}`.
 
 {: .example }
 `001_mysplit_{b}.png` After finding a match, wait until the video no longer matches before splitting.
+
+## Reset type
+
+Press the reset hotkey when a match is found. Only one reset split can exist per folder; if you have more than one, only one will be found and used. This split is always being checked in the background, and it doesn't appear in your splits list in-app. If you want to see it and/or see how much it matches with your video feed, click and hold on the split image display on the right-hand side.
+
+Even if you have a reset split, it won't be searched for during the first split image. The first split image should be used as a "start split" -- after this split has been found, the run has begun. You can also delay searching for the reset image for a period of time after the first split by setting a [reset wait](#reset-wait).
+
+Insert an `r` between curly braces: `{r}`.
+
+{: .example }
+`121_theend_{r}.png` After finding a match, the run and splits are reset.
