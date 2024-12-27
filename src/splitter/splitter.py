@@ -619,7 +619,7 @@ class Splitter:
 
         # Create output if none supplied
         if output_path is None:
-            fps = min(self._cap.get(cv2.CAP_PROP_FPS), self.target_fps)
+            fps = self.target_fps
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             recordings_dir = settings.get_str("LAST_RECORD_DIR")
             timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
@@ -643,7 +643,7 @@ class Splitter:
             # Output path has changed
             if (
                 not (self.recording_enabled and settings.get_bool("RECORD_CLIPS"))
-                or fps != min(self._cap.get(cv2.CAP_PROP_FPS), self.target_fps)
+                or fps != self.target_fps
                 or recordings_dir != settings.get_str("LAST_RECORD_DIR")
             ):
                 self._delete_video(output_path)
