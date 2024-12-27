@@ -35,9 +35,9 @@ Click the gear icon to the right of the "Start Virtual Camera" button to configu
 
 ## Record clips
 
-Optionally, you can save clips of completed splits each time a split image is detected or you press the split hotkey. To enable this setting, click on the video feed itself. To choose the folder where recordings are saved, double-click on the video feed.
+Optionally, you can save clips of completed splits each time a split image is detected or you press the split hotkey. To enable this setting, click on the video feed itself, and you will see a record symbol appear in the upper-right corner of the video feed. To choose the folder where recordings are saved, double-click on the video feed.
 
-If you find that clips are sped up or too slow, this is likely because your [FPS setting]({% link 04-settings.md %}#frames-per-second) is higher than your capture source can output. Try reducing your FPS setting, then clicking the `Reconnect Video` button.
+If you find that clips are sped up or too fast, this is likely because your [FPS setting]({% link 04-settings.md %}#frames-per-second) is higher than your capture source can output. See if reducing your FPS setting helps.
 
 {: .note }
 > Clips of the first split image are not saved.
