@@ -108,7 +108,9 @@ class Splitter:
         self.comparison_frame = None
         self.frame_pixmap = None
         self._cap = None
-        self._fps_adjust_factor = 1.22  # Roughly the amount needed here; YMMV
+        # This number works on my machine. Your mileage may vary.
+        self._fps_adjust_factor = self._default_fps_adjust_factor = 1.22
+        self._most_recent_fps = settings.get_int("FPS")
         self._interval = self._get_interval()
 
         # record_thread
@@ -485,22 +487,11 @@ class Splitter:
     def _update_fps_factor(
         self, frames_this_second: int, frame_counter_start_time: float
     ) -> Tuple[int, float]:
-        """Watch _look_for_match's actual FPS count and adjusts self._interval
-        as needed to reach the target framerate. This is needed since using
+        """Watch _capture's actual FPS count and adjusts self._interval as
+        needed to reach the target framerate. This is needed since using
         time.sleep, as this method does, always introduces a little bit of
         drag, but the amount of drag depends on the machine and on the FPS
         setting the user chooses.
-
-        This method is currently only implemented in _look_for_match. It could
-        be implemented in _capture, too, but there are two reasons I don't want
-        to:
-            1) _look_for_match runs a little slower than _capture, at least on
-                my machine, so basing self._interval off the speed of
-                _look_for_match guarantees that the _capture framerate isn't
-                needlessly throttled.
-            2) Implementing this method inside more than one method would
-                require tracking multiple intervals, which I feel would be
-                needlessly complicated.
 
         Args:
             frames_this_second (int): The amount of frames processed this
@@ -509,19 +500,29 @@ class Splitter:
                 time.perf_counter(), the current second started.
 
         Returns:
-            Tuple[int, float]: The update frames_this_second and
+            Tuple[int, float]: The updated frames_this_second and
                 frame_counter_start_time values.
         """
         if time.perf_counter() - frame_counter_start_time >= 1:
-            # print(frames_this_second)  # For debug
 
+            # print(frames_this_second)  # For debug
             fps = settings.get_int("FPS")
-            if frames_this_second != fps:
+
+            # Reset adjust factor when FPS changes
+            if self._most_recent_fps != fps:
+                self._most_recent_fps = fps
+                self._fps_adjust_factor = self._default_fps_adjust_factor
+
+            # Adjust factor if no setting change, but FPS isn't quite right
+            elif frames_this_second != fps:
                 difference = fps - frames_this_second
                 self._fps_adjust_factor += difference * 0.002
+
+            # Get new interval and restart the counter
             self._interval = self._get_interval()
             frames_this_second = 0
             frame_counter_start_time = time.perf_counter()
+
         else:
             frames_this_second += 1
 
