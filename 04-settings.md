@@ -27,9 +27,9 @@ Lowering this setting is a great way to save CPU.
 
 The amount of frames per second Pilgrim Autosplitter captures and processes.
 
-A good rule of thumb is to use half your game's FPS. If you play Super Mario 64, then you would use 15 (Super Mario 64 is 30 FPS). You might be able to use an even lower FPS if your split images use elements that stay on the screen for a long time.
+A decent rule of thumb for the minimum needed FPS is to use half your game's FPS. If you play Super Mario 64, this would be 15 (Super Mario 64 runs at 30 FPS). You might be able to use an even lower FPS if your split images use elements that stay on the screen for a long time. However, iff your split images contain elements that are only onscreen for one frame, you should use at least your game's FPS.
 
-If your split images contain elements that are only onscreen for one frame, use your game's FPS.
+Of course, there's no downside to using a higher FPS -- it just comes with a higher performance cost.
 
 Framerates higher than 60 FPS are not supported.
 
