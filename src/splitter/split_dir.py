@@ -306,6 +306,7 @@ class SplitDir:
             )
             self.delay_duration, self.delay_is_default = self._get_delay_from_name()
             self.pause_duration, self.pause_is_default = self._get_pause_from_name()
+            self.reset_wait_duration = self._get_reset_wait_from_name()
             self.threshold, self.threshold_is_default = self._get_threshold_from_name()
             self.loops, self.loops_is_default = self._get_loops_from_name()
 
@@ -620,6 +621,35 @@ class SplitDir:
 
             pause = float(pause[1])
             return max(min(pause, MAX_LOOPS_AND_WAIT), 1), False
+
+        def _get_reset_wait_from_name(self) -> Optional[float]:
+            """Set reset image's wait time, the time the splitter waits before
+            beginning to look for the rest image. If this is 0, the splitter
+            starts looking for the reset image right after the first split.
+
+            Reset wait duration is set in the filename by placing a float in
+            between percent signs, like this: %20% (the splitter won't look for
+            the reset image for 20 seconds after it normally would).
+
+            Using is_digit guarantees that this method will not return negative
+            numbers, which is what we want.
+
+            There is no minimum reset wait time, but it cannot be greater than
+            MAX_LOOPS_AND_WAIT.
+
+            Returns:
+                float: The reset wait time indicated in the filename. Default
+                    is 0. Returns None if the image isn't a split image.
+            """
+            if not self.reset_flag:
+                return None
+
+            reset_wait = re.search(r"_\%(.+?)\%", self.name)
+            if reset_wait is None or not str(reset_wait[1]).replace(".", "", 1).isdigit():
+                return settings.get_float("DEFAULT_RESET_WAIT")
+
+            reset_wait = float(reset_wait[1])
+            return max(min(reset_wait, MAX_LOOPS_AND_WAIT), 0)
 
         def _get_threshold_from_name(self) -> float:
             """Set split image's threshold match percent by reading filename

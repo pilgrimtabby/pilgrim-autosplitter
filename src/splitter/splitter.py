@@ -1012,6 +1012,14 @@ class Splitter:
         ):
             time.sleep(0.01)
 
+        # Wait the reset wait duration before beginning comparisons
+        start_time = time.perf_counter()
+        while (
+            time.perf_counter() - start_time < self.splits.reset_image.reset_wait_duration
+            and not self._compare_reset_thread_finished
+        ):
+            time.sleep(0.01)
+
         # Start displaying match percents
         self.match_reset_percent = 0
         self.highest_reset_percent = 0
@@ -1093,11 +1101,12 @@ class Splitter:
         self.safe_exit_compare_split_thread()
 
         # Handle delay
-        if self.splits.reset_image.delay_duration > 0:
+        reset_image = self.splits.reset_image
+        if reset_image.delay_duration > 0:
             # Save total_delay because if the user changes default delay in
             # settings during this method, we don't want the delay remaining
             # to actually change until we're done here
-            total_delay = self.splits.reset_image.delay_duration
+            total_delay = reset_image.delay_duration
             self.reset_delay_remaining = total_delay
             start_time = time.perf_counter()
 

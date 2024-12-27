@@ -151,12 +151,13 @@ def set_program_vals(settings: QSettings = settings) -> None:
     home_dir = get_home_dir()
 
     # Unset hotkeys if upgrading from <=v1.0.6 because of hotkey implementation
-    # updates
+    # updates. Set a default reset wait for the same reason.
     last_version = get_str("LAST_VERSION", settings)
     if last_version == "None":
         last_version = "v1.0.0"
     if not version_ge(last_version, "v1.0.7"):
         unset_hotkey_bindings()
+        set_value("DEFAULT_RESET_WAIT", 0.0, settings)
 
     if not get_bool("SETTINGS_SET", settings):
         # Indicate that default settings have been populated
@@ -176,6 +177,9 @@ def set_program_vals(settings: QSettings = settings) -> None:
 
         # The default pause (seconds) after a split
         set_value("DEFAULT_PAUSE", 1.0, settings)
+
+        # The default wait time before looking for reset image
+        set_value("DEFAULT_RESET_WAIT", 0.0, settings)
 
         # The FPS used by splitter and ui_controller
         set_value("FPS", 30, settings)

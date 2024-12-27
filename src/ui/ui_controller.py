@@ -482,6 +482,7 @@ class UIController:
         self._splitter.safe_exit_compare_split_thread()
         self._splitter.safe_exit_compare_reset_thread()
         self._splitter.splits.reset_split_images()
+
         if (
             len(self._splitter.splits.list) > 0
             and self._splitter.capture_thread.is_alive()
