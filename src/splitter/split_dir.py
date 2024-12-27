@@ -645,7 +645,10 @@ class SplitDir:
                 return None
 
             reset_wait = re.search(r"_\%(.+?)\%", self.name)
-            if reset_wait is None or not str(reset_wait[1]).replace(".", "", 1).isdigit():
+            if (
+                reset_wait is None
+                or not str(reset_wait[1]).replace(".", "", 1).isdigit()
+            ):
                 return settings.get_float("DEFAULT_RESET_WAIT")
 
             reset_wait = float(reset_wait[1])

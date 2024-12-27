@@ -1036,22 +1036,27 @@ class Splitter:
 
         # Set conditions for current split being the second split
         if first_split_loop_count == 1:
-            is_second_split = self.splits.current_image_index == 1 and self.splits.current_loop == 1
+            is_second_split = (
+                self.splits.current_image_index == 1 and self.splits.current_loop == 1
+            )
         else:
-            is_second_split = self.splits.current_image_index == 0 and self.splits.current_loop == 2
+            is_second_split = (
+                self.splits.current_image_index == 0 and self.splits.current_loop == 2
+            )
 
-        # Wait split image's reset_wait_duration if this is the second split
+        # Wait reset image's reset_wait_duration if this is the second split
         if is_second_split:
+            reset_wait = self.splits.reset_image.reset_wait_duration
             start_time = time.perf_counter()
             while (
-                time.perf_counter() - start_time < self.splits.reset_image.reset_wait_duration
+                time.perf_counter() - start_time < reset_wait
                 and not self._compare_reset_thread_finished
             ):
                 time.sleep(0.01)
 
         # Return True if thread should continue (ie it's not finished)
         return not self._compare_reset_thread_finished
-        
+
     def _compare_with_reset_image(
         self, frame: numpy.ndarray, above_reset_threshold: bool
     ) -> Tuple[bool, bool]:
