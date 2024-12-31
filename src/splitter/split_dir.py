@@ -166,8 +166,8 @@ class SplitDir:
         """Get a list of SplitImage objects from a directory, including a reset
         image if present.
 
-        Currently supported image types include .png, .jpg, and .jpeg. Only
-        .png is tested, and it is the only recommended image format.
+        Only image type currently supported is .png. Other types could easily
+        be supported, it's just a matter of doing it.
 
         Use multiprocessing.dummy.Pool to construct the split images list. This
         cuts the time spent making the list by a factor of ten, which matters a
@@ -216,11 +216,7 @@ class SplitDir:
         if not pathlib.Path(dir_path).is_dir():
             return [], None  # The directory doesn't exist; return an empty list
 
-        image_paths = sorted(
-            glob.glob(f"{dir_path}/*.png")
-            + glob.glob(f"{dir_path}/*.jpg")
-            + glob.glob(f"{dir_path}/*.jpeg")
-        )
+        image_paths = sorted(glob.glob(f"{dir_path}/*.png"))
 
         # Get the reset image if it exists, remove it from the main list
         reset_image_path = reset_image = None
