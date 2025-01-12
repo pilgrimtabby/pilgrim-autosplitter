@@ -1665,8 +1665,10 @@ class UIController:
                     self._hotkey_box_to_change = hotkey_box
                     self._hotkey_box_key_code = key_code
                     self._hotkey_box_key_name = key_name
-                    return
 
+                hotkey_box.clearFocus()
+                return
+    
         # Use #2 (set "hotkey pressed" flag for _react_to_hotkey_flags)
         if not self._settings_window.isVisible():
             for hotkey_pressed, setting in {
