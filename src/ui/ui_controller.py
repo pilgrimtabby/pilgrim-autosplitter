@@ -1661,14 +1661,20 @@ class UIController:
             self._settings_window.toggle_global_hotkeys_hotkey_box,
         ]:
             if hotkey_box.hasFocus():
+
+                # Set flags to be picked up by _react_to_settings_menu_flags
                 with self._hotkey_box_lock:
                     self._hotkey_box_to_change = hotkey_box
                     self._hotkey_box_key_code = key_code
                     self._hotkey_box_key_name = key_name
 
-                hotkey_box.clearFocus()
+                # Take focus off hotkey box so hotkey saves properly
+                # (needed on some Linux versions)
+                if platform.system() != "Windows" and platform.system() != "Darwin":
+                    hotkey_box.clearFocus()
+
                 return
-    
+
         # Use #2 (set "hotkey pressed" flag for _react_to_hotkey_flags)
         if not self._settings_window.isVisible():
             for hotkey_pressed, setting in {
