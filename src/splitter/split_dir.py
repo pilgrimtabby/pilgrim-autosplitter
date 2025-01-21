@@ -421,8 +421,9 @@ class SplitDir:
             pauses = re.findall(r"\[.*?\]", self.name)
             thresholds = re.findall(r"\(.*?\)", self.name)
             loops = re.findall(r"\@.*?\@", self.name)
+            reset_wait = re.findall(r"\%.*?\%", self.name)
 
-            non_name_text = [flags, delays, pauses, thresholds, loops]
+            non_name_text = [flags, delays, pauses, thresholds, loops, reset_wait]
             stripped_name = self.name
 
             # Remove the extra text
