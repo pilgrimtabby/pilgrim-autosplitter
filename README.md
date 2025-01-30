@@ -8,7 +8,7 @@ Pilgrim Autosplitter was designed to fill the gap left by other image-based spee
 
 Bring your best speedgame on Windows, MacOS, and Linux (and whether you game on console or computer).
 
-This program is still relatively new, so you may encounter bugs. If you do, or if you have an idea for a new feature or improvement, [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
+Contributions are welcome and encouraged! If you find bugs or have an idea for a new feature or improvement, please [submit an issue](https://github.com/pilgrimtabby/pilgrim-autosplitter/issues) or [open a pull request](https://github.com/pilgrimtabby/pilgrim-autosplitter/pulls).
 
 # About
 
@@ -42,6 +42,9 @@ The installation method depends on your operating system.
 ### Method 1: Download Application
 
 Download the latest Windows build (Pilgrim.Autosplitter.Windows.v1.x.x) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Unzip and run Pilgrim Autosplitter.exe.
+
+> [!Note]
+> The most recent application build is out of date and will likely remain that way for a while, as I don't have too much time to devote to this project. If you want to use the latest features, you'll need to run the source code.
 
 ### Method 2: Run from source with Python
 
@@ -80,6 +83,9 @@ If this is your first time using Python:
 Download the latest MacOS build corresponding to your computer's architecture (`MacOS.Intel` or `MacOS.Silicon`) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). If you're not sure which option you should choose, see [this guide](https://support.apple.com/en-us/116943).
 
 Extract and run Pilgrim Autosplitter.app. When prompted to allow access in System Settings (or System Preferences, depending on your MacOS version), do it. Then, navigate to `Privacy and Security > Accessibility` and toggle the app so it has permissions. You may need to close and restart the app. 
+
+> [!Note]
+> The most recent application build is out of date and will likely remain that way for a while, as I don't have too much time to devote to this project. If you want to use the latest features, you'll need to run the source code.
 
 Known limitations:
 
@@ -129,6 +135,9 @@ If this is your first time using Python:
 ### Method 1: Download application
 
 Download the latest Linux build for your architecture (`Linux.AMD` or `Linux.ARM`) from the [most recent release page](https://github.com/pilgrimtabby/pilgrim-autosplitter/releases/latest). Extract Pilgrim Autosplitter and use the command line to run it AS ROOT (there is no other known way to make hotkeys work as intended).
+
+> [!Note]
+> The most recent application build is out of date and will likely remain that way for a while, as I don't have too much time to devote to this project. If you want to use the latest features, you'll need to run the source code.
 
 Known limitations:
 
