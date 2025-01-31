@@ -1,4 +1,4 @@
-# Copyright (c) 2024 pilgrim_tabby
+# Copyright (c) 2024-2025 pilgrim_tabby
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ COMPARISON_FRAME_WIDTH = 320
 COMPARISON_FRAME_HEIGHT = 240
 
 # Pilgrim Autosplitter's current version number
-VERSION_NUMBER = "v1.0.7"
+VERSION_NUMBER = "v1.1.0"
 
 # The URL of Pilgrim Autosplitter's GitHub repo
 REPO_URL = "https://github.com/pilgrimtabby/pilgrim-autosplitter/"
@@ -141,7 +141,7 @@ def set_program_vals(settings: QSettings = settings) -> None:
 
     Populates settings with default values if they have not yet been set.
 
-    Ensures that LAST_IMAGE_DIR points to an existing path.
+    Ensures that LAST_IMAGE_DIR and LAST_RECORD_DIR point to existing paths.
 
     Ensures that the program starts in full view if START_WITH_VIDEO is false,
     since the user would have to exit minimal view to turn the video on anyway.
@@ -151,12 +151,13 @@ def set_program_vals(settings: QSettings = settings) -> None:
     home_dir = get_home_dir()
 
     # Unset hotkeys if upgrading from <=v1.0.6 because of hotkey implementation
-    # updates
+    # updates. Set a default reset wait for the same reason.
     last_version = get_str("LAST_VERSION", settings)
     if last_version == "None":
         last_version = "v1.0.0"
     if not version_ge(last_version, "v1.0.7"):
         unset_hotkey_bindings()
+        set_value("DEFAULT_RESET_WAIT", 0.0, settings)
 
     if not get_bool("SETTINGS_SET", settings):
         # Indicate that default settings have been populated
@@ -164,6 +165,9 @@ def set_program_vals(settings: QSettings = settings) -> None:
 
         # Set hotkeys to default values
         unset_hotkey_bindings()
+
+        # Turn off recording splits as clips by default
+        set_value("RECORD_CLIPS", False, settings)
 
         # The default minimum match percent needed to force a split action
         set_value("DEFAULT_THRESHOLD", 0.90, settings)
@@ -174,11 +178,17 @@ def set_program_vals(settings: QSettings = settings) -> None:
         # The default pause (seconds) after a split
         set_value("DEFAULT_PAUSE", 1.0, settings)
 
+        # The default wait time before looking for reset image
+        set_value("DEFAULT_RESET_WAIT", 0.0, settings)
+
         # The FPS used by splitter and ui_controller
         set_value("FPS", 30, settings)
 
         # The location of split images
         set_value("LAST_IMAGE_DIR", home_dir, settings)
+
+        # The location of recordings
+        set_value("LAST_RECORD_DIR", home_dir, settings)
 
         # Determine whether screenshots should be opened using the machine's
         # default image viewer after capture
@@ -220,6 +230,12 @@ def set_program_vals(settings: QSettings = settings) -> None:
     last_image_dir = get_str("LAST_IMAGE_DIR", settings)
     if not last_image_dir.startswith(home_dir) or not Path(last_image_dir).is_dir():
         set_value("LAST_IMAGE_DIR", home_dir, settings)
+
+    # Make sure recordings dir exists and is within the user's home dir
+    # (This limits i/o to user-controlled areas)
+    last_record_dir = get_str("LAST_RECORD_DIR", settings)
+    if not last_record_dir.startswith(home_dir) or not Path(last_record_dir).is_dir():
+        set_value("LAST_RECORD_DIR", home_dir, settings)
 
     # Always start in full view if video doesn't come on automatically
     if not get_bool("START_WITH_VIDEO", settings):

@@ -1,4 +1,4 @@
-# Copyright (c) 2024 pilgrim_tabby
+# Copyright (c) 2024-2025 pilgrim_tabby
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -133,11 +133,14 @@ style_sheet_dark = Template(
         border: 1px solid #3EA0EC;
     }
 
-    QLabel#image_label_active {
-        background: $default_background;
+    QLabel#video_label {
+        background: #555555;
         border: 1px solid $text_and_borders;
     }
-    QLabel#image_label_inactive {
+    QLabel#video_overlay {
+        background-color: transparent;
+    }
+    QLabel#image_label {
         background: #555555;
         border: 1px solid $text_and_borders;
     }
@@ -249,11 +252,14 @@ style_sheet_light = Template(
         border: 1px solid #3EA0EC;
     }
 
-    QLabel#image_label_active {
-        background: $default_background;
+    QLabel#video_label {
+        background: #bbbbbb;
         border: 1px solid $text_and_borders;
     }
-    QLabel#image_label_inactive {
+    QLabel#video_overlay {
+        background-color: transparent;
+    }
+    QLabel#image_label {
         background: #bbbbbb;
         border: 1px solid $text_and_borders;
     }
@@ -277,16 +283,3 @@ style_sheet_light = Template(
     }
     """
 ).substitute(style_dict_light)
-
-
-def set_style(window: QObject, theme: str) -> None:
-    """Set the style sheet of a QWidget.
-
-    Args:
-        window (QWidget): The widget whose style is being set.
-        theme (str): The theme to be set.
-    """
-    if theme == "dark":
-        window.setStyleSheet(style_sheet_dark)
-    elif theme == "light":
-        window.setStyleSheet(style_sheet_light)

@@ -1,4 +1,4 @@
-# Copyright (c) 2024 pilgrim_tabby
+# Copyright (c) 2024-2025 pilgrim_tabby
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
