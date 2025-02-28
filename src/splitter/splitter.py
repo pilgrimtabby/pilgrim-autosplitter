@@ -665,16 +665,19 @@ class Splitter:
         current_split_image = self.splits.list[current_index]
         stripped_name = current_split_image.stripped_name
 
+        # Get timestamp from temporary video name
+        video = pathlib.Path(current_path)
+        timestamp = video.stem
+
         # Get loop and total loops of current split
         loop = self.splits.current_loop
         total_loops = current_split_image.loops
 
         # Get new video name
-        video = pathlib.Path(current_path)
         if total_loops == 1:
-            new_name = f"{stripped_name}-{video.stem}.mp4"
+            new_name = f"{stripped_name}-{timestamp}.mp4"
         else:
-            new_name = f"{stripped_name}-loop_{loop}-{video.stem}.mp4"
+            new_name = f"{stripped_name}-loop_{loop}-{timestamp}.mp4"
 
         # Rename video
         video.rename(pathlib.Path(video.parent, new_name))
