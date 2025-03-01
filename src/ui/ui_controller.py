@@ -422,8 +422,10 @@ class UIController:
         the thread down on accident, so we also check if this method is being
         called as the result of a hotkey press.
         """
-        # Kill recording
-        self._splitter.safe_exit_record_thread()
+        # Kill recording if not calling this method as the result of
+        # a dummy split
+        if not self._splitter.continue_recording:
+            self._splitter.safe_exit_record_thread()
 
         # Kill splitter threads if we're on the last split
         # (This call must be the result of a split key hotpress)
@@ -463,8 +465,12 @@ class UIController:
                 self._splitter.splits.next_split_image()
                 self._splitter.changing_splits = False
 
-        # Restart recording
-        self._splitter.restart_record_thread()
+        # Restart recording if not calling this method as the result of
+        # a dummy split
+        if self._splitter.continue_recording:
+            self._splitter.continue_recording = False
+        else:
+            self._splitter.restart_record_thread()
 
     def _request_reset_splits(self) -> None:
         """Tell splitter.splits to call reset_split_images, and ask

@@ -548,57 +548,28 @@ class Splitter:
     #                               #
     #################################
 
-    def _record(
-        self,
-        output_path: Optional[str] = None,
-        fps: Optional[float] = None,
-        recordings_dir: Optional[str] = None,
-    ) -> None:
-        """Record and save clips of each completed split.
-
-        When this method ends, it erases the recording it made unless flags are
-        set somewhere else.
-
-        If no arguments are supplied, those arguments are generated in the
-        method. They should only be supplied when continuing, not restarting, a
-        recording.
-
-        Framerate used is necessarily somewhat of a guess.
-
-        Args:
-            output_path (str, optional): The path to write the video to.
-                Defaults to None.
-            fps (float, optional): The FPS at which to save the video. Defaults
-                to None.
-            recordings_dir (str, optional): The directory that holds the
-                recordings. Defaults to None.
-        """
+    def _record(self) -> None:
+        """Record and save clips of each completed split."""
         # Wait for recording to become enabled
         while not (self.recording_enabled and settings.get_bool("RECORD_CLIPS")):
             time.sleep(0.01)
             if self._record_thread_finished:
                 return
 
-        # Unset flags
-        self.save_recording = False
-        self.continue_recording = False
+        fps = settings.get_int("FPS")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        recordings_dir = settings.get_str("LAST_RECORD_DIR")
+        timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
+        output_path = f"{recordings_dir}/{timestamp}.mp4"
+        output = cv2.VideoWriter(
+            output_path,
+            fourcc,
+            fps,
+            (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
+        )
 
-        # Create output if none supplied
-        if output_path is None:
-            fps = settings.get_int("FPS")
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-            recordings_dir = settings.get_str("LAST_RECORD_DIR")
-            timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
-            output_path = f"{recordings_dir}/{timestamp}.mp4"
-            output = cv2.VideoWriter(
-                output_path,
-                fourcc,
-                fps,
-                (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
-            )
-
-            # Get rid of (potentially very old) images
-            self._record_queue = Queue(10)
+        # Get rid of (potentially very old) images
+        self._record_queue = Queue(10)
 
         # Record each frame
         while not self._record_thread_finished:
@@ -627,14 +598,8 @@ class Splitter:
             self._rename_video(output_path)
             self.result_text = "Split recording saved!"
 
-        # Broken loop caused by dummy split / split hotkey on dummy split
-        # (keep recording same video)
-        elif self.continue_recording:
-            self.continue_recording = False
-            self._record(output_path, fps, recordings_dir)
-
         # Broken loop caused by any other split image change, program closing,
-        # or anything else (end recording, delete video)
+        # or anything else (end recording, delete video) except dummy split
         else:
             self._delete_video(output_path)
 
