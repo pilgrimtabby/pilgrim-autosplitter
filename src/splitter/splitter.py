@@ -591,7 +591,9 @@ class Splitter:
         self._record_queue = Queue(10)
 
         # Start audio thread
-        self._audio_thread = threading.Thread(target=self._record_audio, args=(audio_file,))
+        self._audio_thread = threading.Thread(
+            target=self._record_audio, args=(audio_file,)
+        )
         self._audio_thread.daemon = True
         self._audio_thread_finished = False
         self._audio_thread.start()
@@ -605,7 +607,7 @@ class Splitter:
         # Record video
         if not self._write_frames(fps, recordings_dir, video_writer):
 
-            # See _write_frames for circumstances that cause the method to 
+            # See _write_frames for circumstances that cause the method to
             # return False
             # If this happens, kill audio thread, restart recording
             self._recording_audio = False
@@ -631,7 +633,7 @@ class Splitter:
             # Mux the files together (or save the video file if no audio)
             self._make_final_video(video_file, audio_file, recordings_dir)
 
-        # The split has changed for some other reason, not including dummy 
+        # The split has changed for some other reason, not including dummy
         # splits -- stop and delete everything
         else:
             self._recording_audio = False
@@ -639,7 +641,9 @@ class Splitter:
             self._audio_thread.join()
             self._delete_folder(tmp_output_dir)
 
-    def _write_frames(self, fps: int, recordings_dir: str, video_writer: cv2.VideoWriter) -> bool:
+    def _write_frames(
+        self, fps: int, recordings_dir: str, video_writer: cv2.VideoWriter
+    ) -> bool:
         """Write frames to the video file as long as the thread is alive.
 
         Args:
@@ -677,8 +681,10 @@ class Splitter:
             shutil.rmtree(dir)
         except FileNotFoundError:
             pass
-        
-    def _record_audio(self, audio_file: str, audio_src: str = "USB Digital Audio") -> None:
+
+    def _record_audio(
+        self, audio_file: str, audio_src: str = "USB Digital Audio"
+    ) -> None:
         """Record audio from a named audio source and write it to a file.
 
         Args:
@@ -689,7 +695,9 @@ class Splitter:
         ffmpeg = settings._get_exec_path("ffmpeg")
         ffprobe = settings._get_exec_path("ffprobe")
         if ffmpeg is None or ffprobe is None:
-            print("WARNING: ffmpeg or ffprobe not found on PATH. Audio will not be recorded when saving clips.")
+            print(
+                "WARNING: ffmpeg or ffprobe not found on PATH. Audio will not be recorded when saving clips."
+            )
             return
 
         format = pyaudio.paInt16
@@ -705,9 +713,14 @@ class Splitter:
         # Get the valid channel count so there's no need to guess
         while True:
             try:
-                audio_stream = audio.open(format=format, channels=channels,
-                                rate=bitrate, input=True,
-                                frames_per_buffer=chunk_size, input_device_index=audio_device_index)
+                audio_stream = audio.open(
+                    format=format,
+                    channels=channels,
+                    rate=bitrate,
+                    input=True,
+                    frames_per_buffer=chunk_size,
+                    input_device_index=audio_device_index,
+                )
                 break
             except ValueError:
                 channels += 1
@@ -746,7 +759,9 @@ class Splitter:
         device_count = api_info.get("deviceCount")
 
         for i in range(0, device_count):
-            device_info = audio.get_device_info_by_host_api_device_index(host_api_index=0, host_api_device_index=i)
+            device_info = audio.get_device_info_by_host_api_device_index(
+                host_api_index=0, host_api_device_index=i
+            )
             if device_info.get("maxInputChannels") > 0:
                 device_name = device_info.get("name")
                 if device_name == target_name:
@@ -783,10 +798,17 @@ class Splitter:
         # files.
         # Do this in a separate thread because it can take a little while.
         if pathlib.Path(audio).is_file():
-            mux_thread = threading.Thread(target=self._mux_video_and_audio, args=(video, audio, new_path,))
+            mux_thread = threading.Thread(
+                target=self._mux_video_and_audio,
+                args=(
+                    video,
+                    audio,
+                    new_path,
+                ),
+            )
             mux_thread.daemon = True
             mux_thread.start()
-        
+
         # No audio -- just move the video file to the right spot.
         else:
             os.rename(video, new_path)
@@ -800,7 +822,9 @@ class Splitter:
         device_count = api_info.get("deviceCount")
 
         for i in range(0, device_count):
-            device_info = audio.get_device_info_by_host_api_device_index(host_api_index=0, host_api_device_index=i)
+            device_info = audio.get_device_info_by_host_api_device_index(
+                host_api_index=0, host_api_device_index=i
+            )
             if device_info.get("maxInputChannels") > 0:
                 device_name = device_info.get("name")
                 print(f"Device {i}: {device_name}")
@@ -816,7 +840,17 @@ class Splitter:
         """
         ffprobe = settings._get_exec_path("ffprobe")
         csv_val = "p=0"
-        cmd = [ffprobe, "-i", file_path, "-show_entries", "format=duration", "-v", "quiet", "-of", f"csv={csv_val}"]
+        cmd = [
+            ffprobe,
+            "-i",
+            file_path,
+            "-show_entries",
+            "format=duration",
+            "-v",
+            "quiet",
+            "-of",
+            f"csv={csv_val}",
+        ]
 
         actual_length = subprocess.check_output(cmd)
         return float(actual_length.decode().strip())
@@ -849,19 +883,42 @@ class Splitter:
             audio (str): Path to the audio file.
             out_path (str): Path to the muxed video file.
         """
-        video_length_actual = self._most_recent_record_end_time - self._most_recent_record_start_time
+        video_length_actual = (
+            self._most_recent_record_end_time - self._most_recent_record_start_time
+        )
         video_length_raw = self._get_recording_duration_seconds(video)
         stretch_factor = video_length_actual / video_length_raw
 
         tmp_output_dir = pathlib.Path(audio).parent
         audio_stretched = f"{tmp_output_dir}/audio_stretched.wav"
 
-        ffmpeg = settings._get_exec_path("ffmpeg")            
+        ffmpeg = settings._get_exec_path("ffmpeg")
 
-        cmd = [ffmpeg, "-i", audio, "-filter:a", f"atempo={stretch_factor}", audio_stretched]
+        # Stretch / shrink audio to match video length
+        cmd = [
+            ffmpeg,
+            "-i",
+            audio,
+            "-filter:a",
+            f"atempo={stretch_factor}",
+            audio_stretched,
+        ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        cmd = [ffmpeg, "-y", "-ac", "2", "-i", audio_stretched, "-i", video, "-pix_fmt", "yuv420p", out_path]
+        # Mux video and stretched / shrunk audio to out_path
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-ac",
+            "2",
+            "-i",
+            audio_stretched,
+            "-i",
+            video,
+            "-pix_fmt",
+            "yuv420p",
+            out_path,
+        ]
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         # Delete files

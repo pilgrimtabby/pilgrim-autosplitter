@@ -467,7 +467,7 @@ class SplitDir:
                     math.sqrt(COMPARISON_FRAME_WIDTH * COMPARISON_FRAME_HEIGHT * 3)
                     * 255
                 )
-            
+
             return math.sqrt(cv2.countNonZero(self.mask) * 3) * 255
 
         def _is_single_channel(self, image: numpy.ndarray) -> bool:
