@@ -37,7 +37,7 @@ import os
 import platform
 import subprocess
 import time
-from typing import Optional, Union
+from typing import Union
 import webbrowser
 from pathlib import Path
 from threading import Lock, Thread
@@ -422,8 +422,10 @@ class UIController:
         the thread down on accident, so we also check if this method is being
         called as the result of a hotkey press.
         """
-        # Kill recording
-        self._splitter.safe_exit_record_thread()
+        # Kill recording if not calling this method as the result of
+        # a dummy split
+        if not self._splitter.continue_recording:
+            self._splitter.safe_exit_record_thread()
 
         # Kill splitter threads if we're on the last split
         # (This call must be the result of a split key hotpress)
@@ -463,8 +465,12 @@ class UIController:
                 self._splitter.splits.next_split_image()
                 self._splitter.changing_splits = False
 
-        # Restart recording
-        self._splitter.restart_record_thread()
+        # Restart recording if not calling this method as the result of
+        # a dummy split
+        if self._splitter.continue_recording:
+            self._splitter.continue_recording = False
+        else:
+            self._splitter.restart_record_thread()
 
     def _request_reset_splits(self) -> None:
         """Tell splitter.splits to call reset_split_images, and ask
@@ -2302,7 +2308,7 @@ class UIController:
             if platform.system() == "Darwin":
                 if splitter_active:
 
-                    caffeinate_path = self._get_exec_path("caffeinate")
+                    caffeinate_path = settings._get_exec_path("caffeinate")
 
                     # No caffeinate, use fallback
                     if caffeinate_path is None:
@@ -2337,23 +2343,3 @@ class UIController:
         while not self._caffeinate_thread_finished:
             subprocess.Popen([caffeinate_path, "-d", "-t", "1"])
             time.sleep(self._wake_interval)
-
-    def _get_exec_path(self, name: str) -> Optional[str]:
-        """Return the path to an executable file, if it exists.
-
-        Args:
-            name (str): The name (not path) of an exectable file. Ex: "grep"
-
-        Returns:
-            str: The absolute path to the executable, if it exists.
-        """
-        if platform.system() == "Windows":
-            search = "where"
-        else:
-            search = "which"
-        try:
-            return subprocess.check_output([search, name]).decode().strip()
-
-        # The executable doesn't exist (or at least isn't on PATH)
-        except subprocess.CalledProcessError:
-            return None

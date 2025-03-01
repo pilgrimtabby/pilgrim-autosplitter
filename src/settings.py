@@ -31,6 +31,9 @@
 
 import os
 from pathlib import Path
+import platform
+import subprocess
+from typing import Optional
 
 import requests
 from PyQt5.QtCore import QSettings
@@ -131,6 +134,27 @@ def set_value(key: str, value: any, settings: QSettings = settings) -> None:
         value (any): The value the key should reference.
     """
     settings.setValue(key, str(value))
+
+
+def _get_exec_path(name: str) -> Optional[str]:
+    """Return the path to an executable file, if it exists.
+
+    Args:
+        name (str): The name (not path) of an exectable file. Ex: "grep"
+
+    Returns:
+        str: The absolute path to the executable, if it exists.
+    """
+    if platform.system() == "Windows":
+        search = "where"
+    else:
+        search = "which"
+    try:
+        return subprocess.check_output([search, name]).decode().strip()
+
+    # The executable doesn't exist (or at least isn't on PATH)
+    except subprocess.CalledProcessError:
+        return None
 
 
 def set_program_vals(settings: QSettings = settings) -> None:

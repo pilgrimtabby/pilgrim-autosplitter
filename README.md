@@ -1,3 +1,9 @@
+# NOTE
+
+This is a dev branch that allows recording clips with audio. It should work fine, but the audio source name is currently hard coded in and I don't have plans to add the ability to manually adjust this in-app anytime soon. If someone would like to make some adjustments to allow this, that would be more than welcome. Until the ability to adjust the source is added, I won't consider this branch production-ready.
+
+In addition, for the audio recording features to work, you must have [FFmpeg and ffprobe installed](https://formulae.brew.sh/formula/ffmpeg) and on your PATH.
+
 # Pilgrim Autosplitter
 
 Finally, a multi-platform image-based speedrun autosplitter!

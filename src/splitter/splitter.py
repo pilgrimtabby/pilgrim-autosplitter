@@ -29,16 +29,21 @@
 """Capture video and compare it to a template image."""
 
 from datetime import datetime
+import os
 import pathlib
 import platform
 from queue import Full, Queue
+import shutil
+import subprocess
 import threading
 import time
 from typing import Optional, Tuple
+import wave
 
 import cv2
 import numpy
 from PyQt5.QtGui import QImage, QPixmap
+import pyaudio
 
 import settings
 from settings import COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT
@@ -52,8 +57,8 @@ class Splitter:
     - capture_thread: Captures video frame-by-frame and feeds it in three
         dedicated queues to the other three threads for processing.
     - record_thread: When recording is enabled (see ui_controller), writes each
-        frame to an .mp4 file. Saves this file on each normal and pause split
-        action.
+        frame to an .mp4 file. Also records audio. Muxes the two recordings and
+        saves the output file after each normal and pause split action.
     - compare_split_thread: Compares each frame to the current split image.
         If a match is found, performs a split action.
     - compare_reset_thread: Compares each frame to the reset image, if it
@@ -115,8 +120,13 @@ class Splitter:
 
         # record_thread
         self._record_queue = Queue(10)  # Number doesn't matter, should be small
-        self.record_thread = threading.Thread(target=self._record)
+        self.record_thread = threading.Thread(target=self._record_video)
+        self._audio_thread = threading.Thread(target=self._record_audio)
         self._record_thread_finished = False
+        self._audio_thread_finished = False
+        self._most_recent_record_start_time = 0
+        self._most_recent_record_end_time = 0
+        self._recording_audio = False
         self.save_recording = False
         self.continue_recording = False
         self.recording_enabled = False
@@ -182,7 +192,7 @@ class Splitter:
         self._record_thread_finished = False
 
         # Re-instantiate and start thread
-        self.record_thread = threading.Thread(target=self._record)
+        self.record_thread = threading.Thread(target=self._record_video)
         self.record_thread.daemon = True
         self.record_thread.start()
 
@@ -548,139 +558,323 @@ class Splitter:
     #                               #
     #################################
 
-    def _record(
-        self,
-        output_path: Optional[str] = None,
-        fps: Optional[float] = None,
-        recordings_dir: Optional[str] = None,
-    ) -> None:
-        """Record and save clips of each completed split.
-
-        When this method ends, it erases the recording it made unless flags are
-        set somewhere else.
-
-        If no arguments are supplied, those arguments are generated in the
-        method. They should only be supplied when continuing, not restarting, a
-        recording.
-
-        Framerate used is necessarily somewhat of a guess.
-
-        Args:
-            output_path (str, optional): The path to write the video to.
-                Defaults to None.
-            fps (float, optional): The FPS at which to save the video. Defaults
-                to None.
-            recordings_dir (str, optional): The directory that holds the
-                recordings. Defaults to None.
-        """
+    def _record_video(self) -> None:
+        """Record and save clips of each completed split, with audio."""
         # Wait for recording to become enabled
         while not (self.recording_enabled and settings.get_bool("RECORD_CLIPS")):
             time.sleep(0.01)
             if self._record_thread_finished:
                 return
 
-        # Unset flags
-        self.save_recording = False
-        self.continue_recording = False
+        # Get needed vars
+        fps = settings.get_int("FPS")
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        recordings_dir = settings.get_str("LAST_RECORD_DIR")
+        timestamp = self._get_timestamp()
+        tmp_output_dir = f"{recordings_dir}/.{timestamp}"
+        video_file = f"{tmp_output_dir}/video_raw.mp4"
+        audio_file = f"{tmp_output_dir}/audio_raw.wav"
 
-        # Create output if none supplied
-        if output_path is None:
-            fps = settings.get_int("FPS")
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-            recordings_dir = settings.get_str("LAST_RECORD_DIR")
-            timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
-            output_path = f"{recordings_dir}/{timestamp}.mp4"
-            output = cv2.VideoWriter(
-                output_path,
-                fourcc,
-                fps,
-                (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
-            )
+        # Make output dir
+        dir = pathlib.Path(tmp_output_dir)
+        dir.mkdir(exist_ok=True)
 
-            # Get rid of (potentially very old) images
-            self._record_queue = Queue(10)
+        # Make video writer
+        video_writer = cv2.VideoWriter(
+            video_file,
+            fourcc,
+            fps,
+            (COMPARISON_FRAME_WIDTH, COMPARISON_FRAME_HEIGHT),
+        )
 
-        # Record each frame
+        # Get rid of (potentially very old) images
+        self._record_queue = Queue(10)
+
+        # Start audio thread
+        self._audio_thread = threading.Thread(target=self._record_audio, args=(audio_file,))
+        self._audio_thread.daemon = True
+        self._audio_thread_finished = False
+        self._audio_thread.start()
+
+        # Track last recording start time
+        self._most_recent_record_start_time = time.perf_counter()
+
+        # Start recording audio
+        self._recording_audio = True
+
+        # Record video
+        if not self._write_frames(fps, recordings_dir, video_writer):
+
+            # See _write_frames for circumstances that cause the method to 
+            # return False
+            # If this happens, kill audio thread, restart recording
+            self._recording_audio = False
+            self._audio_thread_finished = True
+            self._audio_thread.join()
+            self._delete_folder(tmp_output_dir)
+            return self._record_video()
+
+        # A normal or pause split / split hotkey has occured -- save recording
+        if self.save_recording:
+            self.save_recording = False
+
+            # Save the ending time for the recording and stop the recording
+            self._most_recent_record_end_time = time.perf_counter()
+            self.result_text = "Split recording saved!"
+            video_writer.release()
+
+            # Kill audio thread
+            self._recording_audio = False
+            self._audio_thread_finished = True
+            self._audio_thread.join()
+
+            # Mux the files together (or save the video file if no audio)
+            self._make_final_video(video_file, audio_file, recordings_dir)
+
+        # The split has changed for some other reason, not including dummy 
+        # splits -- stop and delete everything
+        else:
+            self._recording_audio = False
+            self._audio_thread_finished = True
+            self._audio_thread.join()
+            self._delete_folder(tmp_output_dir)
+
+    def _write_frames(self, fps: int, recordings_dir: str, video_writer: cv2.VideoWriter) -> bool:
+        """Write frames to the video file as long as the thread is alive.
+
+        Args:
+            fps (int): The FPS setting in place when recording started.
+            recordings_dir (str): The location recordings are saved.
+            video_writer (cv2.VideoWriter): The object used to write frames to
+                the video.
+
+        Returns:
+            bool: False if recording is suddenly no longer enabled, the FPS
+                setting is changed, or the recordings dir is changed.
+        """
         while not self._record_thread_finished:
 
-            # Delete + restart recording if:
-            # Recording isn't enabled anymore
-            # FPS has changed (messes with saving)
-            # Output path has changed
             if (
                 not (self.recording_enabled and settings.get_bool("RECORD_CLIPS"))
                 or fps != settings.get_int("FPS")
                 or recordings_dir != settings.get_str("LAST_RECORD_DIR")
             ):
-                self._delete_video(output_path)
-                return self._record()
+                return False
 
-            # Save the frame
             frame = self._record_queue.get()
             if frame is not None:
-                output.write(frame)
+                video_writer.write(frame)
 
-        # Broken loop caused by normal or pause split / split hotkey on
-        # non-dummy split (end recording, don't delete)
-        if self.save_recording:
-            self.save_recording = False
-            self._rename_video(output_path)
-            self.result_text = "Split recording saved!"
+        return True
 
-        # Broken loop caused by dummy split / split hotkey on dummy split
-        # (keep recording same video)
-        elif self.continue_recording:
-            self.continue_recording = False
-            self._record(output_path, fps, recordings_dir)
-
-        # Broken loop caused by any other split image change, program closing,
-        # or anything else (end recording, delete video)
-        else:
-            self._delete_video(output_path)
-
-    def _delete_video(self, video_path: str) -> None:
-        """Delete the video file at video_path.
-
-        No error is thrown if the video file doesn't exist.
+    def _delete_folder(self, dir: str) -> None:
+        """Delete dir and its contents if it exists.
 
         Args:
-            video_path (str): Path to the video.
+            dir (str): Path to the directory to delete.
         """
-        video = pathlib.Path(video_path)
-        video.unlink(missing_ok=True)
-
-    def _rename_video(self, current_path: str) -> None:
-        """Place simplified name of split image into the recording name.
-
-        We don't put the simplified name into output_path in the first instance
-        because it might not be the name of the actual last split (e.g. if
-        dummy splits are used). The idea is for the clip name to be the same as
-        the name of the actual split name.
+        try:
+            shutil.rmtree(dir)
+        except FileNotFoundError:
+            pass
+        
+    def _record_audio(self, audio_file: str, audio_src: str = "USB Digital Audio") -> None:
+        """Record audio from a named audio source and write it to a file.
 
         Args:
-            output_path (str): The current name of the video.
+            audio_file (str): The file the audio is written to.
+            audio_src (str): The name of the audio source as it is exposed to
+                pyaudio.
+        """
+        ffmpeg = settings._get_exec_path("ffmpeg")
+        ffprobe = settings._get_exec_path("ffprobe")
+        if ffmpeg is None or ffprobe is None:
+            print("WARNING: ffmpeg or ffprobe not found on PATH. Audio will not be recorded when saving clips.")
+            return
+
+        format = pyaudio.paInt16
+        channels = 0
+        bitrate = 44100
+        chunk_size = 1024
+
+        audio = pyaudio.PyAudio()
+        audio_device_index = self.get_audio_device_index_by_name(audio_src)
+        if audio_device_index is None:
+            return  # Invalid source name, don't record audio
+
+        # Get the valid channel count so there's no need to guess
+        while True:
+            try:
+                audio_stream = audio.open(format=format, channels=channels,
+                                rate=bitrate, input=True,
+                                frames_per_buffer=chunk_size, input_device_index=audio_device_index)
+                break
+            except ValueError:
+                channels += 1
+                if channels > 2:
+                    return
+
+        # Record audio as long as the thread continues
+        with wave.open(audio_file, "wb") as wav_file:
+            wav_file.setnchannels(channels)
+            wav_file.setsampwidth(audio.get_sample_size(format))
+            wav_file.setframerate(bitrate)
+
+            while not self._audio_thread_finished:
+                if self.recording_enabled:
+                    data = audio_stream.read(chunk_size)
+                    wav_file.writeframes(data)
+                else:
+                    time.sleep(0.01)
+
+        # Recording finished, kill the stream and audio source
+        audio_stream.stop_stream()
+        audio_stream.close()
+        audio.terminate()
+
+    def get_audio_device_index_by_name(self, target_name: str) -> Optional[int]:
+        """Get the pyaudio audio source index using the name of the source.
+
+        Args:
+            target_name (str): The source's name. Case-sensitive.
+
+        Returns:
+            Optional[int]: The index if found, None otherwise.
+        """
+        audio = pyaudio.PyAudio()
+        api_info = audio.get_host_api_info_by_index(0)
+        device_count = api_info.get("deviceCount")
+
+        for i in range(0, device_count):
+            device_info = audio.get_device_info_by_host_api_device_index(host_api_index=0, host_api_device_index=i)
+            if device_info.get("maxInputChannels") > 0:
+                device_name = device_info.get("name")
+                if device_name == target_name:
+                    return i
+
+        return None
+
+    def _make_final_video(self, video: str, audio: str, recordings_dir: str) -> None:
+        """Mux the video and audio together (if applicable), or save the video.
+
+        Args:
+            video (str): Path to the video file.
+            audio (str): Path to the audio file.
+            recordings_dir (str): Location where final videos are placed.
         """
         # Get simplified name of current split
         current_index = self.splits.current_image_index
         current_split_image = self.splits.list[current_index]
         stripped_name = current_split_image.stripped_name
 
-        # Get timestamp from temporary video name
-        video = pathlib.Path(current_path)
-        timestamp = video.stem
-
         # Get loop and total loops of current split
         loop = self.splits.current_loop
         total_loops = current_split_image.loops
 
-        # Get new video name
+        # Get new video name using the above info
+        timestamp = self._get_timestamp()
         if total_loops == 1:
             new_name = f"{stripped_name}-{timestamp}.mp4"
         else:
             new_name = f"{stripped_name}-loop_{loop}-{timestamp}.mp4"
+        new_path = f"{pathlib.Path(recordings_dir, new_name)}"
 
-        # Rename video
-        video.rename(pathlib.Path(video.parent, new_name))
+        # If there's audio, mux the video and audio together, then delete the
+        # files.
+        # Do this in a separate thread because it can take a little while.
+        if pathlib.Path(audio).is_file():
+            mux_thread = threading.Thread(target=self._mux_video_and_audio, args=(video, audio, new_path,))
+            mux_thread.daemon = True
+            mux_thread.start()
+        
+        # No audio -- just move the video file to the right spot.
+        else:
+            os.rename(video, new_path)
+            tmp_dir = pathlib.Path(video).parent
+            self._delete_folder(tmp_dir)
+
+    def list_audio_devices() -> None:
+        """Print a list of available audio devices. For now, debug use only."""
+        audio = pyaudio.PyAudio()
+        api_info = audio.get_host_api_info_by_index(0)
+        device_count = api_info.get("deviceCount")
+
+        for i in range(0, device_count):
+            device_info = audio.get_device_info_by_host_api_device_index(host_api_index=0, host_api_device_index=i)
+            if device_info.get("maxInputChannels") > 0:
+                device_name = device_info.get("name")
+                print(f"Device {i}: {device_name}")
+
+    def _get_recording_duration_seconds(self, file_path: str) -> float:
+        """Get the duration of a video or audio recording in seconds.
+
+        Args:
+            file_path (str): The file to measure.
+
+        Returns:
+            float: The number of seconds.
+        """
+        ffprobe = settings._get_exec_path("ffprobe")
+        csv_val = "p=0"
+        cmd = [ffprobe, "-i", file_path, "-show_entries", "format=duration", "-v", "quiet", "-of", f"csv={csv_val}"]
+
+        actual_length = subprocess.check_output(cmd)
+        return float(actual_length.decode().strip())
+
+    def _get_recording_frame_count(video: str) -> int:
+        """Get the number of frames in a video file.
+
+        Args:
+            video (str): Path to the video file.
+
+        Returns:
+            int: Number of frames in the video.
+        """
+        frames = 0
+        cap = cv2.VideoCapture(video)
+
+        while True:
+            keep_going, _ = cap.read()
+            if not keep_going:
+                return frames
+            frames += 1
+
+    def _mux_video_and_audio(self, video: str, audio: str, out_path: str) -> None:
+        """Mux video and audio files together, matching the audio length to the
+        video length by accounting for the slight difference between the
+        settings FPS and the actual FPS.
+
+        Args:
+            video (str): Path to the video file.
+            audio (str): Path to the audio file.
+            out_path (str): Path to the muxed video file.
+        """
+        video_length_actual = self._most_recent_record_end_time - self._most_recent_record_start_time
+        video_length_raw = self._get_recording_duration_seconds(video)
+        stretch_factor = video_length_actual / video_length_raw
+
+        tmp_output_dir = pathlib.Path(audio).parent
+        audio_stretched = f"{tmp_output_dir}/audio_stretched.wav"
+
+        ffmpeg = settings._get_exec_path("ffmpeg")            
+
+        cmd = [ffmpeg, "-i", audio, "-filter:a", f"atempo={stretch_factor}", audio_stretched]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        cmd = [ffmpeg, "-y", "-ac", "2", "-i", audio_stretched, "-i", video, "-pix_fmt", "yuv420p", out_path]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # Delete files
+        tmp_dir = pathlib.Path(video).parent
+        self._delete_folder(tmp_dir)
+
+    def _get_timestamp(self) -> datetime:
+        """Return a timestamp with date and time.
+
+        Returns:
+            datetime: The timestamp.
+        """
+        return datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
 
     ########################################
     #                                      #
