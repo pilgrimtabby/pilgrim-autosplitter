@@ -706,7 +706,7 @@ class Splitter:
         chunk_size = 1024
 
         audio = pyaudio.PyAudio()
-        audio_device_index = self.get_audio_device_index_by_name(audio_src)
+        audio_device_index = self._get_audio_device_index_by_name(audio_src)
         if audio_device_index is None:
             return  # Invalid source name, don't record audio
 
@@ -745,7 +745,7 @@ class Splitter:
         audio_stream.close()
         audio.terminate()
 
-    def get_audio_device_index_by_name(self, target_name: str) -> Optional[int]:
+    def _get_audio_device_index_by_name(self, target_name: str) -> Optional[int]:
         """Get the pyaudio audio source index using the name of the source.
 
         Args:
@@ -815,7 +815,7 @@ class Splitter:
             tmp_dir = pathlib.Path(video).parent
             self._delete_folder(tmp_dir)
 
-    def list_audio_devices() -> None:
+    def _list_audio_devices() -> None:
         """Print a list of available audio devices. For now, debug use only."""
         audio = pyaudio.PyAudio()
         api_info = audio.get_host_api_info_by_index(0)
