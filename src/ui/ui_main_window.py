@@ -1,4 +1,4 @@
-# Copyright (c) 2024 pilgrim_tabby
+# Copyright (c) 2024-2025 pilgrim_tabby
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -30,14 +30,24 @@
 should be provided in a controller class.
 """
 
-
+import os
 import platform
 from typing import Optional
 
-from PyQt5.QtCore import QRect, Qt, pyqtSignal
+from PyQt5.QtCore import (
+    pyqtSignal,
+    QEvent,
+    QObject,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QTimer,
+)
 from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import (
     QAction,
+    QApplication,
+    QGraphicsOpacityEffect,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -147,6 +157,8 @@ class UIMainWindow(QMainWindow):
             show the split_display_txt.
         split_loop_label (QLabel): Informs the user about the current
             split's loop information.
+        split_loop_label_reset_txt (QLabel): Tells the user the currently
+            displayed image is the reset image.
         split_overlay (QLabel): Informs the user that a pre-split delay
             or post-split pause is taking place.
         split_name_label (QLabel): Shows the current split name.
@@ -196,6 +208,8 @@ class UIMainWindow(QMainWindow):
         self.setCentralWidget(self._container)
 
         self.setWindowTitle(f"Pilgrim Autosplitter {VERSION_NUMBER}")
+
+        self._mouse_allowed = True  # For usage, see self.eventFilter
 
         # Menu bar
         self.settings_action = QAction("Open settings menu", self)
@@ -256,10 +270,30 @@ class UIMainWindow(QMainWindow):
         self.video_live_txt = "Video feed"
         self.video_down_txt = ""
 
-        self.video_display = QLabel(self._container)
+        self.video_display = ClickableQLabel(self._container)
         self.video_display.setAlignment(Qt.AlignCenter)
-        self.video_display.setObjectName("image_label_inactive")
+        self.video_display.setObjectName("video_label")
+        # Prevent clicking this widget when window is out of focus
+        # from having any effect (see self.eventFilter)
+        self.video_display.installEventFilter(self)
         self.video_display_txt = "No video feed detected"
+
+        self.video_record_overlay = QLabel(self._container)
+        self.video_record_overlay.setAlignment(Qt.AlignCenter)
+        self.video_record_overlay.setObjectName("video_overlay")
+        self.video_record_overlay.setVisible(False)
+        self.video_record_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        program_dir = os.path.dirname(os.path.abspath(__file__))
+        self.record_active_img = f"{program_dir}/../../resources/record_active.png"
+        self.record_idle_img = f"{program_dir}/../../resources/record_idle.png"
+
+        self.video_info_overlay = ShadowFadeQLabel(self._container)
+        self.video_info_overlay.setAlignment(Qt.AlignLeft)
+        self.video_info_overlay.setObjectName("video_overlay")
+        self.video_info_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.video_info_overlay.set_text_color("white")
+        self.video_info_overlay.set_shadow_color("black")
 
         #########################
         #                       #
@@ -280,19 +314,26 @@ class UIMainWindow(QMainWindow):
         self.split_loop_label_empty_txt = "Split does not loop"
         # Include placeholders for current and total loops
         self.split_loop_label_txt = "Loop {} of {}"
+        self.split_loop_label_reset_txt = "Reset image"
 
-        self.split_display = QLabel(self._container)
+        self.split_display = ClickableQLabel(self._container)
         self.split_display.setAlignment(Qt.AlignCenter)
-        self.split_display.setObjectName("image_label_inactive")
+        self.split_display.setObjectName("image_label")
+        # Prevent clicking this widget when window is out of focus
+        # from having any effect (see self.eventFilter)
+        self.split_display.installEventFilter(self)
         self.split_display_txt = "No split images loaded"
 
         self.split_overlay = QLabel(self._container)
         self.split_overlay.setAlignment(Qt.AlignCenter)
         self.split_overlay.setObjectName("split_overlay")
         self.split_overlay.setVisible(False)
+        self.split_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
-        self.overlay_delay_txt_secs = "Splitting in {:.1f} s"
-        self.overlay_delay_txt_mins = "Splitting in {}"
+        self.overlay_split_delay_txt_secs = "Splitting in {:.1f} s"
+        self.overlay_split_delay_txt_mins = "Splitting in {}"
+        self.overlay_reset_delay_txt_secs = "Resetting in {:.1f} s"
+        self.overlay_reset_delay_txt_mins = "Resetting in {}"
         self.overlay_pause_txt_secs = "Paused for {:.1f} s"
         self.overlay_pause_txt_mins = "Paused for {}"
 
@@ -317,6 +358,7 @@ class UIMainWindow(QMainWindow):
         )
         self.match_percent_short_txt = "Sim:"
         self.match_percent_long_txt = "Similarity to split image:"
+        self.match_reset_percent_txt = "Similarity to reset image:"
 
         self.match_percent = QLabel(self._container)
         self.match_percent.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -412,11 +454,13 @@ class UIMainWindow(QMainWindow):
         self.screenshot_button_long_txt = "Take screenshot"
 
         # Screenshot success message box
-        self.screenshot_ok_msg = QMessageBox(self)
+        # (No parent widget -- parent widget keeps it from closing)
+        self.screenshot_ok_msg = QMessageBox()
         self.screenshot_ok_msg.setText("Screenshot taken")
 
         # Screenshot error message box (no video)
-        self.screenshot_err_no_video = QMessageBox(self)
+        # (No parent widget -- parent widget keeps it from closing)
+        self.screenshot_err_no_video = QMessageBox()
         self.screenshot_err_no_video.setText("Could not take screenshot")
         self.screenshot_err_no_video.setInformativeText(
             "No video feed detected. Please make sure video feed is active and try again."
@@ -424,7 +468,8 @@ class UIMainWindow(QMainWindow):
         self.screenshot_err_no_video.setIcon(QMessageBox.Warning)
 
         # Screenshot error message box (file couldn't be saved)
-        self.screenshot_err_no_file = QMessageBox(self)
+        # (No parent widget -- parent widget keeps it from closing)
+        self.screenshot_err_no_file = QMessageBox()
         self.screenshot_err_no_file.setText("Could not save screenshot")
         self.screenshot_err_no_file.setInformativeText(
             "Pilgrim Autosplitter can't write files to this folder. Please select a different folder and try again."
@@ -487,7 +532,8 @@ class UIMainWindow(QMainWindow):
         ##################################
 
         # Update available message box
-        self.update_available_msg = QMessageBox(self._container)
+        # (Parent widget ok here since the signals are hooked up)
+        self.update_available_msg = QMessageBox()
         self.update_available_msg.setText("New update available!")
         self.update_available_msg.setInformativeText(
             "Pilgrim Autosplitter has been updated!\nShow new release?"
@@ -527,7 +573,7 @@ class UIMainWindow(QMainWindow):
         ##################
 
         # Couldn't find file or directory error message box
-        self.err_not_found_msg = QMessageBox(self)
+        self.err_not_found_msg = QMessageBox()
         self.err_not_found_msg.setText("File or folder not found")
         self.err_not_found_msg.setInformativeText(
             "The file or folder could not be found. Please try again."
@@ -535,29 +581,347 @@ class UIMainWindow(QMainWindow):
         self.err_not_found_msg.setIcon(QMessageBox.Warning)
 
         # Invalid image directory chosen message box
-        self.err_invalid_dir_msg = QMessageBox(self)
+        self.err_invalid_dir_msg = QMessageBox()
         self.err_invalid_dir_msg.setText("Invalid folder selection")
         self.err_invalid_dir_msg.setInformativeText(
             f"You must select your home folder ({settings.get_home_dir()}) or one of its subfolders."
         )
         self.err_invalid_dir_msg.setIcon(QMessageBox.Warning)
 
-        #####################
-        #                   #
-        # Check for updates #
-        #                   #
-        #####################
+    def eventFilter(self, obj: QObject, event: QEvent):
+        """Watch for QEvent.WindowActivate, which is triggered when the window
+        was not in focus and is brought into focus.
 
-        if settings.get_bool("CHECK_FOR_UPDATES"):
-            latest_version = settings.get_latest_version()
-            if not settings.version_ge(settings.VERSION_NUMBER, latest_version):
-                # Yes, I call both show and open. If you just call show, the
-                # box doesn't always appear centered over the window (it's way
-                # off to the side). If you just call show, then bafflingly, the
-                # wrong button is highlighted by default. Calling both makes
-                # everything work, for some reason.
-                self.update_available_msg.show()
-                self.update_available_msg.open()
+        This method disables mouse presses on a widget for 50 ms after the
+        window is brought into focus. It does this by setting _mouse_allowed to
+        False, then 50 ms later setting it True again. Mouse clicks only filter
+        through if _mouse_allowed is True.
+
+        Args:
+            obj (QObject): The watched QObject. Unused here.
+            event (QEvent): The event to filter out (or not).
+
+        Returns:
+            bool: Returning True stops the QEvent from propogating further
+                (basically neutralizes it). Returning False allows it to filter
+                through.
+        """
+        if event.type() == QEvent.WindowActivate:
+            self._mouse_allowed = False
+            QTimer.singleShot(50, lambda: setattr(self, "_mouse_allowed", True))
+
+        elif event.type() == QEvent.MouseButtonPress and not self._mouse_allowed:
+            self._mouse_allowed = True
+            return True
+
+        return False
+
+
+class ShadowFadeQLabel(QWidget):
+    """QWidget containing 2 QLabels, both with identical text, but with
+    (optionally) different text colors to produce a drop shadow effect. Any
+    text set fades out after _text_duration ms, with an animation length of
+    _fade_duration ms.
+
+    This is done because it's not natively possible to use a drop shadow effect
+    and a fade effect together for some reason.
+    """
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Inherit from QWidget and set up the attributes.
+
+        Args:
+            parent (QWidget, optional): The parent class. Defaults to None.
+        """
+        QWidget.__init__(self, parent)
+
+        # Create the two widgets that hold the text
+        self._lower_txt = QLabel(self)
+        self._upper_txt = QLabel(self)  # This one's last so it's on top
+
+        # How long the text stays on screen (ms)
+        self._text_duration = 3000
+
+        # How long the text takes to fade out (ms)
+        self._fade_duration = 1000
+
+        # Create the fade effect and animation and a timer to start it
+        self._fade_effect = QGraphicsOpacityEffect()
+        self._fade_effect.setOpacity(1)
+        self.setGraphicsEffect(self._fade_effect)
+
+        self._fade_animation = QPropertyAnimation(self._fade_effect, b"opacity")
+        self._fade_animation.setDuration(self._fade_duration)
+        self._fade_animation.setStartValue(1)
+        self._fade_animation.setEndValue(0)
+
+        self._fade_timer = QTimer()
+        self._fade_timer.setSingleShot(True)
+        self._fade_timer.setInterval(self._text_duration)
+        self._fade_timer.timeout.connect(self._fade_animation.start)
+
+    def setAlignment(self, flag: Qt.Alignment) -> None:
+        """Make sure text alignment for the two text labels match.
+
+        Args:
+            flag (Qt.Alignment): The alignment flag.
+        """
+        self._upper_txt.setAlignment(flag)
+        self._lower_txt.setAlignment(flag)
+
+    def setObjectName(self, name: str) -> None:
+        """Make sure the object names for both parent and children match.
+
+        Args:
+            name (str): The object name.
+        """
+        self._upper_txt.setObjectName(name)
+        self._lower_txt.setObjectName(name)
+        super().setObjectName(name)
+
+    def setAttribute(self, attribute: Qt.WidgetAttribute, on: bool = True) -> None:
+        """Make sure the attributes of both parent and children match.
+
+        Args:
+            attribute (Qt.WidgetAttribute): The attribute to set.
+            on (bool, optional): Whether the attribute is actually enabled.
+                Defaults to True.
+        """
+        self._upper_txt.setAttribute(attribute, on)
+        self._lower_txt.setAttribute(attribute, on)
+        super().setAttribute(attribute, on)
+
+    def setGeometry(self, geometry: QRect) -> None:
+        """Move the child widgets and make sure _lower_txt is positioned down
+        right of upper text to produce a drop shadow effect.
+
+        For some reason, adjusting the geometry of the parent makes the child
+        widgets disappear, so it's not affected here.
+
+        Args:
+            geometry (QRect): The geometry to apply.
+        """
+        self._upper_txt.setGeometry(geometry)
+        self._lower_txt.setGeometry(geometry)
+        self._lower_txt.move(self._lower_txt.x() + 2, self._lower_txt.y() + 2)
+
+    def set_text_color(self, color: str) -> None:
+        """Set the color of the widget's text.
+
+        Args:
+            color (str): The color to set. Any string accepted by CSS is fine.
+        """
+        style = self._upper_txt.styleSheet()
+        style += f"""
+            * {{
+                color: {color};
+            }}
+        """
+        self._upper_txt.setStyleSheet(style)
+
+    def set_shadow_color(self, color: str) -> None:
+        """Set the color of the widget's drop shadow.
+
+        Args:
+            color (str): The color to set. Any string accepted by CSS is fine.
+        """
+        style = self._lower_txt.styleSheet()
+        style += f"""
+            * {{
+                color: {color};
+            }}
+        """
+        self._lower_txt.setStyleSheet(style)
+
+    def set_text(self, text: str) -> None:
+        """Set (right-elided) text to both labels and restart the fade timer.
+
+        Args:
+            text (str): The text to set.
+        """
+        # Stop fading and make the text opaque
+        self._fade_timer.stop()
+        self._fade_animation.stop()
+        self._fade_effect.setOpacity(1)
+
+        # Set the text
+        elided_text = self._get_elided_text(text)
+        self._upper_txt.setText(elided_text)
+        self._lower_txt.setText(elided_text)
+
+        # Restart the timer
+        self._fade_timer.start()
+
+    def _get_elided_text(self, text: str) -> str:
+        """Right-elide text to the width of the widget.
+
+        Returns:
+            str: The elided text.
+        """
+        return self.fontMetrics().elidedText(text, Qt.ElideRight, self.width() - 10)
+
+
+class ClickableQLabel(QLabel):
+    """QLabel with additional flags indicating whether it is being clicked and/
+    or hovered by the mouse.
+
+    One known limitation is that this doesn't set self.hovered to True if the
+    mouse entered the widget while clicked. I'm fine with this -- it actually
+    gives the behavior I want -- but it is technically wrong.
+
+    Attributes:
+        adjusted (bool): Whether the widget has been set to an alternate state.
+            Can be used to keep track of widget modifications.
+        clicked (bool): Whether the mouse is currently clicked on this widget.
+        delayed_single_click (bool): Whether a single click was registered, but
+            hasn't yet been released. Useful if you want the effect of a single
+            click to take place after releasing the mouse, even if the user
+            holds the mouse for a long time.
+        double_click (bool): Whether the mouse was double-clicked.
+        hovered (bool): Whether the mouse is currently hovered over this widget.
+            Will not reflect a mouse hover if the hover began while the mouse
+            was clicked on another widget and the mouse has not yet been
+            released from that click.
+        valid_double_click (pyqtSignal): Emitted when the widget is clicked and
+            released twice within 200 ms while the mouse is over the widget.
+        valid_single_click (pyqtSignal): Emitted when the widget is clicked and
+            released just once with the left mouse button while the mouse is
+            over the widget.
+    """
+
+    valid_single_click = pyqtSignal()
+    valid_double_click = pyqtSignal()
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Inherit from QLabel and set default attribute values.
+
+        Args:
+            parent (QLabel, optional): The parent class. Defaults to None.
+        """
+        QLabel.__init__(self, parent)
+        self.adjusted = False
+        self.clicked = False
+        self.delayed_single_click = False
+        self.double_click = False
+        self.hovered = False
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Set self.clicked to True when the left mouse button is pressed.
+
+        Also start a 200 ms timer that calls mouseSingleClickEvent. If the
+        timer goes off and a double click hasn't occured, that method will
+        finish; otherwise, only the logic in mouseDoubleClickEvent will go
+        through. This allows a single click and a double click to do different
+        things.
+
+        Set double_click to False so that, absent a double-click, only
+        mouseSingleClickEvent will have any effect.
+
+        Args:
+            event: The mouse press event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.button() == Qt.LeftButton:
+            self.clicked = True
+            self.double_click = False
+            QTimer.singleShot(
+                QApplication.doubleClickInterval(),
+                lambda event=event: self.mouseSingleClickEvent(event),
+            )
+
+    def mouseSingleClickEvent(self, event: QMouseEvent) -> None:
+        """Emit valid_single_click if a single left mouse click is released
+        within the widget's boundaries.
+
+        If the mouse actually hasn't been released yet, set delayed_single_
+        click to True instead, so the single click action can occur during
+        mouseReleaseEvent.
+
+        If self.double_click is False (due to no double click), do nothing.
+
+        Args:
+            event: The mouse press event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.pos() in self.rect() and not self.double_click:
+            if self.clicked:
+                self.delayed_single_click = True
+            else:
+                self.valid_single_click.emit()
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        """Set double_click to True when a double click is registered so the
+        double click action can occur during mouseReleaseEvent. This flag also
+        prevents mouseSingleClickEvent from doing anything.
+
+        Set clicked to True since the mouse is still clicked (this wouldn't be
+        reflected otherwise since mousePressEvent isn't called for a double
+        click).
+
+        Args:
+            event: The mouse press event. See help(PyQt5.QtCore.QEvent).
+        """
+        self.clicked = self.double_click = True
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        """Set self.clicked to False when the left mouse button is released.
+
+        If delayed_single_click was set in mouseSingleClickEvent, do the single
+        click action here and unset the flag.
+
+        Otherwise if double_click was set in mouseDoubleClickEvent, do the
+        double click action here.
+
+        Args:
+            event: The mouse release event. See help(PyQt5.QtCore.QEvent).
+        """
+        if event.button() == Qt.LeftButton:
+            self.clicked = False
+
+            if self.delayed_single_click:
+                self.delayed_single_click = False
+                if event.pos() in self.rect():
+                    self.valid_single_click.emit()
+
+            elif self.double_click and event.pos() in self.rect():
+                self.valid_double_click.emit()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Track whether the clicked mouse is inside the widget's bounds.
+
+        This method only returns values when the mouse is clicked. Sets
+        self.hovered to True if the mouse is over the widget, False
+        otherwise.
+
+        Args:
+            event (QMouseEvent | None): The mouse drag event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        self.hovered = event.pos() in self.rect()
+
+    def enterEvent(self, event: QMouseEvent) -> None:
+        """Detect when the unclicked mouse enters the widget.
+
+        The enter and leave methods are needed because mouseMoveEvent only
+        works when the mouse isn't clicked, but we want to set hovered
+        regardless of whether the mouse is clicked or not.
+
+        Args:
+            event (QMouseEvent | None): The mouse enter event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        self.hovered = True
+
+    def leaveEvent(self, event: QMouseEvent) -> None:
+        """Detect when the unclicked mouse leaves the widget.
+
+        The enter and leave methods are needed because mouseMoveEvent only
+        works when the mouse isn't clicked, but we want to set hovered
+        regardless of whether the mouse is clicked or not.
+
+        Args:
+            event (QMouseEvent | None): The mouse enter event.
+                See help(PyQt5.QtGui.QMouseEvent).
+        """
+        self.hovered = False
 
 
 class ClickableLineEdit(QLineEdit):
@@ -587,7 +951,7 @@ class ClickableLineEdit(QLineEdit):
         """
         QLineEdit.__init__(self, parent)
 
-    def mouseMoveEvent(self, a0: Optional[QMouseEvent]) -> None:
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Prevent the mouse moving from having any effect.
 
         I override this method specifically to prevent selecting text by
@@ -600,7 +964,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseDoubleClickEvent(self, a0: Optional[QMouseEvent]) -> None:
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         """Prevent a double click from having any effect.
 
         I override this method specifically to prevent double-clicking to
@@ -614,7 +978,7 @@ class ClickableLineEdit(QLineEdit):
         """
         pass
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Emit self.clicked if the mouse was pressed and released.
 
         Args:
