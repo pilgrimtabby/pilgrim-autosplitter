@@ -2186,7 +2186,10 @@ class UIController:
         # Personal hotkey -- press left and right simultaneously
         elif self._reset_clip_hotkey_pressed:
             if hotkey_presses_allowed:
-                while self._splitter.splits.current_image_index != len(self._splitter.splits.list) - 1:
+                while (
+                    self._splitter.splits.current_image_index
+                    != len(self._splitter.splits.list) - 1
+                ):
                     self._request_next_split()
                 self._previous_hotkey_pressed = True
                 self._next_hotkey_pressed = True

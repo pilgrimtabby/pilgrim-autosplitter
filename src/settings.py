@@ -312,6 +312,7 @@ def version_ge(version1: str, version2: str) -> bool:
 
     return True
 
+
 def unset_hotkey_bindings() -> None:
     """Unset all hotkey bindings."""
     # Text values

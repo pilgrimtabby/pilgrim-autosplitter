@@ -161,7 +161,9 @@ class UIKeyboardController:
                 print(f"Key name: {key.char} | Key code: {key.vk}")
             # Thrown when the key isn't an alphanumeric key
             except AttributeError:
-                print(f"Key name: {str(key).replace('Key.', '')} | Key code: {key.value.vk}")
+                print(
+                    f"Key name: {str(key).replace('Key.', '')} | Key code: {key.value.vk}"
+                )
         else:
             print(f"Key name: {key.name} | Key code: {key.name}")
 
