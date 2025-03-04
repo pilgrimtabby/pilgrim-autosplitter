@@ -71,9 +71,9 @@ class UIKeyboardController:
 
         Args:
             on_press (callable | None): Function to be executed on key down. If
-                None, call _do_nothing (pass).
+                None, call _do_nothing (pass). Default is None.
             on_release (callable | None): Function to be executed on key up. If
-                None, call _do_nothing (pass).
+                None, call _do_nothing (pass). Default is None.
         """
         if on_press is None:
             on_press = self._do_nothing
@@ -171,6 +171,8 @@ class UIKeyboardController:
 
 
 if __name__ == "__main__":
+
+    # Test key names and codes -- press any key to see its values
     controller = UIKeyboardController()
     controller.start_listener(on_press=controller._print_key_info)
     while True:
