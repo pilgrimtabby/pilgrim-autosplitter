@@ -147,6 +147,9 @@ class UIController:
         self._screenshot_hotkey_pressed = False
         self._toggle_hotkeys_hotkey_pressed = False
 
+        # Personal hotkey for clips recording
+        self._reset_clip_hotkey_pressed = False
+
         # Values for keeping display awake (see _wake_display)
         self._last_wake_time = time.perf_counter()
         # Attempt wake after this many seconds. Should be < 1 min, since that's
@@ -2098,6 +2101,10 @@ class UIController:
                     "TOGGLE_HOTKEYS_HOTKEY_NAME",
                     "TOGGLE_HOTKEYS_HOTKEY_CODE",
                 ),
+                "_reset_clip_hotkey_pressed": (
+                    "RESET_CLIP_HOTKEY_NAME",
+                    "RESET_CLIP_HOTKEY_CODE",
+                ),
             }.items():
                 settings_name = settings.get_str(setting[0])
                 settings_code = settings.get_str(setting[1])
@@ -2175,6 +2182,15 @@ class UIController:
             if hotkey_presses_allowed:
                 self._main_window.screenshot_button.click()
             self._screenshot_hotkey_pressed = False
+
+        # Personal hotkey -- press left and right simultaneously
+        elif self._reset_clip_hotkey_pressed:
+            if hotkey_presses_allowed:
+                while self._splitter.splits.current_image_index != len(self._splitter.splits.list) - 1:
+                    self._request_next_split()
+                self._previous_hotkey_pressed = True
+                self._next_hotkey_pressed = True
+            self._reset_clip_hotkey_pressed = False
 
     def _react_to_settings_menu_flags(self) -> None:
         """React to the flags set in _handle_key_press for updating hotkeys.

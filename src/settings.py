@@ -174,6 +174,10 @@ def set_program_vals(settings: QSettings = settings) -> None:
     """
     home_dir = get_home_dir()
 
+    # Personal hotkey (see ui_controller)
+    set_value("RESET_CLIP_HOTKEY_NAME", "enter", settings)
+    set_value("RESET_CLIP_HOTKEY_CODE", 36, settings)
+
     # Unset hotkeys if upgrading from <=v1.0.6 because of hotkey implementation
     # updates. Set a default reset wait for the same reason.
     last_version = get_str("LAST_VERSION", settings)
@@ -307,7 +311,6 @@ def version_ge(version1: str, version2: str) -> bool:
             return False
 
     return True
-
 
 def unset_hotkey_bindings() -> None:
     """Unset all hotkey bindings."""
