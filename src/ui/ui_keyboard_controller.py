@@ -31,6 +31,7 @@
 
 
 import platform
+import time
 from typing import Callable, Optional, Tuple, Union
 
 if platform.system() == "Windows" or platform.system() == "Darwin":
@@ -59,8 +60,8 @@ class UIKeyboardController:
 
     def start_listener(
         self,
-        on_press: Optional[Callable[..., None]],
-        on_release: Optional[Callable[..., None]],
+        on_press: Optional[Callable[..., None]] = None,
+        on_release: Optional[Callable[..., None]] = None,
     ) -> None:
         """Start a keyboard listener.
 
@@ -70,9 +71,9 @@ class UIKeyboardController:
 
         Args:
             on_press (callable | None): Function to be executed on key down. If
-                None, call _do_nothing (pass).
+                None, call _do_nothing (pass). Default is None.
             on_release (callable | None): Function to be executed on key up. If
-                None, call _do_nothing (pass).
+                None, call _do_nothing (pass). Default is None.
         """
         if on_press is None:
             on_press = self._do_nothing
@@ -145,6 +146,34 @@ class UIKeyboardController:
         else:
             return key.name, key.name
 
+    def _print_key_info(
+        self, key: Union["pynput_keyboard.key", "keyboard.KeyboardEvent"]
+    ) -> None:
+        """Print a key's string name and its internal integer value. For debug.
+
+        Args:
+            key: A wrapper whose structure and contents depend on the backend.
+                With pynput (Windows / MacOS), it's a pynput.keyboard.Key; with
+                keyboard (Linux) it's a keyboard.KeyboardEvent).
+        """
+        if platform.system() == "Windows" or platform.system() == "Darwin":
+            try:
+                print(f"Key name: {key.char} | Key code: {key.vk}")
+            # Thrown when the key isn't an alphanumeric key
+            except AttributeError:
+                print(f"Key name: {str(key).replace('Key.', '')} | Key code: {key.value.vk}")
+        else:
+            print(f"Key name: {key.name} | Key code: {key.name}")
+
     def _do_nothing(self, *args, **kwargs) -> None:
         """Dummy method for when you don't want anything to happen."""
         pass
+
+
+if __name__ == "__main__":
+
+    # Test key names and codes -- press any key to see its values
+    controller = UIKeyboardController()
+    controller.start_listener(on_press=controller._print_key_info)
+    while True:
+        time.sleep(1)
