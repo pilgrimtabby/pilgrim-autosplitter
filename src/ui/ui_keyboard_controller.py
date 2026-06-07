@@ -1,29 +1,36 @@
-# Copyright (c) 2024-2026 pilgrim_tabby
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# Copyright (c) 2024-2025 pilgrim_tabby
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """Wrapper for separate keyboard manip libraries to support cross-platform dev.
 """
 
 
 import platform
-import time
 from typing import Callable, Optional, Tuple, Union
 
 if platform.system() == "Windows" or platform.system() == "Darwin":
@@ -32,6 +39,54 @@ if platform.system() == "Windows" or platform.system() == "Darwin":
 else:
     # Pynput doesn't work well on Linux, so use keyboard instead
     import keyboard
+
+# macOS: keypad digit virtual keys are *not* contiguous (vk 90 is unused;
+# keypad 8/9 are 91/92). Using vk - 0x52 wrongly maps keypad 8 to "Num 9".
+# Aligned with pynput `lib/pynput/_util/darwin_vks.SYMBOLS` keypad entries.
+_DARWIN_NUMPAD_DIGIT_VK = {
+    82: 0,
+    83: 1,
+    84: 2,
+    85: 3,
+    86: 4,
+    87: 5,
+    88: 6,
+    89: 7,
+    91: 8,
+    92: 9,
+}
+
+
+def _pynput_numpad_display_name(vk: int) -> Optional[str]:
+    """Human-readable label for numeric keypad keys (Windows / macOS virtual keys)."""
+    sys = platform.system()
+    if sys == "Windows":
+        if 96 <= vk <= 105:
+            return f"Num {vk - 96}"
+        operators = {
+            106: "Num *",
+            107: "Num +",
+            109: "Num -",
+            110: "Num .",
+            111: "Num /",
+        }
+        return operators.get(vk)
+    if sys == "Darwin":
+        digit = _DARWIN_NUMPAD_DIGIT_VK.get(vk)
+        if digit is not None:
+            return f"Num {digit}"
+        operators = {
+            0x41: "Num .",
+            0x43: "Num *",
+            0x45: "Num +",
+            0x47: "Num Clear",
+            0x4B: "Num /",
+            0x4C: "Num Enter",
+            0x4E: "Num -",
+            0x51: "Num =",
+        }
+        return operators.get(vk)
+    return None
 
 
 class UIKeyboardController:
@@ -52,8 +107,8 @@ class UIKeyboardController:
 
     def start_listener(
         self,
-        on_press: Optional[Callable[..., None]] = None,
-        on_release: Optional[Callable[..., None]] = None,
+        on_press: Optional[Callable[..., None]],
+        on_release: Optional[Callable[..., None]],
     ) -> None:
         """Start a keyboard listener.
 
@@ -63,9 +118,9 @@ class UIKeyboardController:
 
         Args:
             on_press (callable | None): Function to be executed on key down. If
-                None, call _do_nothing (pass). Default is None.
+                None, call _do_nothing (pass).
             on_release (callable | None): Function to be executed on key up. If
-                None, call _do_nothing (pass). Default is None.
+                None, call _do_nothing (pass).
         """
         if on_press is None:
             on_press = self._do_nothing
@@ -131,43 +186,24 @@ class UIKeyboardController:
         """
         if platform.system() == "Windows" or platform.system() == "Darwin":
             try:
-                return key.char, key.vk
+                vk = key.vk
+                numpad = _pynput_numpad_display_name(vk)
+                if numpad is not None:
+                    return numpad, vk
+                ch = key.char
+                if ch is not None:
+                    return ch, vk
+                return str(key).replace("Key.", ""), vk
             # Thrown when the key isn't an alphanumeric key
             except AttributeError:
-                return str(key).replace("Key.", ""), key.value.vk
+                vk = key.value.vk
+                numpad = _pynput_numpad_display_name(vk)
+                if numpad is not None:
+                    return numpad, vk
+                return str(key).replace("Key.", ""), vk
         else:
             return key.name, key.name
-
-    def _print_key_info(
-        self, key: Union["pynput_keyboard.key", "keyboard.KeyboardEvent"]
-    ) -> None:
-        """Print a key's string name and its internal integer value. For debug.
-
-        Args:
-            key: A wrapper whose structure and contents depend on the backend.
-                With pynput (Windows / MacOS), it's a pynput.keyboard.Key; with
-                keyboard (Linux) it's a keyboard.KeyboardEvent).
-        """
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            try:
-                print(f"Key name: {key.char} | Key code: {key.vk}")
-            # Thrown when the key isn't an alphanumeric key
-            except AttributeError:
-                print(
-                    f"Key name: {str(key).replace('Key.', '')} | Key code: {key.value.vk}"
-                )
-        else:
-            print(f"Key name: {key.name} | Key code: {key.name}")
 
     def _do_nothing(self, *args, **kwargs) -> None:
         """Dummy method for when you don't want anything to happen."""
         pass
-
-
-if __name__ == "__main__":
-
-    # Test key names and codes -- press any key to see its values
-    controller = UIKeyboardController()
-    controller.start_listener(on_press=controller._print_key_info)
-    while True:
-        time.sleep(1)

@@ -1,28 +1,37 @@
-# Copyright (c) 2024-2026 pilgrim_tabby
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# Copyright (c) 2024-2025 pilgrim_tabby
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """Template for the main window view. Most functionality is not provided and
 should be provided in a controller class.
 """
 
 import os
+import paths
 import platform
 from typing import Optional
 
@@ -32,26 +41,53 @@ from PyQt5.QtCore import (
     QObject,
     QPropertyAnimation,
     QRect,
+    QSize,
     Qt,
     QTimer,
 )
-from PyQt5.QtGui import QMouseEvent
+from PyQt5.QtGui import QIcon, QKeyEvent, QKeySequence, QMouseEvent
 from PyQt5.QtWidgets import (
     QAction,
+    QAbstractSpinBox,
     QApplication,
+    QDoubleSpinBox,
     QGraphicsOpacityEffect,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMenu,
     QMenuBar,
     QMessageBox,
     QPushButton,
     QShortcut,
+    QSpinBox,
+    QToolButton,
     QWidget,
 )
 
 import settings
 from settings import VERSION_NUMBER
+
+
+class CropStepSpinBox(QSpinBox):
+    """Spin box that steps by ±10 when Shift is held with Up / Down."""
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        mods = event.modifiers()
+        # Shift-only coarse step (ignore ⌘/Ctrl/Alt so Undo/other chords stay normal).
+        if (
+            event.key() in (Qt.Key_Up, Qt.Key_Down)
+            and mods & Qt.ShiftModifier
+            and not (mods & Qt.ControlModifier)
+            and not (mods & Qt.MetaModifier)
+            and not (mods & Qt.AltModifier)
+        ):
+            delta = 10 if event.key() == Qt.Key_Up else -10
+            self.setValue(self.value() + delta)
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class UIMainWindow(QMainWindow):
@@ -66,9 +102,9 @@ class UIMainWindow(QMainWindow):
     help(PyQt5.QtWidgets.QMainWindow).
 
     Attributes:
-        HEIGHT_CORRECTION (int): The pixels the window's height is extended by.
-            Useful on Windows, where QMenuBar is displayed on top of the main
-            window, increasing window size.
+        HEIGHT_CORRECTION (int): Extra pixels added to the window height on
+            non-macOS platforms so the in-window menu bar and frame do not clip
+            the bottom of the fixed layout (especially on Windows).
         LEFT_EDGE_CORRECTION (int): The pixels the window's widgets are all
             pushed to the right.
         TOP_EDGE_CORRECTION (int): The pixels the window's widgets are all
@@ -90,6 +126,13 @@ class UIMainWindow(QMainWindow):
             controller attempts to open a file or directory that doesn't exist.
         help_action (QAction): Adds a menu bar item which triggers opening the
             user manual.
+        connect_menu (QMenu): Top-bar menu for LiveSplit One WebSocket integration.
+        connect_disconnect_action (QAction): Stops timer sync and the WebSocket server.
+        connect_start_server_action (QAction): Starts the WebSocket server and shows its URL.
+        profile_menu (QMenu): Top-bar profile menu for save/load profile actions.
+        profile_load_action (QAction): Opens a file picker to load a profile.
+        profile_save_action (QAction): Saves current runtime/settings as a profile.
+        profile_recent_actions (list[QAction]): Fixed list of recent-profile menu rows.
         highest_percent (QLabel): Displays the highest image match
             percent so far, or a null string (see ui_controller._update_ui for
             details).
@@ -125,6 +168,8 @@ class UIMainWindow(QMainWindow):
         screenshot_button (QPushButton): Allows the user to take a screenshot
             of the current video frame and save it to the current split
             directory.
+        screenshot_settings_button (QPushButton): Opens screenshot / burst
+            settings (gear icon beside ``screenshot_button``).
         screenshot_err_no_video (QMessageBox): Message to display
             if the screenshot button or hotkey was pressed, ui_controller.
             take_screenshot was called, but splitter.comparison_frame was None.
@@ -197,6 +242,7 @@ class UIMainWindow(QMainWindow):
         super().__init__()
 
         self._container = QWidget(self)
+        self._container.setFocusPolicy(Qt.StrongFocus)
         self.setCentralWidget(self._container)
 
         self.setWindowTitle(f"Pilgrim Autosplitter {VERSION_NUMBER}")
@@ -216,13 +262,42 @@ class UIMainWindow(QMainWindow):
         self._menu_bar_dropdown.addAction(self.settings_action)
         self._menu_bar_dropdown.addAction(self.help_action)
 
-        # Layout attributes
+        self.profile_menu = self._menu_bar.addMenu("&Profile")
+        self.profile_load_action = QAction("Load Profile...", self)
+        self.profile_save_action = QAction("Save Profile...", self)
+        self.profile_load_action.setShortcut(QKeySequence.Open)
+        self.profile_save_action.setShortcut(QKeySequence.Save)
+        self.profile_menu.addAction(self.profile_load_action)
+        self.profile_menu.addAction(self.profile_save_action)
+        self.profile_menu.addSeparator()
+        self.profile_recent_actions = []
+        for _ in range(5):
+            act = QAction("(empty)", self)
+            act.setEnabled(False)
+            self.profile_menu.addAction(act)
+            self.profile_recent_actions.append(act)
+
+        self.connect_menu = self._menu_bar.addMenu("&Connect")
+        self.connect_disconnect_action = QAction("Disconnect", self)
+        self.connect_disconnect_action.setEnabled(False)
+        self.connect_start_server_action = QAction("WebSocket Server...", self)
+        self.connect_menu.addAction(self.connect_start_server_action)
+        self.connect_menu.addSeparator()
+        self.connect_menu.addAction(self.connect_disconnect_action)
+
+        # Layout attributes (see ui_controller: design x + LEFT_EDGE_CORRECTION).
+        # Same on all platforms as upstream pilgrim-autosplitter (macOS release layout).
         self.LEFT_EDGE_CORRECTION = -44
         self.TOP_EDGE_CORRECTION = -215
-        if platform.system() != "Darwin":
-            self.HEIGHT_CORRECTION = 22
-        else:
+        if platform.system() == "Darwin":
             self.HEIGHT_CORRECTION = 0
+        elif platform.system() == "Windows":
+            # Menu lives inside the client area on Windows; layout math matches macOS.
+            # Use menu height + slack so the bottom strip is not clipped (DPI / style).
+            _mb_h = int(self.menuBar().sizeHint().height())
+            self.HEIGHT_CORRECTION = max(40, _mb_h + 20)
+        else:
+            self.HEIGHT_CORRECTION = 22
 
         # Close app convenience shortcut
         self.close_window_shortcut = QShortcut("ctrl+w", self)
@@ -262,6 +337,10 @@ class UIMainWindow(QMainWindow):
         self.video_live_txt = "Video feed"
         self.video_down_txt = ""
 
+        self.video_viewport_border = QLabel(self._container)
+        self.video_viewport_border.setObjectName("video_viewport_border")
+        self.video_viewport_border.setAttribute(Qt.WA_TransparentForMouseEvents)
+
         self.video_display = ClickableQLabel(self._container)
         self.video_display.setAlignment(Qt.AlignCenter)
         self.video_display.setObjectName("video_label")
@@ -276,9 +355,9 @@ class UIMainWindow(QMainWindow):
         self.video_record_overlay.setVisible(False)
         self.video_record_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
 
-        program_dir = os.path.dirname(os.path.abspath(__file__))
-        self.record_active_img = f"{program_dir}/../../resources/record_active.png"
-        self.record_idle_img = f"{program_dir}/../../resources/record_idle.png"
+        _res = paths.resources_dir()
+        self.record_active_img = str(_res / "record_active.png")
+        self.record_idle_img = str(_res / "record_idle.png")
 
         self.video_info_overlay = ShadowFadeQLabel(self._container)
         self.video_info_overlay.setAlignment(Qt.AlignLeft)
@@ -286,6 +365,96 @@ class UIMainWindow(QMainWindow):
         self.video_info_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.video_info_overlay.set_text_color("white")
         self.video_info_overlay.set_shadow_color("black")
+
+        # Same look as ``split_overlay`` (grey veil + border), over the video feed
+        # while burst capture runs.
+        self.video_burst_overlay = QLabel(self._container)
+        self.video_burst_overlay.setAlignment(Qt.AlignCenter)
+        self.video_burst_overlay.setObjectName("video_burst_overlay")
+        self.video_burst_overlay.setVisible(False)
+        self.video_burst_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        # Source crop — one row under the video (capture-frame px, before resize)
+        self.video_crop_panel = QWidget(self._container)
+        self.video_crop_panel.setObjectName("video_crop_strip")
+        crop_row = QHBoxLayout(self.video_crop_panel)
+        self.video_crop_row = crop_row
+        crop_row.setContentsMargins(6, 2, 6, 6)
+        crop_row.setSpacing(0)
+        crop_row.addStretch(1)
+
+        self.video_crop_spin_left = CropStepSpinBox(self.video_crop_panel)
+        self.video_crop_spin_right = CropStepSpinBox(self.video_crop_panel)
+        self.video_crop_spin_up = CropStepSpinBox(self.video_crop_panel)
+        self.video_crop_spin_down = CropStepSpinBox(self.video_crop_panel)
+        _undo_key = QKeySequence(QKeySequence.Undo).toString(QKeySequence.NativeText)
+        _redo_key = QKeySequence(QKeySequence.Redo).toString(QKeySequence.NativeText)
+        spin_tips = {
+            "left": "Crop left edge",
+            "right": "Crop right edge",
+            "up": "Crop top edge",
+            "down": "Crop bottom edge",
+        }
+        for spin in (
+            self.video_crop_spin_left,
+            self.video_crop_spin_right,
+            self.video_crop_spin_up,
+            self.video_crop_spin_down,
+        ):
+            spin.setFocusPolicy(Qt.StrongFocus)
+            spin.setRange(0, 8192)
+            spin.setFixedWidth(57)
+        self.video_crop_spin_left.setToolTip(spin_tips["left"])
+        self.video_crop_spin_right.setToolTip(spin_tips["right"])
+        self.video_crop_spin_up.setToolTip(spin_tips["up"])
+        self.video_crop_spin_down.setToolTip(spin_tips["down"])
+
+        def add_edge(
+            label_short: str, label_tip: str, spin: CropStepSpinBox, attr_name: str
+        ) -> None:
+            lab = QLabel(label_short, self.video_crop_panel)
+            lab.setFocusPolicy(Qt.NoFocus)
+            lab.setToolTip("")
+            lab.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            lab.setContentsMargins(0, 0, 0, 0)
+            setattr(self, attr_name, lab)
+            crop_row.addWidget(lab)
+            crop_row.addWidget(spin)
+            crop_row.addSpacing(0)
+
+        add_edge(
+            "Left:",
+            "Crop left edge",
+            self.video_crop_spin_left,
+            "video_crop_label_left",
+        )
+        add_edge(
+            "Right:",
+            "Crop right edge",
+            self.video_crop_spin_right,
+            "video_crop_label_right",
+        )
+        add_edge(
+            "Up:",
+            "Crop top edge",
+            self.video_crop_spin_up,
+            "video_crop_label_up",
+        )
+        add_edge(
+            "Down:",
+            "Crop bottom edge",
+            self.video_crop_spin_down,
+            "video_crop_label_down",
+        )
+        # Extra space after Down spin before Reset (keeps Reset clear of spin “boxes”).
+        crop_row.addSpacing(8)
+        self.video_crop_btn_reset = QPushButton("Reset", self.video_crop_panel)
+        # Keep Reset out of the Tab chain so Tab moves between edit settings.
+        self.video_crop_btn_reset.setFocusPolicy(Qt.ClickFocus)
+        self.video_crop_btn_reset.setToolTip("Resets values to 0")
+        self.video_crop_btn_reset.setEnabled(False)
+        crop_row.addWidget(self.video_crop_btn_reset)
+        crop_row.addStretch(1)
 
         #########################
         #                       #
@@ -307,6 +476,10 @@ class UIMainWindow(QMainWindow):
         # Include placeholders for current and total loops
         self.split_loop_label_txt = "Loop {} of {}"
         self.split_loop_label_reset_txt = "Reset image"
+
+        self.split_viewport_border = QLabel(self._container)
+        self.split_viewport_border.setObjectName("split_viewport_border")
+        self.split_viewport_border.setAttribute(Qt.WA_TransparentForMouseEvents)
 
         self.split_display = ClickableQLabel(self._container)
         self.split_display.setAlignment(Qt.AlignCenter)
@@ -444,6 +617,21 @@ class UIMainWindow(QMainWindow):
         self.screenshot_button.setFocusPolicy(Qt.NoFocus)
         self.screenshot_button_short_txt = "Screenshot"
         self.screenshot_button_long_txt = "Take screenshot"
+        self.screenshot_button_burst_short_txt = "Take burst"
+        self.screenshot_button_burst_long_txt = "Take burst"
+
+        # QPushButton (not QToolButton) so macOS / Fusion paint the same chrome as
+        # ``screenshot_button`` and other bottom-row push buttons.
+        self.screenshot_settings_button = QPushButton(self._container)
+        self.screenshot_settings_button.setObjectName("screenshot_settings_button")
+        gear_icon_path = str(_res / "icons" / "gear_white.svg")
+        self.screenshot_settings_button.setIcon(QIcon(gear_icon_path))
+        self.screenshot_settings_button.setIconSize(QSize(20, 20))
+        self.screenshot_settings_button.setText("")
+        self.screenshot_settings_button.setToolTip("Screenshot settings")
+        self.screenshot_settings_button.setFocusPolicy(Qt.NoFocus)
+        self.screenshot_settings_button.setAutoDefault(False)
+        self.screenshot_settings_button.setDefault(False)
 
         # Screenshot success message box
         # (No parent widget -- parent widget keeps it from closing)
@@ -517,6 +705,125 @@ class UIMainWindow(QMainWindow):
         self.reset_button_short_txt = "Reset"
         self.reset_button_long_txt = "Reset splits"
 
+        # Per-split override controls (0 means use defaults from settings)
+        self.split_override_panel = QWidget(self._container)
+        self.split_override_panel.setObjectName("split_override_strip")
+        split_row = QHBoxLayout(self.split_override_panel)
+        self.split_override_row = split_row
+        split_row.setContentsMargins(6, 2, 6, 2)
+        split_row.setSpacing(0)
+        split_row.addStretch(1)
+
+        self.split_threshold_label = QLabel("Threshold:", self.split_override_panel)
+        self.split_threshold_label.setFocusPolicy(Qt.NoFocus)
+        self.split_threshold_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.split_threshold_label.setContentsMargins(0, 0, 0, 0)
+        self.split_threshold_spin = QDoubleSpinBox(self.split_override_panel)
+        self.split_threshold_spin.setRange(0.0, 100.0)
+        self.split_threshold_spin.setDecimals(1)
+        self.split_threshold_spin.setSingleStep(0.5)
+        self.split_threshold_spin.setFocusPolicy(Qt.StrongFocus)
+        self.split_threshold_spin.setFixedWidth(57)
+        self.split_threshold_spin.setToolTip("Split threshold (0 = default setting)")
+
+        self.split_delay_label = QLabel("Delay:", self.split_override_panel)
+        self.split_delay_label.setFocusPolicy(Qt.NoFocus)
+        self.split_delay_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.split_delay_label.setContentsMargins(0, 0, 0, 0)
+        self.split_delay_spin = QDoubleSpinBox(self.split_override_panel)
+        self.split_delay_spin.setRange(0.0, 99999.0)
+        self.split_delay_spin.setDecimals(1)
+        self.split_delay_spin.setSingleStep(0.1)
+        self.split_delay_spin.setFocusPolicy(Qt.StrongFocus)
+        self.split_delay_spin.setFixedWidth(57)
+        self.split_delay_spin.setToolTip("Split delay (0 = default setting)")
+
+        self.split_loop_label_2 = QLabel("Loop:", self.split_override_panel)
+        self.split_loop_label_2.setFocusPolicy(Qt.NoFocus)
+        self.split_loop_label_2.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.split_loop_label_2.setContentsMargins(0, 0, 0, 0)
+        self.split_loop_spin = QSpinBox(self.split_override_panel)
+        self.split_loop_spin.setRange(0, 99999)
+        self.split_loop_spin.setSingleStep(1)
+        self.split_loop_spin.setFocusPolicy(Qt.StrongFocus)
+        self.split_loop_spin.setFixedWidth(57)
+        self.split_loop_spin.setToolTip("Split loop (0 = default setting)")
+
+        self.split_pause_label = QLabel("Pause:", self.split_override_panel)
+        self.split_pause_label.setFocusPolicy(Qt.NoFocus)
+        self.split_pause_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.split_pause_label.setContentsMargins(0, 0, 0, 0)
+        self.split_pause_spin = QDoubleSpinBox(self.split_override_panel)
+        self.split_pause_spin.setRange(0.0, 99999.0)
+        self.split_pause_spin.setDecimals(1)
+        self.split_pause_spin.setSingleStep(0.1)
+        self.split_pause_spin.setFocusPolicy(Qt.StrongFocus)
+        self.split_pause_spin.setFixedWidth(57)
+        self.split_pause_spin.setToolTip("Split pause (0 = default setting)")
+
+        self.split_type_menu_button = QToolButton(self.split_override_panel)
+        self.split_type_menu_button.setObjectName("split_type_menu_button")
+        self.split_type_menu_button.setArrowType(Qt.NoArrow)
+        self.split_type_menu_button.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.split_type_menu_button.setPopupMode(QToolButton.InstantPopup)
+        self.split_type_menu_button.setFocusPolicy(Qt.StrongFocus)
+        self.split_type_menu_button.setAutoRaise(False)
+        chevron_icon_path = str(_res / "icons" / "chevron_down_white.svg")
+        self.split_type_menu_button.setIcon(QIcon(chevron_icon_path))
+        self.split_type_menu_button.setIconSize(QSize(10, 10))
+        self.split_type_menu_button.setStyleSheet(
+            """
+            QToolButton#split_type_menu_button::menu-indicator {
+                image: none;
+                width: 0px;
+                height: 0px;
+                subcontrol-position: right bottom;
+            }
+            """
+        )
+        self.split_type_menu = QMenu(self.split_type_menu_button)
+        self.split_type_dummy_action = QAction("Dummy", self.split_type_menu)
+        self.split_type_dummy_action.setCheckable(True)
+        self.split_type_dummy_action.setToolTip("Make split dummy")
+        self.split_type_below_action = QAction("Below", self.split_type_menu)
+        self.split_type_below_action.setCheckable(True)
+        self.split_type_below_action.setToolTip("Make split below")
+        self.split_type_menu.addAction(self.split_type_dummy_action)
+        self.split_type_menu.addAction(self.split_type_below_action)
+        self.split_type_menu.setToolTipsVisible(True)
+        self.split_type_menu.setStyleSheet(
+            """
+            QMenu {
+                font-size: 12px;
+            }
+            QMenu::item {
+                min-height: 16px;
+                padding: 2px 8px 2px 10px;
+            }
+            QMenu::indicator {
+                width: 11px;
+                height: 11px;
+                left: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #6a6a6a;
+            }
+            """
+        )
+        self.split_type_menu_button.setMenu(self.split_type_menu)
+        split_row.addWidget(self.split_threshold_label)
+        split_row.addWidget(self.split_threshold_spin)
+        split_row.addWidget(self.split_delay_label)
+        split_row.addWidget(self.split_delay_spin)
+        split_row.addWidget(self.split_loop_label_2)
+        split_row.addWidget(self.split_loop_spin)
+        split_row.addWidget(self.split_pause_label)
+        split_row.addWidget(self.split_pause_spin)
+        # Small dedicated gap before popup so it doesn't stick to Pause box.
+        split_row.addSpacing(7)
+        split_row.addWidget(self.split_type_menu_button)
+        split_row.addStretch(1)
+
         ##################################
         #                                #
         # Widgets (Update available msg) #
@@ -580,6 +887,31 @@ class UIMainWindow(QMainWindow):
         )
         self.err_invalid_dir_msg.setIcon(QMessageBox.Warning)
 
+        # Track editable boxes whose focus should clear on outside click.
+        self._deselect_on_outside_click = {
+            self.video_crop_spin_left,
+            self.video_crop_spin_right,
+            self.video_crop_spin_up,
+            self.video_crop_spin_down,
+            self.split_threshold_spin,
+            self.split_delay_spin,
+            self.split_loop_spin,
+            self.split_pause_spin,
+        }
+        QApplication.instance().installEventFilter(self)
+        QTimer.singleShot(0, self._clear_initial_input_focus)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        QTimer.singleShot(0, self._clear_initial_input_focus)
+
+    def _clear_initial_input_focus(self) -> None:
+        """Prevent startup from auto-focusing the first editable control."""
+        focused = QApplication.focusWidget()
+        if focused is not None and focused.window() is self:
+            focused.clearFocus()
+            self._container.setFocus(Qt.OtherFocusReason)
+
     def eventFilter(self, obj: QObject, event: QEvent):
         """Watch for QEvent.WindowActivate, which is triggered when the window
         was not in focus and is brought into focus.
@@ -598,13 +930,24 @@ class UIMainWindow(QMainWindow):
                 (basically neutralizes it). Returning False allows it to filter
                 through.
         """
-        if event.type() == QEvent.WindowActivate:
+        if obj is self and event.type() == QEvent.WindowActivate:
             self._mouse_allowed = False
             QTimer.singleShot(50, lambda: setattr(self, "_mouse_allowed", True))
 
-        elif event.type() == QEvent.MouseButtonPress and not self._mouse_allowed:
+        elif obj is self and event.type() == QEvent.MouseButtonPress and not self._mouse_allowed:
             self._mouse_allowed = True
             return True
+
+        elif event.type() == QEvent.MouseButtonPress and isinstance(obj, QWidget):
+            if obj.window() is self:
+                focused = QApplication.focusWidget()
+                if (
+                    focused in self._deselect_on_outside_click
+                    and focused is not obj
+                    and not focused.isAncestorOf(obj)
+                ):
+                    focused.clearFocus()
+                    self.setFocus(Qt.MouseFocusReason)
 
         return False
 

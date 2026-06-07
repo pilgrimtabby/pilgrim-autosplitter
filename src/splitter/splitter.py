@@ -1,22 +1,30 @@
-# Copyright (c) 2024-2026 pilgrim_tabby
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# Copyright (c) 2024-2025 pilgrim_tabby
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """Capture video and compare it to a template image."""
 
@@ -25,8 +33,8 @@ import pathlib
 import platform
 from queue import Full, Queue
 import threading
+from typing import List, Optional, Tuple
 import time
-from typing import Optional, Tuple
 
 import cv2
 import numpy
@@ -121,9 +129,13 @@ class Splitter:
         self.splits = SplitDir()
         self.match_percent = None
         self.highest_percent = None
+        self._highest_percent_frame = None
+        self._highest_peak_lock = threading.Lock()
         self.split_delay_remaining = None
         self.reset_delay_remaining = None
         self.suspend_remaining = None
+        self.suspend_display_highest = None
+        self.suspend_display_threshold = None
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
@@ -285,6 +297,36 @@ class Splitter:
 
         return found_valid_source
 
+    def get_highest_similarity_snapshot(
+        self,
+    ) -> Tuple[Optional[numpy.ndarray], float, float, str]:
+        """Copy of the peak comparison frame for the current split attempt.
+
+        Returns:
+            Tuple of (BGR frame or None, peak match 0–1, threshold 0–1, split
+            stripped name). Falls back to ``comparison_frame`` when no peak
+            frame has been stored yet this attempt.
+        """
+        with self._highest_peak_lock:
+            frame = (
+                self._highest_percent_frame.copy()
+                if self._highest_percent_frame is not None
+                else None
+            )
+            peak = float(self.highest_percent or 0.0)
+
+        if frame is None and self.comparison_frame is not None:
+            frame = self.comparison_frame.copy()
+            if self.match_percent is not None:
+                peak = float(self.match_percent)
+
+        index = self.splits.current_image_index
+        if index is None or index >= len(self.splits.list):
+            return frame, peak, 0.0, "split"
+
+        split = self.splits.list[index]
+        return frame, peak, float(split.threshold), split.stripped_name
+
     def toggle_suspended(self) -> None:
         """Stop the compare threads, then start them if the splitter was
         suspended and there are splits.
@@ -389,6 +431,8 @@ class Splitter:
                 self._capture_thread_finished = True
                 break
 
+            frame = self._apply_source_crop(frame)
+
             if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
                 self.comparison_frame = cv2.resize(
                     frame,
@@ -445,6 +489,57 @@ class Splitter:
         self.safe_exit_record_thread()
         self.safe_exit_compare_split_thread()
         self.safe_exit_compare_reset_thread()
+
+    def _apply_source_crop(self, frame: numpy.ndarray) -> numpy.ndarray:
+        """Trim pixels from each capture edge before resize/compare.
+
+        Stored settings are insets from left, right, top, and bottom. When all
+        are zero, the frame is unchanged. Invalid combinations fall back to
+        the full frame so capture never crashes.
+
+        Args:
+            frame: BGR image from VideoCapture.
+
+        Returns:
+            Cropped frame, or the original frame when crop is off or unsafe.
+        """
+        try:
+            if frame is None or getattr(frame, "size", 0) == 0:
+                return frame
+            if frame.ndim < 2:
+                return frame
+
+            fh, fw = int(frame.shape[0]), int(frame.shape[1])
+            if fh < 2 or fw < 2:
+                return frame
+
+            left = settings.get_int_nonneg("VIDEO_CROP_INSET_LEFT")
+            right = settings.get_int_nonneg("VIDEO_CROP_INSET_RIGHT")
+            top = settings.get_int_nonneg("VIDEO_CROP_INSET_TOP")
+            bottom = settings.get_int_nonneg("VIDEO_CROP_INSET_BOTTOM")
+
+            if left + right + top + bottom == 0:
+                return frame
+
+            left = min(left, fw - 1)
+            right = min(right, fw - 1)
+            top = min(top, fh - 1)
+            bottom = min(bottom, fh - 1)
+
+            if left + right >= fw or top + bottom >= fh:
+                return frame
+
+            w = fw - left - right
+            h = fh - top - bottom
+            if w < 1 or h < 1:
+                return frame
+
+            out = frame[top : top + h, left : left + w]
+            if getattr(out, "size", 0) == 0:
+                return frame
+            return out
+        except Exception:
+            return frame
 
     def _frame_to_pixmap(self, frame: Optional[numpy.ndarray]) -> QPixmap:
         """Generate a QPixmap instance from a 3-channel image stored as a numpy
@@ -678,6 +773,8 @@ class Splitter:
         match_found = False
         self.match_percent = 0
         self.highest_percent = 0
+        with self._highest_peak_lock:
+            self._highest_percent_frame = None
         self._compare_split_queue = Queue(10)  # Get rid of old images
 
         while not self._compare_split_thread_finished:
@@ -701,6 +798,15 @@ class Splitter:
             )
             if match_found:
                 break
+
+        if match_found:
+            idx = self.splits.current_image_index
+            if idx is not None and self.splits.list[idx].pause_duration > 0:
+                self.suspend_display_highest = self.highest_percent
+                self.suspend_display_threshold = self.splits.list[idx].threshold
+            else:
+                self.suspend_display_highest = None
+                self.suspend_display_threshold = None
 
         # Tell the ui_controller not to display match percents
         self.match_percent = None
@@ -735,6 +841,8 @@ class Splitter:
         )
         if self.match_percent > self.highest_percent:
             self.highest_percent = self.match_percent
+            with self._highest_peak_lock:
+                self._highest_percent_frame = frame.copy()
 
         # Image match is above threshold
         if (
@@ -894,6 +1002,8 @@ class Splitter:
                 )
                 time.sleep(0.01)
             self.suspend_remaining = None
+            self.suspend_display_highest = None
+            self.suspend_display_threshold = None
 
         return True
 

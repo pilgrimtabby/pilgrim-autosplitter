@@ -1,22 +1,30 @@
-# Copyright (c) 2024-2026 pilgrim_tabby
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# Copyright (c) 2024-2025 pilgrim_tabby
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """Stores css-style Template strings that can be edited by changing dict
 variable values.
@@ -39,7 +47,7 @@ from PyQt5.QtCore import QObject
 ##########################
 
 style_dict_dark = {
-    "default_background": "#333333",
+    "default_background": "#2c2c2c",
     "widget_fill_color": "#606060",
     "hover_widget_fill_color": "#6a6a6a",
     "hover_button_fill_color": "#5a5a5a",
@@ -77,6 +85,76 @@ style_sheet_dark = Template(
 
     QFrame#border {
         border: 1px solid $text_and_borders;
+        background-color: $default_background;
+    }
+
+    QWidget#screenshot_dlg_checkbox_wrap {
+        background-color: $default_background;
+    }
+    QWidget#screenshot_dlg_checkbox_wrap QCheckBox {
+        background-color: $widget_fill_color;
+        spacing: 0px;
+        padding: 0px;
+        margin: 0px;
+    }
+    QWidget#screenshot_dlg_checkbox_wrap QLabel#checkbox_helper {
+        background-color: rgba(0, 0, 0, 0);
+    }
+
+    QWidget#screenshot_dlg_dated_checkbox_wrap {
+        background-color: $default_background;
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap QCheckBox {
+        background-color: $widget_fill_color;
+        spacing: 0px;
+        padding: 0px;
+        margin: 0px;
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap QLabel#checkbox_helper {
+        background-color: rgba(0, 0, 0, 0);
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap[burst_off="true"] QCheckBox {
+        background-color: #4a4a4a;
+        color: $disabled_button_text_color;
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap[burst_off="true"] QLabel#checkbox_helper {
+        border: 1px solid $disabled_button_text_color;
+        background-color: rgba(0, 0, 0, 0);
+    }
+
+    QLabel#burst_complete_path {
+        color: $disabled_button_text_color;
+    }
+    QMenuBar {
+        padding: 5px 12px;
+        spacing: 12px;
+    }
+    QMenuBar::item {
+        padding: 8px 18px;
+        background-color: transparent;
+    }
+    QMenuBar::item:selected {
+        background-color: $widget_fill_color;
+    }
+
+    QMenu {
+        font-family: "Gill Sans", "Calibri", "Noto Sans";
+        font-size: $font_size;
+        border: 1px solid $text_and_borders;
+        background-color: $default_background;
+        padding: 2px 0px;
+    }
+    QMenu::item {
+        padding: 6px 16px;
+        background-color: transparent;
+    }
+    QMenu::item:selected {
+        background-color: $widget_fill_color;
+    }
+    QMenu::separator {
+        height: 1px;
+        background-color: $text_and_borders;
+        margin: 4px 12px;
     }
 
     QPushButton {
@@ -91,6 +169,7 @@ style_sheet_dark = Template(
     }
     QPushButton:disabled {
         color: $disabled_button_text_color;
+        background-color: #3e3e3e;
     }
 
     QCheckBox {
@@ -105,6 +184,9 @@ style_sheet_dark = Template(
         background-color: #444444;
         border: 1px solid #242424;
         border-radius: 2px;
+    }
+    QLineEdit#connect_ws_url {
+        padding: 3px 6px;
     }
     QLineEdit:hover {
         color: $text_and_borders;
@@ -127,18 +209,23 @@ style_sheet_dark = Template(
 
     QLabel#video_label {
         background: #555555;
-        border: 1px solid $text_and_borders;
     }
     QLabel#video_overlay {
         background-color: transparent;
     }
     QLabel#image_label {
         background: #555555;
+    }
+    QLabel#video_viewport_border,
+    QLabel#split_viewport_border {
+        background-color: transparent;
         border: 1px solid $text_and_borders;
     }
     QLabel#split_overlay {
         background-color: rgba(134, 134, 134, 0.7);
-        border: 1px solid $text_and_borders;
+    }
+    QLabel#video_burst_overlay {
+        background-color: rgba(134, 134, 134, 0.7);
     }
     QLabel#checkbox_helper {
         border: 1px solid $text_and_borders;
@@ -153,6 +240,30 @@ style_sheet_dark = Template(
     QSpinBox:hover,
     QDoubleSpinBox:hover {
         background-color: $hover_widget_fill_color;
+    }
+
+    QWidget#video_crop_strip,
+    QWidget#split_override_strip {
+        background-color: #242424;
+        border-radius: 2px;
+    }
+    QWidget#video_crop_strip QLabel,
+    QWidget#split_override_strip QLabel {
+        background: transparent;
+    }
+    QToolButton#split_type_menu_button {
+        background-color: $widget_fill_color;
+        border: none;
+        border-radius: 2px;
+        padding: 0px;
+    }
+    QToolButton#split_type_menu_button:hover {
+        background-color: $hover_widget_fill_color;
+    }
+
+    QToolTip {
+        padding-left: 2px;
+        padding-right: 2px;
     }
     """
 ).substitute(style_dict_dark)
@@ -171,7 +282,7 @@ style_dict_light = {
     "hover_button_fill_color": "#aeaeae",
     "disabled_button_text_color": "#888888",
     "button_fill_color": "#aaaaaa",
-    "text_and_borders": "black",
+    "text_and_borders": "#202020",
 }
 style_dict_light["font_size"] = font_size
 
@@ -195,6 +306,76 @@ style_sheet_light = Template(
 
     QFrame#border {
         border: 1px solid $text_and_borders;
+        background-color: $default_background;
+    }
+
+    QWidget#screenshot_dlg_checkbox_wrap {
+        background-color: $default_background;
+    }
+    QWidget#screenshot_dlg_checkbox_wrap QCheckBox {
+        background-color: $widget_fill_color;
+        spacing: 0px;
+        padding: 0px;
+        margin: 0px;
+    }
+    QWidget#screenshot_dlg_checkbox_wrap QLabel#checkbox_helper {
+        background-color: rgba(0, 0, 0, 0);
+    }
+
+    QWidget#screenshot_dlg_dated_checkbox_wrap {
+        background-color: $default_background;
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap QCheckBox {
+        background-color: $widget_fill_color;
+        spacing: 0px;
+        padding: 0px;
+        margin: 0px;
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap QLabel#checkbox_helper {
+        background-color: rgba(0, 0, 0, 0);
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap[burst_off="true"] QCheckBox {
+        background-color: #c8c8c8;
+        color: $disabled_button_text_color;
+    }
+    QWidget#screenshot_dlg_dated_checkbox_wrap[burst_off="true"] QLabel#checkbox_helper {
+        border: 1px solid $disabled_button_text_color;
+        background-color: rgba(0, 0, 0, 0);
+    }
+
+    QLabel#burst_complete_path {
+        color: $disabled_button_text_color;
+    }
+    QMenuBar {
+        padding: 5px 12px;
+        spacing: 12px;
+    }
+    QMenuBar::item {
+        padding: 8px 18px;
+        background-color: transparent;
+    }
+    QMenuBar::item:selected {
+        background-color: $widget_fill_color;
+    }
+
+    QMenu {
+        font-family: "Gill Sans", "Calibri", "Noto Sans";
+        font-size: $font_size;
+        border: 1px solid $text_and_borders;
+        background-color: $default_background;
+        padding: 2px 0px;
+    }
+    QMenu::item {
+        padding: 6px 16px;
+        background-color: transparent;
+    }
+    QMenu::item:selected {
+        background-color: $widget_fill_color;
+    }
+    QMenu::separator {
+        height: 1px;
+        background-color: $text_and_borders;
+        margin: 4px 12px;
     }
 
     QPushButton {
@@ -209,6 +390,7 @@ style_sheet_light = Template(
     }
     QPushButton:disabled {
         color: $disabled_button_text_color;
+        background-color: #dadada;
     }
 
     QCheckBox {
@@ -224,6 +406,9 @@ style_sheet_light = Template(
         border: 1px solid #cccccc;
         border-radius: 2px;
         padding-left: 5px;
+    }
+    QLineEdit#connect_ws_url {
+        padding: 3px 6px;
     }
     QLineEdit:hover {
         color: $text_and_borders;
@@ -246,18 +431,23 @@ style_sheet_light = Template(
 
     QLabel#video_label {
         background: #bbbbbb;
-        border: 1px solid $text_and_borders;
     }
     QLabel#video_overlay {
         background-color: transparent;
     }
     QLabel#image_label {
         background: #bbbbbb;
+    }
+    QLabel#video_viewport_border,
+    QLabel#split_viewport_border {
+        background-color: transparent;
         border: 1px solid $text_and_borders;
     }
     QLabel#split_overlay {
         background-color: rgba(134, 134, 134, 0.7);
-        border: 1px solid $text_and_borders;
+    }
+    QLabel#video_burst_overlay {
+        background-color: rgba(134, 134, 134, 0.7);
     }
     QLabel#checkbox_helper {
         border: 1px solid $text_and_borders;
@@ -272,6 +462,30 @@ style_sheet_light = Template(
     QSpinBox:hover,
     QDoubleSpinBox:hover {
         background-color: $hover_widget_fill_color;
+    }
+
+    QWidget#video_crop_strip,
+    QWidget#split_override_strip {
+        background-color: #ababab;
+        border-radius: 2px;
+    }
+    QWidget#video_crop_strip QLabel,
+    QWidget#split_override_strip QLabel {
+        background: transparent;
+    }
+    QToolButton#split_type_menu_button {
+        background-color: $widget_fill_color;
+        border: 1px solid #8f8f8f;
+        border-radius: 2px;
+        padding: 0px;
+    }
+    QToolButton#split_type_menu_button:hover {
+        background-color: $hover_widget_fill_color;
+    }
+
+    QToolTip {
+        padding-left: 2px;
+        padding-right: 2px;
     }
     """
 ).substitute(style_dict_light)

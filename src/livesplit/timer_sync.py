@@ -26,26 +26,41 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Test pilgrim_autosplitter.py."""
+"""LiveSplit One timer commands over the WebSocket server protocol."""
 
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-_src = Path(__file__).resolve().parents[1] / "src"
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
+import time
+from typing import Optional, TYPE_CHECKING
 
-from PyQt5.QtWidgets import QApplication
+if TYPE_CHECKING:
+    from livesplit.ws_server import LiveSplitWebSocketServer
 
-from pilgrim_autosplitter import PilgrimAutosplitter
-from splitter.splitter import Splitter
-from ui.ui_controller import UIController
+_MANUAL_NAV_COOLDOWN_SEC = 0.75
 
 
-def test_PilgrimAutosplitter():
-    app = PilgrimAutosplitter()
-    assert (
-        type(app.app) == QApplication
-        and type(app.splitter) == Splitter
-        and type(app.ui_controller) == UIController
-    )
+class LiveSplitTimerSync:
+    """Send timer commands when LiveSplit One is connected to our WebSocket server."""
+
+    def __init__(self) -> None:
+        self._server: Optional[LiveSplitWebSocketServer] = None
+        self._manual_nav_deadline = 0.0
+
+    def set_server(self, server: Optional[LiveSplitWebSocketServer]) -> None:
+        self._server = server
+
+    @property
+    def linked(self) -> bool:
+        return self._server is not None and self._server.is_client_connected
+
+    def send(self, command: str, **params: object) -> bool:
+        if not self.linked or self._server is None:
+            return False
+        return self._server.send_command(command, **params)
+
+    def after_manual_navigation(self) -> None:
+        """Ignore autosplit timer commands briefly after manual skip/undo/reset."""
+        self._manual_nav_deadline = time.monotonic() + _MANUAL_NAV_COOLDOWN_SEC
+
+    def autosplit_may_send(self) -> bool:
+        return time.monotonic() >= self._manual_nav_deadline

@@ -1,22 +1,30 @@
-# Copyright (c) 2024-2026 pilgrim_tabby
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# Copyright (c) 2024-2025 pilgrim_tabby
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """Persist and reference user settings and key values."""
 
@@ -33,8 +41,8 @@ COMPARISON_FRAME_WIDTH = 320
 # The height of the frame generated and used by splitter.py to find a match
 COMPARISON_FRAME_HEIGHT = 240
 
-# Pilgrim Autosplitter's current version number
-VERSION_NUMBER = "v1.1.0"
+# Pilgrim Autosplitter's current version number (fork tag; upstream release is v1.1.0).
+VERSION_NUMBER = "v1.1.3"
 
 # The URL of Pilgrim Autosplitter's GitHub repo
 REPO_URL = "https://github.com/pilgrimtabby/pilgrim-autosplitter/"
@@ -97,6 +105,29 @@ def get_int(key: str, settings: QSettings = settings) -> int:
     return int(settings.value(key))
 
 
+def get_int_nonneg(key: str, default: int = 0, settings: QSettings = settings) -> int:
+    """Non-negative int from settings; tolerate missing or corrupt values.
+
+    Used for values like crop insets where invalid stored data must not crash
+    the capture thread.
+
+    Args:
+        key (str): Setting name.
+        default (int): Fallback when unset or unparsable.
+        settings (QSettings): Settings store.
+
+    Returns:
+        int: ``max(0, parsed)`` or ``default``.
+    """
+    raw = settings.value(key)
+    if raw is None:
+        return default
+    try:
+        return max(0, int(raw))
+    except (ValueError, TypeError):
+        return default
+
+
 def get_float(key: str, settings: QSettings = settings) -> float:
     """Return a float from settings, regardless of the stored value's type.
 
@@ -125,7 +156,9 @@ def set_value(key: str, value: any, settings: QSettings = settings) -> None:
     settings.setValue(key, str(value))
 
 
-def set_program_vals(settings: QSettings = settings) -> None:
+def set_program_vals(
+    settings: QSettings = settings, *, align_burst_fps_to_main: bool = True
+) -> None:
     """Ensure that settings values are updated and make sense before use.
 
     Unsets hotkeys if last used version was <=1.0.6 due to a change in the way
@@ -139,6 +172,11 @@ def set_program_vals(settings: QSettings = settings) -> None:
     since the user would have to exit minimal view to turn the video on anyway.
 
     Makes sure that the correct aspect ratio is shown.
+
+    Args:
+        settings: Settings store.
+        align_burst_fps_to_main: When True (app launch), set ``BURST_FPS`` from
+            general ``FPS``. When False (e.g. profile load), keep stored burst FPS.
     """
     home_dir = get_home_dir()
 
@@ -217,16 +255,28 @@ def set_program_vals(settings: QSettings = settings) -> None:
         # Whether program checks for updates on launch
         set_value("CHECK_FOR_UPDATES", True, settings)
 
+        # JSON list of recently loaded/saved profile paths
+        set_value("RECENT_PROFILE_PATHS", "[]", settings)
+
+        # Optional override for profile save directory; empty means project /saves
+        set_value("PROFILE_SAVE_DIR", "", settings)
+
+        # LiveSplit One WebSocket server port (localhost only)
+        set_value("WS_SERVER_PORT", 16834, settings)
+
+    if not settings.contains("WS_SERVER_PORT"):
+        set_value("WS_SERVER_PORT", 16834, settings)
+
     # Make sure image dir exists and is within the user's home dir
     # (This limits i/o to user-controlled areas)
     last_image_dir = get_str("LAST_IMAGE_DIR", settings)
-    if not last_image_dir.startswith(home_dir) or not Path(last_image_dir).is_dir():
+    if not path_is_within_home(last_image_dir) or not Path(last_image_dir).is_dir():
         set_value("LAST_IMAGE_DIR", home_dir, settings)
 
     # Make sure recordings dir exists and is within the user's home dir
     # (This limits i/o to user-controlled areas)
     last_record_dir = get_str("LAST_RECORD_DIR", settings)
-    if not last_record_dir.startswith(home_dir) or not Path(last_record_dir).is_dir():
+    if not path_is_within_home(last_record_dir) or not Path(last_record_dir).is_dir():
         set_value("LAST_RECORD_DIR", home_dir, settings)
 
     # Always start in full view if video doesn't come on automatically
@@ -235,6 +285,45 @@ def set_program_vals(settings: QSettings = settings) -> None:
 
     # Remember last used version number (to unset hotkeys if upgrading)
     set_value("LAST_VERSION", VERSION_NUMBER, settings)
+
+    if not settings.contains("RECENT_PROFILE_PATHS"):
+        set_value("RECENT_PROFILE_PATHS", "[]", settings)
+    if not settings.contains("PROFILE_SAVE_DIR"):
+        set_value("PROFILE_SAVE_DIR", "", settings)
+
+    # Burst screenshot capture (burst FPS is aligned with Settings ▸ FPS on each startup)
+    if not settings.contains("BURST_MODE_ENABLED"):
+        set_value("BURST_MODE_ENABLED", False, settings)
+    if not settings.contains("BURST_DURATION_SEC"):
+        set_value("BURST_DURATION_SEC", 2.0, settings)
+    if align_burst_fps_to_main:
+        _main_fps = max(1, min(120, get_int("FPS", settings)))
+        set_value("BURST_FPS", float(_main_fps), settings)
+    elif not settings.contains("BURST_FPS"):
+        _main_fps = max(1, min(120, get_int("FPS", settings)))
+        set_value("BURST_FPS", float(_main_fps), settings)
+
+    if not settings.contains("BURST_DATED_SESSION_FOLDERS"):
+        set_value("BURST_DATED_SESSION_FOLDERS", True, settings)
+
+    # Parent folder for screenshots and burst runs.
+    if not settings.contains("BURST_SHOTS_BASE_DIR"):
+        set_value("BURST_SHOTS_BASE_DIR", home_dir, settings)
+    else:
+        burst_base = get_str("BURST_SHOTS_BASE_DIR", settings)
+        if (
+            not path_is_within_home(burst_base)
+            or not Path(burst_base).expanduser().is_dir()
+        ):
+            set_value("BURST_SHOTS_BASE_DIR", home_dir, settings)
+
+    # Save peak sim hotkey (added after initial release; unset reads as "None")
+    for key in ("SAVE_PEAK_HOTKEY_NAME", "SAVE_PEAK_HOTKEY_CODE"):
+        if not settings.contains(key) or get_str(key, settings) == "None":
+            set_value(key, "", settings)
+
+    # Video crop (source pixels; applied before resize to comparison/UI frame)
+    _ensure_video_crop_defaults(settings)
 
     # Set correct video, split image width and height relative to aspect ratio
     aspect_ratio = get_str("ASPECT_RATIO", settings)
@@ -277,6 +366,22 @@ def version_ge(version1: str, version2: str) -> bool:
     return True
 
 
+def _ensure_video_crop_defaults(settings: QSettings = settings) -> None:
+    """Populate video crop inset keys when missing (pixels trimmed per edge).
+
+    All zeros means no crop. Legacy VIDEO_CROP_* keys are ignored.
+    """
+    defaults = {
+        "VIDEO_CROP_INSET_LEFT": 0,
+        "VIDEO_CROP_INSET_RIGHT": 0,
+        "VIDEO_CROP_INSET_TOP": 0,
+        "VIDEO_CROP_INSET_BOTTOM": 0,
+    }
+    for key, value in defaults.items():
+        if not settings.contains(key):
+            set_value(key, value, settings=settings)
+
+
 def unset_hotkey_bindings() -> None:
     """Unset all hotkey bindings."""
     # Text values
@@ -288,6 +393,7 @@ def unset_hotkey_bindings() -> None:
     set_value("PREV_HOTKEY_NAME", "", settings)
     set_value("NEXT_HOTKEY_NAME", "", settings)
     set_value("SCREENSHOT_HOTKEY_NAME", "", settings)
+    set_value("SAVE_PEAK_HOTKEY_NAME", "", settings)
     set_value("TOGGLE_HOTKEYS_HOTKEY_NAME", "", settings)
 
     # Key IDs
@@ -299,6 +405,7 @@ def unset_hotkey_bindings() -> None:
     set_value("PREV_HOTKEY_CODE", "", settings)
     set_value("NEXT_HOTKEY_CODE", "", settings)
     set_value("SCREENSHOT_HOTKEY_CODE", "", settings)
+    set_value("SAVE_PEAK_HOTKEY_CODE", "", settings)
     set_value("TOGGLE_HOTKEYS_HOTKEY_CODE", "", settings)
 
 
@@ -350,3 +457,20 @@ def get_home_dir() -> str:
         user = os.environ.get("SUDO_USER")
         home_dir = os.path.expanduser(f"~{user}")
     return home_dir.replace("\\", "/")
+
+
+def path_is_within_home(path: str) -> bool:
+    """True if ``path`` resolves to the user's home directory or a subdirectory.
+
+    ``QFileDialog`` on Windows returns backslashes; ``get_home_dir`` uses
+    forward slashes, so string ``startswith`` is not reliable for this check.
+    """
+    if not (path or "").strip():
+        return False
+    try:
+        resolved = Path(path).expanduser().resolve()
+        home = Path(get_home_dir()).expanduser().resolve()
+        resolved.relative_to(home)
+        return True
+    except (ValueError, OSError, RuntimeError):
+        return False

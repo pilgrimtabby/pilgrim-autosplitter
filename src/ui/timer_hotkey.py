@@ -26,26 +26,28 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Test pilgrim_autosplitter.py."""
+"""Simulate timer hotkeys when the external app does not receive the key."""
 
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-_src = Path(__file__).resolve().parents[1] / "src"
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from PyQt5.QtWidgets import QApplication
-
-from pilgrim_autosplitter import PilgrimAutosplitter
-from splitter.splitter import Splitter
-from ui.ui_controller import UIController
+from typing import Callable
 
 
-def test_PilgrimAutosplitter():
-    app = PilgrimAutosplitter()
-    assert (
-        type(app.app) == QApplication
-        and type(app.splitter) == Splitter
-        and type(app.ui_controller) == UIController
-    )
+def hotkey_not_caught(focus_window, global_hotkeys_enabled: bool) -> bool:
+    """True when a local hotkey press would not reach the focused timer app."""
+    return focus_window is None and not global_hotkeys_enabled
+
+
+def press_hotkey_or_fallback(
+    key_code: str,
+    press_and_release: Callable[[str], None],
+    *,
+    focus_window,
+    global_hotkeys_enabled: bool,
+    fallback: Callable[[], None],
+) -> None:
+    """Press a configured hotkey, or run fallback if it would not be caught."""
+    if len(key_code) > 0:
+        press_and_release(key_code)
+    if len(key_code) == 0 or hotkey_not_caught(focus_window, global_hotkeys_enabled):
+        fallback()

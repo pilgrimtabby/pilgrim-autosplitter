@@ -26,26 +26,43 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Test pilgrim_autosplitter.py."""
+"""Tests for ui.timer_hotkey."""
 
-import sys
-from pathlib import Path
+from unittest.mock import MagicMock
 
-_src = Path(__file__).resolve().parents[1] / "src"
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
-
-from PyQt5.QtWidgets import QApplication
-
-from pilgrim_autosplitter import PilgrimAutosplitter
-from splitter.splitter import Splitter
-from ui.ui_controller import UIController
+from ui.timer_hotkey import hotkey_not_caught, press_hotkey_or_fallback
 
 
-def test_PilgrimAutosplitter():
-    app = PilgrimAutosplitter()
-    assert (
-        type(app.app) == QApplication
-        and type(app.splitter) == Splitter
-        and type(app.ui_controller) == UIController
+def test_hotkey_not_caught_when_unfocused_and_not_global():
+    assert hotkey_not_caught(None, False) is True
+    assert hotkey_not_caught(MagicMock(), True) is False
+
+
+def test_press_hotkey_or_fallback_empty_key():
+    pressed = []
+    fallback = []
+
+    press_hotkey_or_fallback(
+        "",
+        pressed.append,
+        focus_window=None,
+        global_hotkeys_enabled=False,
+        fallback=lambda: fallback.append(1),
     )
+    assert pressed == []
+    assert fallback == [1]
+
+
+def test_press_hotkey_or_fallback_uses_fallback_when_not_caught():
+    pressed = []
+    fallback = []
+
+    press_hotkey_or_fallback(
+        "x",
+        pressed.append,
+        focus_window=None,
+        global_hotkeys_enabled=False,
+        fallback=lambda: fallback.append(1),
+    )
+    assert pressed == ["x"]
+    assert fallback == [1]

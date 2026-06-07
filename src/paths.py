@@ -26,26 +26,17 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Test pilgrim_autosplitter.py."""
+"""Filesystem locations shared across the app (source tree vs PyInstaller bundle)."""
+
+from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-_src = Path(__file__).resolve().parents[1] / "src"
-if str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
 
-from PyQt5.QtWidgets import QApplication
-
-from pilgrim_autosplitter import PilgrimAutosplitter
-from splitter.splitter import Splitter
-from ui.ui_controller import UIController
-
-
-def test_PilgrimAutosplitter():
-    app = PilgrimAutosplitter()
-    assert (
-        type(app.app) == QApplication
-        and type(app.splitter) == Splitter
-        and type(app.ui_controller) == UIController
-    )
+def resources_dir() -> Path:
+    """Directory containing ``icon-macos.png``, ``demo.gif``, ``icons/``, etc."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / "resources"
+    # Running from source: this file is ``src/paths.py``.
+    return Path(__file__).resolve().parent.parent / "resources"
