@@ -52,6 +52,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ui.screenshot_capture import SNAP_PEAK_HOTKEY_LABEL
+
 
 class UISettingsWindow(QDialog):
     """Initialize settings window widgets and allow the settings window to be
@@ -625,14 +627,14 @@ class UISettingsWindow(QDialog):
             lambda: setattr(self.screenshot_hotkey_box, "key_code", "")
         )
 
-        # Save peak sim hotkey
+        # Snap Peak hotkey
         self.save_peak_hotkey_box = KeyLineEdit(self)
         self.save_peak_hotkey_box.setGeometry(
             QRect(410 + self._LEFT, 282 + self._TOP, 121, 25)
         )
         self.save_peak_hotkey_box.setReadOnly(True)
 
-        self._save_peak_hotkey_label = QLabel("Save peak sim", self)
+        self._save_peak_hotkey_label = QLabel(SNAP_PEAK_HOTKEY_LABEL, self)
         self._save_peak_hotkey_label.setGeometry(
             QRect(300 + self._LEFT, 280 + self._TOP, 100, 31)
         )

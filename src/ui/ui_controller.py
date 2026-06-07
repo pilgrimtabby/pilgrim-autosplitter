@@ -33,18 +33,16 @@ input to the UI and the splitter.
 
 import datetime
 import json
-import math
 import os
 import paths
 import platform
 import re
 import subprocess
 import time
+from pathlib import Path
+from threading import Lock, Thread
 from typing import Any, List, Optional, Tuple, Union
 import webbrowser
-from pathlib import Path
-from queue import Empty, Queue
-from threading import Lock, Thread
 
 import cv2
 from PyQt5.QtCore import QEvent, QObject, QLocale, QRect, QSize, Qt, QTimer
@@ -84,61 +82,34 @@ from ui.ui_settings_window import UISettingsWindow
 from ui.ui_style_sheet import style_sheet_light, style_sheet_dark
 from ui.layout_presets import (
     AspectLayoutPreset,
+    BOTTOM_ADJ_PAIR_GAP_PX,
+    BOTTOM_BLOCK_LIFT_PX,
     LAYOUT_PRESET_320,
     LAYOUT_PRESET_432,
     LAYOUT_PRESET_480,
     LAYOUT_PRESET_512,
     SplitColumnBottomPreset,
+    STRIP_GAP_BELOW_VIEWPORT_PX,
     VIDEO_CROP_STRIP_LAYOUT_DY,
+    VIDEO_COL_SCREENSHOT_H,
+    VIDEO_COL_STATS_LABEL_W,
+    VIDEO_COL_STATS_PCT_X,
+    VIDEO_COL_STATS_ROW_H,
+    VIDEO_COL_STATS_ROW_STEP,
+    VIDEO_COL_STATS_SPAN_W,
+    VIDEO_COL_STATS_VALUE_X,
     VideoColumnBottomPreset,
-    VideoColumnFixedCoords,
-    _320_STRIP_ABBREV_LABEL_MIN_W,
-    _320_STRIP_CONTROL_FONT_PX,
-    _320_STRIP_LABEL_FONT_PX,
-    _320_STRIP_LABEL_GAP_ADJ,
-    _320_STRIP_ROW_MARGINS,
-    _320_STRIP_ROW_SPACING,
-    _320_STRIP_SIZE_F,
-    _432_DISPLAY_W,
-    _BOTTOM_ADJ_PAIR_GAP_PX,
-    _BOTTOM_BLOCK_LIFT_PX,
-    _STRIP_GAP_BELOW_VIEWPORT_PX,
-    _VIDEO_COL_SCREENSHOT_H,
-    _VIDEO_COL_STATS_LABEL_W,
-    _VIDEO_COL_STATS_PCT_X,
-    _VIDEO_COL_STATS_ROW_H,
-    _VIDEO_COL_STATS_ROW_STEP,
-    _VIDEO_COL_STATS_SPAN_W,
-    _VIDEO_COL_STATS_VALUE_X,
 )
+from ui.strip_typography import (
+    STRIP_LOCAL_LABEL_PX,
+    STRIP_LOCAL_SPIN_PX,
+    STRIP_MENU_BOX_HEIGHT_PX,
+    StripTypographyApplier,
+)
+from ui.screenshot_capture import SNAP_PEAK_HOTKEY_LABEL, ScreenshotCapture
 
 # Slightly larger than global theme for bottom stats + main action buttons only.
 _BOTTOM_PANEL_FONT_PX = 17
-# QFontMetrics floor when pairing with strip fonts (widget-local QSS + setFont).
-_STRIP_FONT_METRICS_FLOOR_PX = 8
-# Compact strip fonts — applied per-widget so global "* { font-size: 16px }" does not win.
-_STRIP_LOCAL_LABEL_PX = 12
-_STRIP_LOCAL_SPIN_PX = 13
-_STRIP_LOCAL_SPIN_PX_TINY = 12  # 320×240
-# Pixels past measured text for strip QLabel width (tight; alignment handles the visual gap).
-_STRIP_LABEL_SLACK_PX = 2
-# Strip spin boxes — same outer size on every aspect ratio (only layout position/spacing changes).
-_STRIP_MENU_BOX_WIDTH_PX = 54
-_STRIP_MENU_BOX_HEIGHT_PX = 19
-# Split-type toolbutton: square, same edge length as strip row height (matches spin height).
-_STRIP_POPUP_BUTTON_SIDE_PX = 17
-# 320-only controls aligned with 432 compact styling.
-_STRIP_MENU_BOX_WIDTH_320_PX = 52
-_STRIP_MENU_BOX_HEIGHT_320_PX = 19
-_STRIP_POPUP_BUTTON_SIDE_320_PX = 17
-# 432-only value-box width bump.
-_STRIP_MENU_BOX_WIDTH_432_PX = 52
-# Space between strip label text and the following spin (label contents margin-right).
-_STRIP_LABEL_TO_SPIN_GAP_PX = 2
-# Nudge strip label text slightly right inside its label box.
-_STRIP_LABEL_LEFT_INSET_PX = 3
-# Minimum QLabel width for L:/T:/… strips so glyphs are not clipped.
-_STRIP_ABBREV_LABEL_MIN_WIDTH_PX = 42
 
 
 _MAX_VIDEO_CROP_UNDO = 100
@@ -169,126 +140,6 @@ _PROFILE_BURST_SETTING_KEYS = (
 )
 
 
-class _ScreenshotCountdownRing(QWidget):
-    """Circular stroke ring; active arc shrinks clockwise as auto-close time runs out."""
-
-    _DIAMETER = 22
-    _STROKE = 2.25
-    _START_ANGLE = 90 * 16  # 12 o'clock (top)
-
-    def __init__(
-        self,
-        duration_ms: int,
-        *,
-        remaining_color: QColor,
-        elapsed_color: QColor,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._duration_ms = max(1, duration_ms)
-        self._start = time.monotonic()
-        self._remaining_color = remaining_color
-        self._elapsed_color = elapsed_color
-        self.setFixedSize(self._DIAMETER, self._DIAMETER)
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(40)
-
-    def _remaining_fraction(self) -> float:
-        elapsed_ms = (time.monotonic() - self._start) * 1000
-        return max(0.0, min(1.0, 1.0 - elapsed_ms / self._duration_ms))
-
-    def _tick(self) -> None:
-        if self._remaining_fraction() <= 0:
-            self._timer.stop()
-        self.update()
-
-    def stop(self) -> None:
-        self._timer.stop()
-
-    def paintEvent(self, event) -> None:
-        del event
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        inset = max(2, int(math.ceil(self._STROKE / 2)) + 1)
-        rect = self.rect().adjusted(inset, inset, -inset, -inset)
-
-        track_pen = QPen(self._elapsed_color, self._STROKE)
-        track_pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(track_pen)
-        painter.setBrush(Qt.NoBrush)
-        painter.drawEllipse(rect)
-
-        remaining = self._remaining_fraction()
-        if remaining <= 0:
-            return
-
-        active_pen = QPen(self._remaining_color, self._STROKE)
-        active_pen.setCapStyle(Qt.RoundCap)
-        painter.setPen(active_pen)
-        span = int(round(remaining * 360 * 16))
-        painter.drawArc(rect, self._START_ANGLE, -span)
-
-
-class _ScreenshotSettingsDialog(QDialog):
-    """Screenshot / burst options dialog: no auto-focus; click outside inputs clears focus."""
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.setFocusPolicy(Qt.NoFocus)
-
-    def _blur_focused_descendant(self) -> None:
-        app = QApplication.instance()
-        if app is None:
-            return
-        fw = app.focusWidget()
-        if fw is None or not self.isAncestorOf(fw):
-            return
-        if isinstance(fw, QComboBox):
-            fw.hidePopup()
-        if isinstance(fw, QLineEdit):
-            fw.deselect()
-        fw.clearFocus()
-
-    def _should_blur_for_mouse_press(self, watched: QObject) -> bool:
-        if watched is self:
-            return True
-        if not isinstance(watched, QWidget) or not self.isAncestorOf(watched):
-            return False
-        app = QApplication.instance()
-        if app is None:
-            return False
-        fw = app.focusWidget()
-        if fw is None or not self.isAncestorOf(fw):
-            return False
-        if watched is fw:
-            return False
-        if watched.isAncestorOf(fw):
-            return False
-        # QAbstractSpinBox: focus can be on the wrapper while the press targets
-        # the inner line edit (watched.isAncestorOf(fw) is false in that case).
-        if isinstance(fw, QWidget) and fw.isAncestorOf(watched):
-            return False
-        return True
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        app = QApplication.instance()
-        if app is not None:
-            app.installEventFilter(self)
-        QTimer.singleShot(0, self._blur_focused_descendant)
-
-    def hideEvent(self, event) -> None:
-        app = QApplication.instance()
-        if app is not None:
-            app.removeEventFilter(self)
-        super().hideEvent(event)
-
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.MouseButtonPress and self.isVisible():
-            if self._should_blur_for_mouse_press(watched):
-                self._blur_focused_descendant()
-        return False
 
 
 class UIController:
@@ -325,6 +176,8 @@ class UIController:
         self._splitter = splitter
         self._main_window = UIMainWindow()
         self._settings_window = UISettingsWindow()
+        self._strip_typography = StripTypographyApplier(self)
+        self._screenshot = ScreenshotCapture(self)
         self._livesplit_ws_server: Optional[Any] = None
         self._lso = LiveSplitTimerSync()
         self._livesplit_menu_linked: Optional[bool] = None
@@ -361,11 +214,11 @@ class UIController:
         self._most_recent_style_sheet = None
         # Strip typography (injected into the composed main-window stylesheet)
         # Defaults so composed QSS always includes strip layout rules before first layout pass.
-        self._strip_label_font_px: Optional[float] = float(_STRIP_LOCAL_LABEL_PX)
-        self._strip_control_font_px: Optional[float] = float(_STRIP_LOCAL_SPIN_PX)
+        self._strip_label_font_px: Optional[float] = float(STRIP_LOCAL_LABEL_PX)
+        self._strip_control_font_px: Optional[float] = float(STRIP_LOCAL_SPIN_PX)
         self._crop_reset_min_width = 0
-        self._strip_row_height: int = _STRIP_MENU_BOX_HEIGHT_PX
-        self._strip_popup_side: int = _STRIP_MENU_BOX_HEIGHT_PX
+        self._strip_row_height: int = STRIP_MENU_BOX_HEIGHT_PX
+        self._strip_popup_side: int = STRIP_MENU_BOX_HEIGHT_PX
 
         # Only resize record icon when aspect ratio changes
         self._resize_record_icon = False
@@ -398,22 +251,6 @@ class UIController:
         self._screenshot_hotkey_pressed = False
         self._save_peak_hotkey_pressed = False
         self._toggle_hotkeys_hotkey_pressed = False
-
-        self._burst_capture_timer: Optional[QTimer] = None
-        self._burst_shots_remaining = 0
-        self._burst_saved_count = 0
-        self._burst_in_progress = False
-        self._burst_last_path: Optional[str] = None
-        self._burst_session_dir: Optional[str] = None
-        self._burst_overlay_deadline = 0.0
-        self._burst_output_paths: List[str] = []
-        self._burst_path_index = 0
-        self._burst_pending_writes = 0
-        self._burst_write_fail_count = 0
-        self._burst_finishing = False
-        self._burst_write_queue = Queue()
-        self._burst_write_results = Queue()
-        self._burst_writer_thread: Optional[Thread] = None
 
         # Values for keeping display awake (see _wake_display)
         self._last_wake_time = time.perf_counter()
@@ -489,9 +326,9 @@ class UIController:
         self._main_window.next_source_button.clicked.connect(self._splitter.restart)
 
         # Screenshot button
-        self._main_window.screenshot_button.clicked.connect(self._take_screenshot)
+        self._main_window.screenshot_button.clicked.connect(self._screenshot.take_screenshot)
         self._main_window.screenshot_settings_button.clicked.connect(
-            self._exec_screenshot_settings_dialog
+            self._screenshot.exec_settings_dialog
         )
 
         # Reload video button
@@ -1399,23 +1236,23 @@ class UIController:
         center_nudge_x: int = 0,
     ) -> None:
         """Place Sim/High/Thr + screenshot/reconnect centered under ``video_viewport``."""
-        block_w = _VIDEO_COL_STATS_SPAN_W + gap_stats_to_screenshot + screenshot_w
+        block_w = VIDEO_COL_STATS_SPAN_W + gap_stats_to_screenshot + screenshot_w
         block_left = (
             video_viewport.x() + (video_viewport.width() - block_w) // 2 - center_nudge_x
         )
         p_label_x = block_left
-        p_value_x = block_left + _VIDEO_COL_STATS_VALUE_X
-        p_pct_x = block_left + _VIDEO_COL_STATS_PCT_X
-        sx = block_left + _VIDEO_COL_STATS_SPAN_W + gap_stats_to_screenshot
-        row_h = _VIDEO_COL_STATS_ROW_H
-        step = _VIDEO_COL_STATS_ROW_STEP
+        p_value_x = block_left + VIDEO_COL_STATS_VALUE_X
+        p_pct_x = block_left + VIDEO_COL_STATS_PCT_X
+        sx = block_left + VIDEO_COL_STATS_SPAN_W + gap_stats_to_screenshot
+        row_h = VIDEO_COL_STATS_ROW_H
+        step = VIDEO_COL_STATS_ROW_STEP
         mw = self._main_window
-        mw.match_percent_label.setGeometry(QRect(p_label_x, row1, _VIDEO_COL_STATS_LABEL_W, row_h))
+        mw.match_percent_label.setGeometry(QRect(p_label_x, row1, VIDEO_COL_STATS_LABEL_W, row_h))
         mw.highest_percent_label.setGeometry(
-            QRect(p_label_x, row1 + step, _VIDEO_COL_STATS_LABEL_W, row_h)
+            QRect(p_label_x, row1 + step, VIDEO_COL_STATS_LABEL_W, row_h)
         )
         mw.threshold_percent_label.setGeometry(
-            QRect(p_label_x, row1 + 2 * step, _VIDEO_COL_STATS_LABEL_W, row_h)
+            QRect(p_label_x, row1 + 2 * step, VIDEO_COL_STATS_LABEL_W, row_h)
         )
         mw.match_percent.setGeometry(QRect(p_value_x, row1, 46, row_h))
         mw.highest_percent.setGeometry(QRect(p_value_x, row1 + step, 46, row_h))
@@ -1424,9 +1261,9 @@ class UIController:
         mw.percent_sign_2.setGeometry(QRect(p_pct_x, row1 + step, 21, row_h))
         mw.percent_sign_3.setGeometry(QRect(p_pct_x, row1 + 2 * step, 21, row_h))
         self._layout_screenshot_burst_controls(
-            QRect(sx, row1, screenshot_w, _VIDEO_COL_SCREENSHOT_H)
+            QRect(sx, row1, screenshot_w, VIDEO_COL_SCREENSHOT_H)
         )
-        mw.reconnect_button.setGeometry(QRect(sx, row2, screenshot_w, _VIDEO_COL_SCREENSHOT_H))
+        mw.reconnect_button.setGeometry(QRect(sx, row2, screenshot_w, VIDEO_COL_SCREENSHOT_H))
 
     def _place_split_column_bottom_controls(
         self,
@@ -1447,7 +1284,7 @@ class UIController:
         cluster_w = pause_w + gap_pause_to_reset + reset_w
         pause_x = split_viewport.x() + (split_viewport.width() - cluster_w) // 2
         reset_x = pause_x + pause_w + gap_pause_to_reset
-        skip_x = pause_x + undo_w + _BOTTOM_ADJ_PAIR_GAP_PX
+        skip_x = pause_x + undo_w + BOTTOM_ADJ_PAIR_GAP_PX
         row_h = 41
         mw = self._main_window
         mw.pause_button.setGeometry(QRect(pause_x, row1, pause_w, row_h))
@@ -1489,41 +1326,6 @@ class UIController:
             center_nudge_x=preset.center_nudge_x,
         )
 
-    def _place_video_column_fixed(
-        self,
-        row1: int,
-        row2: int,
-        left: int,
-        fixed: VideoColumnFixedCoords,
-        screenshot_w: int,
-    ) -> None:
-        """Place stats + screenshot at explicit design X coords (320×240)."""
-        row_h = _VIDEO_COL_STATS_ROW_H
-        step = _VIDEO_COL_STATS_ROW_STEP
-        mw = self._main_window
-        lw = _VIDEO_COL_STATS_LABEL_W
-        mw.match_percent_label.setGeometry(QRect(fixed.label_design_x + left, row1, lw, row_h))
-        mw.highest_percent_label.setGeometry(
-            QRect(fixed.label_design_x + left, row1 + step, lw, row_h)
-        )
-        mw.threshold_percent_label.setGeometry(
-            QRect(fixed.label_design_x + left, row1 + 2 * step, lw, row_h)
-        )
-        mw.match_percent.setGeometry(QRect(fixed.value_design_x + left, row1, 46, row_h))
-        mw.highest_percent.setGeometry(QRect(fixed.value_design_x + left, row1 + step, 46, row_h))
-        mw.threshold_percent.setGeometry(
-            QRect(fixed.value_design_x + left, row1 + 2 * step, 46, row_h)
-        )
-        mw.percent_sign_1.setGeometry(QRect(fixed.pct_design_x + left, row1, 21, row_h))
-        mw.percent_sign_2.setGeometry(QRect(fixed.pct_design_x + left, row1 + step, 21, row_h))
-        mw.percent_sign_3.setGeometry(QRect(fixed.pct_design_x + left, row1 + 2 * step, 21, row_h))
-        self._layout_screenshot_burst_controls(
-            QRect(fixed.screenshot_design_x + left, row1, screenshot_w, _VIDEO_COL_SCREENSHOT_H)
-        )
-        mw.reconnect_button.setGeometry(
-            QRect(fixed.screenshot_design_x + left, row2, screenshot_w, _VIDEO_COL_SCREENSHOT_H)
-        )
-
     def _apply_video_column_layout(
         self,
         preset: AspectLayoutPreset,
@@ -1533,14 +1335,11 @@ class UIController:
         left: int,
     ) -> None:
         vc = preset.video_column
-        if vc.centered_under_viewport:
-            self._place_video_column_from_preset(video_viewport, row1, row2, vc)
-            return
-        if vc.fixed is None:
+        if not vc.centered_under_viewport:
             raise ValueError(
-                f"Layout preset {preset.aspect_ratio!r} is not centered and has no fixed coords"
+                f"Layout preset {preset.aspect_ratio!r} must use centered video column"
             )
-        self._place_video_column_fixed(row1, row2, left, vc.fixed, vc.screenshot_w)
+        self._place_video_column_from_preset(video_viewport, row1, row2, vc)
 
     def _sync_split_override_controls(self) -> None:
         splits = self._splitter.splits
@@ -2272,7 +2071,7 @@ class UIController:
             ("Previous", self._settings_window.previous_hotkey_box),
             ("Next", self._settings_window.next_hotkey_box),
             ("Screenshot", self._settings_window.screenshot_hotkey_box),
-            ("Save peak sim", self._settings_window.save_peak_hotkey_box),
+            (SNAP_PEAK_HOTKEY_LABEL, self._settings_window.save_peak_hotkey_box),
             ("Toggle Global Hotkeys", self._settings_window.toggle_global_hotkeys_hotkey_box),
         ]
         seen: dict = {}
@@ -2291,7 +2090,7 @@ class UIController:
     def _layout_screenshot_burst_controls(self, shot_rect: QRect) -> None:
         """Place the screenshot button and settings (gear) control within ``shot_rect``."""
         mw = self._main_window
-        gap = _BOTTOM_ADJ_PAIR_GAP_PX
+        gap = BOTTOM_ADJ_PAIR_GAP_PX
         h = max(1, shot_rect.height())
         x0, y0 = shot_rect.x(), shot_rect.y()
         total = max(1, shot_rect.width())
@@ -2300,12 +2099,10 @@ class UIController:
         tb = mw.screenshot_settings_button
         tb.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
-        # Reserve a square column as wide as the row height (matches previous layout math).
         side = h
         shot_w = max(1, total - gap - side)
         sb.setGeometry(QRect(x0, y0, shot_w, h))
 
-        # Gear: same height (and width) as the *actual* screenshot button rect — not larger.
         sbr = sb.geometry()
         gear_side = max(1, sbr.height())
         tb.setGeometry(QRect(sbr.right() + gap, sbr.y(), gear_side, gear_side))
@@ -2313,751 +2110,6 @@ class UIController:
         _ico = max(12, min(gear_side - 8, int(gear_side * 0.42)))
         tb.setIconSize(QSize(_ico, _ico))
         tb.raise_()
-
-    def _sync_burst_aux_controls_enabled(self) -> None:
-        mw = self._main_window
-        # Settings (folder, burst mode, etc.) should work without live video; only
-        # disable the gear while a burst is running (same as blocking the dialog).
-        mw.screenshot_settings_button.setEnabled(not self._burst_in_progress)
-
-    def _screenshot_output_dir_str(self) -> str:
-        """Folder for screenshots, burst output, and Peak Sim saves."""
-        configured = Path(settings.get_str("BURST_SHOTS_BASE_DIR")).expanduser()
-        if configured.is_dir():
-            return str(configured)
-        return str(Path.home())
-
-    def _burst_shots_base_dir_str(self) -> str:
-        """Burst capture base directory."""
-        return self._screenshot_output_dir_str()
-
-    def _burst_dated_session_folders_enabled(self) -> bool:
-        """Prefer dated ``Burst shots …`` subfolders per run (default when unset)."""
-        if not settings.settings.contains("BURST_DATED_SESSION_FOLDERS"):
-            return True
-        return settings.get_bool("BURST_DATED_SESSION_FOLDERS")
-
-    def _make_burst_session_folder(self, base: Path) -> Path:
-        """Create ``Burst shots <date> <time>`` under ``base``; unique if needed."""
-        base = base.expanduser()
-        base.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        name = f"Burst shots {stamp}"
-        path = base / name
-        n = 0
-        while path.exists():
-            n += 1
-            path = base / f"{name} ({n})"
-        path.mkdir(parents=False, exist_ok=False)
-        return path
-
-    def _exec_screenshot_settings_dialog(self) -> None:
-        if self._burst_in_progress:
-            return
-        mw = self._main_window
-        dlg = _ScreenshotSettingsDialog(mw)
-        dlg.setWindowTitle("Screenshot settings")
-        dlg.setModal(True)
-        dlg.setAttribute(Qt.WA_TranslucentBackground, False)
-        dlg.setAutoFillBackground(True)
-        dlg.setFixedWidth(448)
-
-        root = QVBoxLayout(dlg)
-        root.setContentsMargins(8, 8, 8, 8)
-        root.setSpacing(0)
-
-        border_frame = QFrame(dlg)
-        border_frame.setObjectName("border")
-        inner = QVBoxLayout(border_frame)
-        inner.setContentsMargins(10, 8, 10, 8)
-        inner.setSpacing(6)
-
-        _init = Path(self._screenshot_output_dir_str()).expanduser()
-        folder_state: List[Path] = [_init if _init.is_dir() else Path.home()]
-
-        panel = QWidget(border_frame)
-        pan = QVBoxLayout(panel)
-        pan.setContentsMargins(8, 2, 8, 4)
-        pan.setSpacing(4)
-        pan.setAlignment(Qt.AlignTop)
-
-        _spin_w = 64
-        # Left margin inside every field row + matching inner control width so
-        # spinboxes and checkbox wrappers share the same column geometry.
-        _field_cell_lmargin = 2
-        _spin_inner = _spin_w - _field_cell_lmargin
-
-        dur = QSpinBox(panel)
-        dur.setRange(1, 60)
-        dur.setSuffix(" s")
-        _dur_sec = int(round(float(settings.get_float("BURST_DURATION_SEC"))))
-        dur.setValue(max(1, min(60, _dur_sec)))
-        dur.setFixedWidth(_spin_inner)
-        fps = QDoubleSpinBox(panel)
-        fps.setRange(1.0, 120.0)
-        fps.setDecimals(0)
-        fps.setSingleStep(1.0)
-        fps.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
-        fps.setValue(int(round(float(settings.get_float("BURST_FPS")))))
-        fps.setFixedWidth(_spin_inner)
-
-        def make_settings_style_checkbox(
-            checked: bool,
-            field_w: int,
-            *,
-            wrap_object_name: str = "screenshot_dlg_checkbox_wrap",
-        ) -> Tuple[QWidget, QCheckBox]:
-            """Bordered helper + empty ``QCheckBox`` (same layout as ``UISettingsWindow``).
-
-            Helper is at x=0 inside the wrapper so it lines up with ``QDoubleSpinBox``.
-            ``field_w`` must match ``_spin_inner``. The helper is stacked above the
-            checkbox so the indicator does not paint over the bordered frame.
-            ``wrap_object_name`` must match stylesheet rules (burst vs dated row).
-            """
-            wrap = QWidget(panel)
-            wrap.setObjectName(wrap_object_name)
-            _pad_t, _pad_b = 2, 8
-            _inset_l = 0
-            cell_w = field_w
-            cell_h = _pad_t + 15 + _pad_b
-            wrap.setFixedSize(cell_w, cell_h)
-            hx, hy = _inset_l, _pad_t
-            # Match ``UISettingsWindow``: checkbox first, helper second so the helper
-            # stacks above the indicator (otherwise ``raise_`` on the checkbox paints
-            # over the bordered frame and the left stroke looks ``cut off'').
-            cb = QCheckBox(wrap)
-            cb.setText("")
-            cb.setChecked(checked)
-            cb.setFocusPolicy(Qt.ClickFocus)
-            cb.setGeometry(hx, hy + 1, 13, 13)
-            helper = QLabel(wrap)
-            helper.setObjectName("checkbox_helper")
-            helper.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-            helper.setGeometry(hx, hy, 14, 15)
-            helper.raise_()
-            return wrap, cb
-
-        burst_mode_label = QLabel("Burst mode:", panel)
-        burst_mode_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        burst_mode_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        burst_mode_label.setToolTip("When on, the main button runs a timed burst capture.")
-        burst_mode_wrap, burst_on = make_settings_style_checkbox(
-            settings.get_bool("BURST_MODE_ENABLED"), _spin_inner
-        )
-
-        dated_label = QLabel("Create new folder:", panel)
-        dated_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        dated_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        dated_label.setToolTip("")
-        dated_wrap, burst_dated_folders = make_settings_style_checkbox(
-            self._burst_dated_session_folders_enabled(),
-            _spin_inner,
-            wrap_object_name="screenshot_dlg_dated_checkbox_wrap",
-        )
-
-        def sync_burst_folder_row() -> None:
-            on = burst_on.isChecked()
-            # Grey styling uses dynamic property ``burst_off`` (stylesheet), not
-            # ``setEnabled`` on the wrapper — on some platforms disabled wrappers
-            # left the inner checkbox looking grey after Burst mode was turned on.
-            dated_wrap.setEnabled(True)
-            burst_dated_folders.setEnabled(on)
-            dated_wrap.setProperty("burst_off", not on)
-            _st = dated_wrap.style()
-            if _st is not None:
-                _st.unpolish(dated_wrap)
-                _st.polish(dated_wrap)
-            _cb_st = burst_dated_folders.style()
-            if _cb_st is not None:
-                _cb_st.unpolish(burst_dated_folders)
-                _cb_st.polish(burst_dated_folders)
-            if on:
-                dated_label.setStyleSheet("")
-                dated_label.setToolTip("")
-            else:
-                dated_label.setStyleSheet("color: #888888;")
-                dated_label.setToolTip("")
-
-        burst_on.toggled.connect(sync_burst_folder_row)
-        sync_burst_folder_row()
-
-        _row_h = max(
-            dur.sizeHint().height(),
-            fps.sizeHint().height(),
-            burst_mode_wrap.height(),
-        )
-
-        def form_field_cell(w: QWidget) -> QWidget:
-            """Fixed-width field column (match spinboxes), uniform row height, left-aligned."""
-            row = QWidget(panel)
-            row.setFixedWidth(_spin_w)
-            row.setMinimumHeight(_row_h)
-            lay = QHBoxLayout(row)
-            lay.setContentsMargins(_field_cell_lmargin, 0, 0, 0)
-            lay.setSpacing(0)
-            lay.addWidget(w, 0, Qt.AlignLeft | Qt.AlignVCenter)
-            return row
-
-        _form_opts = (
-            (Qt.AlignLeft | Qt.AlignTop),
-            (Qt.AlignLeft | Qt.AlignVCenter),
-            QFormLayout.FieldsStayAtSizeHint,
-            18,
-            6,
-        )
-        fa, la, fgp, hs, vs = _form_opts
-
-        left_form = QFormLayout()
-        left_form.setFormAlignment(fa)
-        left_form.setLabelAlignment(la)
-        left_form.setFieldGrowthPolicy(fgp)
-        left_form.setHorizontalSpacing(hs)
-        left_form.setVerticalSpacing(vs)
-        left_form.setContentsMargins(0, 0, 0, 0)
-        left_form.addRow(burst_mode_label, form_field_cell(burst_mode_wrap))
-        left_form.addRow(dated_label, form_field_cell(dated_wrap))
-
-        right_form = QFormLayout()
-        right_form.setFormAlignment(fa)
-        right_form.setLabelAlignment(la)
-        right_form.setFieldGrowthPolicy(fgp)
-        right_form.setHorizontalSpacing(hs)
-        right_form.setVerticalSpacing(vs)
-        right_form.setContentsMargins(0, 0, 0, 0)
-        right_form.addRow("Duration:", form_field_cell(dur))
-        right_form.addRow("FPS:", form_field_cell(fps))
-
-        columns = QHBoxLayout()
-        columns.setContentsMargins(0, 0, 0, 0)
-        columns.setSpacing(20)
-        columns.addLayout(left_form, 0)
-        columns.addLayout(right_form, 0)
-        columns.addStretch(1)
-        pan.addLayout(columns)
-
-        inner.addWidget(panel)
-
-        def on_pick_folder() -> None:
-            picked = QFileDialog.getExistingDirectory(
-                dlg,
-                "Select folder",
-                str(folder_state[0]),
-            )
-            if not picked:
-                return
-            p = Path(picked)
-            p.mkdir(parents=True, exist_ok=True)
-            folder_state[0] = p
-
-        def on_ok() -> None:
-            exp = folder_state[0]
-            if not exp.is_dir():
-                QMessageBox.warning(
-                    dlg,
-                    "Folder",
-                    "Choose a valid folder (use Select folder).",
-                )
-                return
-            ss_resolved = str(exp.resolve())
-            if not settings.path_is_within_home(ss_resolved):
-                msg = self._main_window.err_invalid_dir_msg
-                msg.setStyleSheet(self._get_style_sheet())
-                msg.show()
-                return
-
-            settings.set_value("BURST_SHOTS_BASE_DIR", ss_resolved)
-
-            settings.set_value("BURST_MODE_ENABLED", burst_on.isChecked())
-            settings.set_value(
-                "BURST_DATED_SESSION_FOLDERS",
-                burst_on.isChecked() and burst_dated_folders.isChecked(),
-            )
-            settings.set_value("BURST_DURATION_SEC", float(dur.value()))
-            settings.set_value("BURST_FPS", fps.value())
-            dlg.accept()
-
-        pick_folder_btn = QPushButton("Select folder", border_frame)
-        pick_folder_btn.setFocusPolicy(Qt.NoFocus)
-        pick_folder_btn.setDefault(False)
-        pick_folder_btn.setAutoDefault(False)
-        pick_folder_btn.setMinimumWidth(
-            pick_folder_btn.fontMetrics().horizontalAdvance("Select folder") + 24
-        )
-        btn_cancel = QPushButton("Cancel", border_frame)
-        btn_cancel.setFocusPolicy(Qt.NoFocus)
-        btn_cancel.setDefault(False)
-        btn_cancel.setAutoDefault(False)
-        btn_ok = QPushButton("OK", border_frame)
-        btn_ok.setFocusPolicy(Qt.NoFocus)
-        btn_ok.setDefault(False)
-        btn_ok.setAutoDefault(False)
-        _btn_font = btn_ok.font()
-        pick_folder_btn.setFont(_btn_font)
-        btn_cancel.setFont(_btn_font)
-        btn_ok.setFont(_btn_font)
-        button_row = QHBoxLayout()
-        button_row.setContentsMargins(0, 0, 0, 0)
-        button_row.setSpacing(10)
-        button_row.addWidget(pick_folder_btn)
-        button_row.addStretch(1)
-        button_row.addWidget(btn_cancel)
-        button_row.addWidget(btn_ok)
-        inner.addSpacing(6)
-        inner.addLayout(button_row)
-
-        root.addWidget(border_frame)
-        dlg.setStyleSheet(self._get_style_sheet())
-        dlg.setFixedHeight(dlg.sizeHint().height())
-
-        pick_folder_btn.clicked.connect(on_pick_folder)
-        btn_cancel.clicked.connect(dlg.reject)
-        btn_ok.clicked.connect(on_ok)
-        self._clear_dialog_focus_after_show(dlg)
-
-        if dlg.exec_() == QDialog.Accepted:
-            self._set_button_and_label_text(
-                truncate=self._layout_uses_truncated_control_text()
-            )
-            self._update_pause_button()
-
-    def _take_screenshot(self) -> None:
-        """Single screenshot, or burst capture when Burst mode is enabled."""
-        if self._burst_in_progress:
-            return
-        if settings.get_bool("BURST_MODE_ENABLED"):
-            self._start_burst_capture()
-        else:
-            self._take_single_screenshot()
-
-    def _take_single_screenshot(self) -> None:
-        """Write ``splitter.comparison_frame`` to one file (optional open)."""
-        frame = self._splitter.comparison_frame
-        if frame is None:
-            msg = self._main_window.screenshot_err_no_video
-            msg.setStyleSheet(self._get_style_sheet())
-            msg.show()
-            QTimer.singleShot(10000, lambda: msg.done(0))
-            return
-
-        image_dir = self._screenshot_output_dir_str()
-        if not Path(image_dir).is_dir():
-            image_dir = os.path.expanduser("~")
-
-        screenshot_path = self._screenshot_paths_for_count(image_dir, 1)[0]
-        cv2.imwrite(screenshot_path, frame)
-
-        if Path(screenshot_path).is_file():
-            if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
-                self._open_file_or_dir(screenshot_path)
-            else:
-                self._show_screenshot_saved_dialog(
-                    window_title="Screenshot taken",
-                    title="Screenshot taken",
-                    summary="Screenshot saved to:",
-                    location_path=self._screenshot_saved_display_dir(),
-                    preview_path=screenshot_path,
-                )
-
-        else:
-            msg = self._main_window.screenshot_err_no_file
-            msg.setStyleSheet(self._get_style_sheet())
-            msg.show()
-            QTimer.singleShot(10000, lambda: msg.done(0))
-
-    def _peak_similarity_filename_part(self, fraction: float) -> str:
-        """Format a 0–1 match/threshold fraction for PNG filenames."""
-        decimals = max(0, min(2, settings.get_int("MATCH_PERCENT_DECIMALS")))
-        if decimals == 0:
-            return str(round(fraction * 100))
-        return f"{fraction * 100:.{decimals}f}"
-
-    def _sanitize_peak_filename_part(self, text: str) -> str:
-        cleaned = re.sub(r"[^\w.-]+", "_", text.strip())
-        return (cleaned[:60] if cleaned else "split")
-
-    def _peak_sim_output_dir(self) -> Path:
-        base = Path(self._screenshot_output_dir_str())
-        if not base.is_dir():
-            base = Path(os.path.expanduser("~"))
-        out = base / "peak_sim"
-        out.mkdir(parents=True, exist_ok=True)
-        return out
-
-    def _save_peak_similarity_frame(self) -> None:
-        """Write the peak comparison frame for the current split attempt."""
-        frame, peak, threshold, split_name = (
-            self._splitter.get_highest_similarity_snapshot()
-        )
-        if frame is None:
-            return
-
-        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_name = self._sanitize_peak_filename_part(split_name)
-        high_part = self._peak_similarity_filename_part(peak)
-        thresh_part = self._peak_similarity_filename_part(threshold)
-        filename = f"{stamp}_{safe_name}_high{high_part}_thresh{thresh_part}.png"
-        out_path = self._peak_sim_output_dir() / filename
-
-        if not cv2.imwrite(str(out_path), frame):
-            return
-
-        if settings.get_bool("OPEN_SCREENSHOT_ON_CAPTURE"):
-            self._open_file_or_dir(str(out_path))
-        else:
-            decimals = settings.get_int("MATCH_PERCENT_DECIMALS")
-            self._show_screenshot_saved_dialog(
-                window_title="Peak similarity saved",
-                title="Peak similarity saved",
-                summary="Saved to:",
-                location_path=self._screenshot_saved_display_dir(),
-                preview_path=str(out_path),
-                detail=(
-                    f"High: {peak * 100:.{decimals}f}%  ·  "
-                    f"Threshold: {threshold * 100:.{decimals}f}%"
-                ),
-            )
-
-    def _start_burst_capture(self) -> None:
-        """Begin timed burst of PNGs from ``comparison_frame``."""
-        frame = self._splitter.comparison_frame
-        if frame is None:
-            msg = self._main_window.screenshot_err_no_video
-            msg.setStyleSheet(self._get_style_sheet())
-            msg.show()
-            QTimer.singleShot(10000, lambda: msg.done(0))
-            return
-
-        base = Path(self._burst_shots_base_dir_str())
-        use_dated_session = settings.get_bool(
-            "BURST_MODE_ENABLED"
-        ) and self._burst_dated_session_folders_enabled()
-        if use_dated_session:
-            try:
-                session_dir = self._make_burst_session_folder(base)
-            except OSError:
-                QMessageBox.warning(
-                    self._main_window,
-                    "Burst folder",
-                    "Could not create burst session folder.",
-                )
-                return
-            self._burst_session_dir = str(session_dir)
-        else:
-            try:
-                base.mkdir(parents=True, exist_ok=True)
-            except OSError:
-                QMessageBox.warning(
-                    self._main_window,
-                    "Burst folder",
-                    "Could not use burst folder.",
-                )
-                return
-            self._burst_session_dir = str(base.resolve())
-
-        duration = max(0.05, float(settings.get_float("BURST_DURATION_SEC")))
-        fps = max(1.0, min(120.0, float(settings.get_float("BURST_FPS"))))
-        interval_ms = max(1, int(round(1000.0 / fps)))
-        self._burst_shots_remaining = max(1, int(round(duration * fps)))
-        self._burst_saved_count = 0
-        self._burst_last_path = None
-        self._burst_output_paths = self._screenshot_paths_for_count(
-            self._burst_session_dir, self._burst_shots_remaining
-        )
-        self._burst_path_index = 0
-        self._burst_pending_writes = 0
-        self._burst_write_fail_count = 0
-        self._burst_finishing = False
-        self._burst_write_queue = Queue()
-        self._burst_write_results = Queue()
-        self._burst_writer_thread = Thread(
-            target=self._burst_writer_loop,
-            args=(self._burst_write_queue, self._burst_write_results),
-            daemon=True,
-        )
-        self._burst_writer_thread.start()
-        self._burst_in_progress = True
-        self._burst_overlay_deadline = time.monotonic() + duration
-        self._sync_burst_aux_controls_enabled()
-        self._main_window.screenshot_button.setEnabled(False)
-
-        if self._burst_capture_timer is None:
-            self._burst_capture_timer = QTimer(self._main_window)
-            self._burst_capture_timer.timeout.connect(self._burst_capture_tick)
-        else:
-            self._burst_capture_timer.stop()
-        self._burst_capture_timer.setInterval(interval_ms)
-        self._burst_capture_timer.start()
-
-    def _screenshot_saved_display_dir(self) -> str:
-        """Configured screenshot folder (no burst session or peak-sim subfolder)."""
-        return str(Path(self._screenshot_output_dir_str()).expanduser().resolve())
-
-    def _screenshot_saved_path_label(
-        self, parent: QWidget, display_path: str, max_width: int
-    ) -> QLabel:
-        """Single-line elided path for screenshot saved dialogs."""
-        lbl = QLabel(parent)
-        lbl.setObjectName("burst_complete_path")
-        metrics = QFontMetrics(lbl.font())
-        lbl.setText(metrics.elidedText(display_path, Qt.ElideMiddle, max_width))
-        lbl.setWordWrap(False)
-        return lbl
-
-    def _show_screenshot_saved_dialog(
-        self,
-        *,
-        window_title: str,
-        title: str,
-        summary: str,
-        location_path: str,
-        preview_path: Optional[str] = None,
-        detail: Optional[str] = None,
-        auto_close_ms: int = 7000,
-    ) -> None:
-        """Non-modal preview popup for screenshot, burst, and Peak Sim saves."""
-        preview_width = 240
-        content_spacing = 12
-        text_min_width = 220
-        outer_margin = 10
-        inner_margin = 10
-
-        dlg = QDialog(self._main_window)
-        dlg.setWindowTitle(window_title)
-        dlg.setModal(False)
-        dlg.setStyleSheet(self._get_style_sheet())
-
-        root = QVBoxLayout(dlg)
-        root.setContentsMargins(outer_margin, outer_margin, outer_margin, outer_margin)
-        root.setSpacing(0)
-
-        border_frame = QFrame(dlg)
-        border_frame.setObjectName("border")
-        inner = QVBoxLayout(border_frame)
-        inner.setContentsMargins(inner_margin, inner_margin, inner_margin, inner_margin)
-        inner.setSpacing(14)
-
-        content = QHBoxLayout()
-        content.setSpacing(content_spacing)
-        content.setContentsMargins(0, 0, 0, 0)
-
-        preview_file = preview_path if preview_path and Path(preview_path).is_file() else None
-        preview_lbl = None
-        if preview_file:
-            pixmap = QPixmap(preview_file)
-            if not pixmap.isNull():
-                scaled = pixmap.scaledToWidth(
-                    preview_width, Qt.SmoothTransformation
-                )
-                preview_lbl = QLabel(border_frame)
-                preview_lbl.setPixmap(scaled)
-                preview_lbl.setFixedSize(scaled.size())
-
-        text_col = QVBoxLayout()
-        text_col.setSpacing(6)
-        text_col.setContentsMargins(0, 0, 0, 0)
-
-        title_lbl = QLabel(title, border_frame)
-        title_font = QFont(title_lbl.font())
-        title_font.setBold(True)
-        if title_font.pointSize() > 0:
-            title_font.setPointSize(title_font.pointSize() + 1)
-        title_lbl.setFont(title_font)
-
-        summary_lbl = QLabel(summary, border_frame)
-        path_lbl = self._screenshot_saved_path_label(
-            border_frame, location_path, 340
-        )
-
-        text_col.addWidget(title_lbl)
-        text_col.addWidget(summary_lbl)
-        text_col.addWidget(path_lbl)
-        if detail:
-            detail_lbl = QLabel(detail, border_frame)
-            detail_lbl.setObjectName("burst_complete_path")
-            text_col.addWidget(detail_lbl)
-        text_col.addStretch(1)
-
-        btn_row = QHBoxLayout()
-        btn_row.addStretch(1)
-        if settings.get_str("THEME") == "light":
-            ring_remaining = QColor("#202020")
-            ring_elapsed = QColor("#aaaaaa")
-        else:
-            ring_remaining = QColor("#ffffff")
-            ring_elapsed = QColor("#555555")
-        countdown_ring = _ScreenshotCountdownRing(
-            auto_close_ms,
-            remaining_color=ring_remaining,
-            elapsed_color=ring_elapsed,
-            parent=border_frame,
-        )
-        ok_btn = QPushButton("OK", border_frame)
-        ok_btn.setFocusPolicy(Qt.NoFocus)
-        ok_btn.setDefault(False)
-        ok_btn.setAutoDefault(False)
-
-        btn_row.addWidget(countdown_ring, 0, Qt.AlignVCenter)
-        btn_row.addSpacing(8)
-        btn_row.addWidget(ok_btn)
-        text_col.addLayout(btn_row)
-
-        text_host = QWidget(border_frame)
-        text_host.setLayout(text_col)
-        text_host.setMinimumWidth(text_min_width)
-        content.addWidget(text_host, 1)
-
-        if preview_lbl is not None:
-            preview_col = QVBoxLayout()
-            preview_col.setContentsMargins(0, 0, 0, 0)
-            preview_col.addStretch(1)
-            preview_col.addWidget(preview_lbl, 0, Qt.AlignLeft | Qt.AlignVCenter)
-            preview_col.addStretch(1)
-            preview_host = QWidget(border_frame)
-            preview_host.setLayout(preview_col)
-            preview_host.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-            content.insertWidget(0, preview_host, 0)
-
-        inner.addLayout(content)
-
-        root.addWidget(border_frame)
-
-        dlg.setMinimumWidth(420)
-        dlg.adjustSize()
-
-        dlg.show()
-        self._clear_dialog_focus_after_show(dlg)
-
-        def _close_dialog() -> None:
-            countdown_ring.stop()
-            dlg.done(0)
-
-        ok_btn.clicked.connect(_close_dialog)
-
-        def _auto_close() -> None:
-            try:
-                if dlg.isVisible():
-                    _close_dialog()
-            except RuntimeError:
-                pass
-
-        QTimer.singleShot(auto_close_ms, _auto_close)
-
-    def _show_burst_complete_dialog(
-        self, folder: str, saved_count: int, failed_count: int = 0
-    ) -> None:
-        """Non-modal summary after a burst."""
-        if failed_count > 0:
-            summary = f"{saved_count} frames saved ({failed_count} failed) to:"
-        else:
-            summary = f"{saved_count} frames saved to:"
-        self._show_screenshot_saved_dialog(
-            window_title="Burst complete",
-            title="Burst completed",
-            summary=summary,
-            location_path=self._screenshot_saved_display_dir(),
-            preview_path=self._burst_last_path,
-            auto_close_ms=7000,
-        )
-
-    def _burst_capture_tick(self) -> None:
-        """Queue one frame per tick until burst quota is done."""
-        self._drain_burst_write_results()
-        if self._burst_finishing:
-            if self._burst_pending_writes <= 0:
-                self._complete_burst_capture()
-            return
-
-        frame = self._splitter.comparison_frame
-        if frame is not None and self._burst_path_index < len(self._burst_output_paths):
-            path = self._burst_output_paths[self._burst_path_index]
-            self._burst_path_index += 1
-            self._burst_pending_writes += 1
-            self._burst_write_queue.put((path, frame.copy()))
-
-        self._burst_shots_remaining -= 1
-        if self._burst_shots_remaining <= 0:
-            self._burst_finishing = True
-            self._burst_write_queue.put(None)
-            if self._burst_capture_timer is not None:
-                self._burst_capture_timer.setInterval(50)
-            self._drain_burst_write_results()
-            if self._burst_pending_writes <= 0:
-                self._complete_burst_capture()
-
-    def _drain_burst_write_results(self) -> None:
-        """Collect completed writer results on the UI thread."""
-        while True:
-            try:
-                path, ok = self._burst_write_results.get_nowait()
-            except Empty:
-                return
-            self._burst_pending_writes = max(0, self._burst_pending_writes - 1)
-            if ok:
-                self._burst_saved_count += 1
-                self._burst_last_path = path
-            else:
-                self._burst_write_fail_count += 1
-
-    def _complete_burst_capture(self) -> None:
-        if self._burst_capture_timer is not None:
-            self._burst_capture_timer.stop()
-        if self._burst_writer_thread is not None:
-            self._burst_writer_thread.join(timeout=0.05)
-        self._burst_in_progress = False
-        self._burst_finishing = False
-        session_dir = self._burst_session_dir
-        self._burst_session_dir = None
-        self._burst_output_paths = []
-        self._burst_path_index = 0
-        self._set_buttons_and_hotkeys_enabled()
-        if self._burst_saved_count > 0 and settings.get_bool(
-            "OPEN_SCREENSHOT_ON_CAPTURE"
-        ):
-            if self._burst_last_path:
-                self._open_file_or_dir(self._burst_last_path)
-        out_dir = session_dir or self._burst_shots_base_dir_str()
-        self._show_burst_complete_dialog(
-            out_dir, self._burst_saved_count, self._burst_write_fail_count
-        )
-
-    def _burst_writer_loop(self, jobs: Queue, results: Queue) -> None:
-        """Write burst frames away from the Qt UI thread."""
-        while True:
-            job = jobs.get()
-            try:
-                if job is None:
-                    return
-                path, frame = job
-                ok = False
-                try:
-                    ok = bool(cv2.imwrite(path, frame)) and Path(path).is_file()
-                except Exception:
-                    ok = False
-                results.put((path, ok))
-            finally:
-                jobs.task_done()
-
-    def _screenshot_paths_for_count(self, dir: str, count: int) -> List[str]:
-        """Return unique screenshot paths with one directory scan."""
-        target_dir = Path(dir)
-        used = set()
-        for child in target_dir.glob("*.png"):
-            match = re.match(r"^(\d+)", child.name)
-            if match:
-                try:
-                    used.add(int(match.group(1)))
-                except ValueError:
-                    pass
-
-        paths = []
-        file_int = 0
-        for _ in range(max(0, count)):
-            while file_int in used:
-                file_int += 1
-            used.add(file_int)
-            paths.append(str(target_dir / f"{file_int:03d}_screenshot.png"))
-            file_int += 1
-        return paths
 
     def get_file_number(self, dir: str) -> str:
         """Return the lowest number not already used as a .png filename prefix.
@@ -3068,7 +2120,7 @@ class UIController:
         Returns:
             file_number (str): The lowest number as a zero-padded string.
         """
-        path = Path(self._screenshot_paths_for_count(dir, 1)[0])
+        path = Path(self._screenshot.paths_for_count(dir, 1)[0])
         return path.name.split("_", 1)[0]
 
     def _open_file_or_dir(self, path: str) -> None:
@@ -3186,681 +2238,14 @@ class UIController:
         QTimer.singleShot(0, self._apply_strip_typography)
 
     def _apply_strip_typography(self) -> None:
-        """Set strip font/spacing adaptively to prevent overlap."""
-        mw = self._main_window
-        mw.video_crop_btn_reset.setMinimumSize(0, 0)
-        mw.video_crop_btn_reset.setMaximumSize(16777215, 16777215)
-        aspect_ratio = settings.get_str("ASPECT_RATIO")
-        strip_scale = 1.0
-
-        # Explicit per-ratio presets to avoid guesswork and clipping.
-        if aspect_ratio == "4:3 (320x240)":
-            size_f = _320_STRIP_SIZE_F
-            crop_row_margins = _320_STRIP_ROW_MARGINS
-            split_row_margins = _320_STRIP_ROW_MARGINS
-            crop_spacing = _320_STRIP_ROW_SPACING
-            split_spacing = _320_STRIP_ROW_SPACING
-            mw.video_crop_label_left.setText("L:")
-            mw.video_crop_label_right.setText("R:")
-            mw.video_crop_label_up.setText("U:")
-            mw.video_crop_label_down.setText("D:")
-            mw.split_threshold_label.setText("T:")
-            mw.split_delay_label.setText("D:")
-            mw.split_loop_label_2.setText("L:")
-            mw.split_pause_label.setText("P:")
-            mw.video_crop_btn_reset.setText("R")
-        elif aspect_ratio == "4:3 (480x360)":
-            # 480x360 still has tight horizontal room under both viewports.
-            strip_scale = 0.32
-            size_f = 8.4
-            crop_row_margins = (16, 2, 16, 2)
-            split_row_margins = (16, 2, 16, 2)
-            crop_spacing = 4
-            split_spacing = 5
-            mw.video_crop_label_left.setText("Left:")
-            mw.video_crop_label_right.setText("Right:")
-            mw.video_crop_label_up.setText("Up:")
-            mw.video_crop_label_down.setText("Down:")
-            mw.split_threshold_label.setText("Threshold:")
-            mw.split_delay_label.setText("Delay:")
-            mw.split_loop_label_2.setText("Loop:")
-            mw.split_pause_label.setText("Pause:")
-            mw.video_crop_btn_reset.setText("Reset")
-            mw.video_crop_btn_reset.setMinimumHeight(0)
-            mw.video_crop_btn_reset.setMaximumHeight(16777215)
-        elif aspect_ratio == "16:9 (432x243)":
-            # Tighter window — a bit more strip inset so controls clear edges.
-            strip_scale = 0.32
-            size_f = 7.0
-            crop_row_margins = (34, 3, 34, 3)
-            split_row_margins = (34, 3, 34, 3)
-            crop_spacing = 5
-            split_spacing = 5
-            mw.video_crop_label_left.setText("L:")
-            mw.video_crop_label_right.setText("R:")
-            mw.video_crop_label_up.setText("U:")
-            mw.video_crop_label_down.setText("D:")
-            mw.split_threshold_label.setText("T:")
-            mw.split_delay_label.setText("D:")
-            mw.split_loop_label_2.setText("L:")
-            mw.split_pause_label.setText("P:")
-            mw.video_crop_btn_reset.setText("R")
-            mw.video_crop_btn_reset.setMinimumHeight(0)
-            mw.video_crop_btn_reset.setMaximumHeight(16777215)
-        else:
-            # 16:9 (512×288)
-            strip_scale = 0.40
-            size_f = 9.4
-            crop_row_margins = (18, 2, 18, 2)
-            split_row_margins = (18, 2, 18, 2)
-            crop_spacing = 22
-            split_spacing = 22
-            mw.video_crop_label_left.setText("Left:")
-            mw.video_crop_label_right.setText("Right:")
-            mw.video_crop_label_up.setText("Up:")
-            mw.video_crop_label_down.setText("Down:")
-            mw.split_threshold_label.setText("Threshold:")
-            mw.split_delay_label.setText("Delay:")
-            mw.split_loop_label_2.setText("Loop:")
-            mw.split_pause_label.setText("Pause:")
-            mw.video_crop_btn_reset.setText("Reset")
-            mw.video_crop_btn_reset.setMinimumHeight(0)
-            mw.video_crop_btn_reset.setMaximumHeight(16777215)
-
-        # Apply strip_scale to layout (margins, spacing, chrome). Fonts use explicit
-        # px below so they stay below the global 16px theme without collapsing to
-        # illegal sizes that trigger fallback rendering.
-        if strip_scale != 1.0:
-            crop_row_margins = tuple(
-                max(0, int(round(v * strip_scale))) for v in crop_row_margins
-            )
-            split_row_margins = tuple(
-                max(0, int(round(v * strip_scale))) for v in split_row_margins
-            )
-            # Floor so scaled layouts keep gap between each spin and the next title.
-            crop_spacing = max(4, int(round(crop_spacing * strip_scale)))
-            split_spacing = max(4, int(round(split_spacing * strip_scale)))
-
-        if aspect_ratio == "16:9 (432x243)":
-            # Keep compact labels close to their value boxes on 432.
-            crop_spacing = 4
-            split_spacing = 4
-
-        font = QFont(mw.font())
-        font.setPointSizeF(size_f)
-        # Ensure all strip children inherit the same scaled font baseline.
-        mw.video_crop_panel.setFont(font)
-        mw.split_override_panel.setFont(font)
-        widgets = [
-            mw.video_crop_label_left,
-            mw.video_crop_label_right,
-            mw.video_crop_label_up,
-            mw.video_crop_label_down,
-            mw.video_crop_spin_left,
-            mw.video_crop_spin_right,
-            mw.video_crop_spin_up,
-            mw.video_crop_spin_down,
-            mw.video_crop_btn_reset,
-            mw.split_threshold_label,
-            mw.split_threshold_spin,
-            mw.split_delay_label,
-            mw.split_delay_spin,
-            mw.split_loop_label_2,
-            mw.split_loop_spin,
-            mw.split_pause_label,
-            mw.split_pause_spin,
-            mw.split_type_menu_button,
-        ]
-        for widget in widgets:
-            widget.setFont(font)
-
-        crop_labels = (
-            mw.video_crop_label_left,
-            mw.video_crop_label_right,
-            mw.video_crop_label_up,
-            mw.video_crop_label_down,
-        )
-        split_labels = (
-            mw.split_threshold_label,
-            mw.split_delay_label,
-            mw.split_loop_label_2,
-            mw.split_pause_label,
-        )
-        # Pixel sizes for metrics — actual painting uses per-widget stylesheets (see below).
-        if aspect_ratio == "4:3 (320x240)":
-            # Match compact 432 typography.
-            label_font_px = _320_STRIP_LABEL_FONT_PX
-            font_px = _320_STRIP_CONTROL_FONT_PX
-        elif aspect_ratio == "16:9 (432x243)":
-            label_font_px = 12.0
-            font_px = float(_STRIP_LOCAL_SPIN_PX_TINY)
-        elif aspect_ratio == "4:3 (480x360)":
-            label_font_px = float(_STRIP_LOCAL_LABEL_PX) + 0.5
-            font_px = float(_STRIP_LOCAL_SPIN_PX) + 0.5
-        elif aspect_ratio == "16:9 (512x288)":
-            label_font_px = float(_STRIP_LOCAL_LABEL_PX) + 0.8
-            font_px = float(_STRIP_LOCAL_SPIN_PX) + 0.8
-        else:
-            label_font_px = float(_STRIP_LOCAL_LABEL_PX)
-            font_px = float(_STRIP_LOCAL_SPIN_PX)
-
-        self._strip_label_font_px = label_font_px
-        self._strip_control_font_px = font_px
-        lip_i = int(round(label_font_px))
-        fpx_i = int(round(font_px))
-
-        # Clear legacy per-widget strip font rules (older builds).
-        _strip_marker = "/* strip-font-size */"
-        for w in (
-            *crop_labels,
-            *split_labels,
-            mw.video_crop_spin_left,
-            mw.video_crop_spin_right,
-            mw.video_crop_spin_up,
-            mw.video_crop_spin_down,
-            mw.video_crop_btn_reset,
-            mw.split_threshold_spin,
-            mw.split_delay_spin,
-            mw.split_loop_spin,
-            mw.split_pause_spin,
-            mw.split_type_menu_button,
-        ):
-            bs = w.styleSheet()
-            if _strip_marker in bs:
-                w.setStyleSheet(bs[: bs.find(_strip_marker)].rstrip())
-
-        # Apply strip QSS first so label/spin fontMetrics match painted text (avoids
-        # fixed widths computed from a different font than stylesheet rendering).
-        composed = self._compose_main_window_stylesheet()
-        self._most_recent_style_sheet = composed
-        self._main_window.setStyleSheet(composed)
-        self._apply_strip_local_font_styles(mw, lip_i, fpx_i)
-        app = QApplication.instance()
-        if app is not None and app.style() is not None:
-            sty = app.style()
-            sty.unpolish(self._main_window)
-            sty.polish(self._main_window)
-
-        mw.video_crop_panel.ensurePolished()
-        mw.split_override_panel.ensurePolished()
-
-        lip = self._strip_label_font_px
-        fpx = self._strip_control_font_px
-        assert lip is not None and fpx is not None
-        fm_strip = self._strip_metrics_at_px(lip)
-        _abbrev_strip = aspect_ratio in ("4:3 (320x240)", "16:9 (432x243)")
-        _lab_gap = _STRIP_LABEL_TO_SPIN_GAP_PX + (2 if _abbrev_strip else 0)
-        if aspect_ratio == "4:3 (320x240)":
-            # Keep title-to-own-menu spacing compact on 320.
-            _lab_gap = max(1, _lab_gap + _320_STRIP_LABEL_GAP_ADJ)
-        elif aspect_ratio == "4:3 (480x360)":
-            # Keep 480 labels closer to their own value boxes.
-            _lab_gap = max(1, _lab_gap - 2)
-        elif aspect_ratio == "16:9 (432x243)":
-            _lab_gap = max(1, _lab_gap - 2)
-        elif aspect_ratio == "16:9 (512x288)":
-            _lab_gap = max(1, _lab_gap + 1)
-        _lab_left_inset = _STRIP_LABEL_LEFT_INSET_PX
-        if aspect_ratio == "4:3 (480x360)":
-            _lab_left_inset += 3
-        for label in (*crop_labels, *split_labels):
-            label.setMinimumWidth(0)
-            label.setMaximumWidth(16777215)
-            label.setContentsMargins(_lab_left_inset, 0, _lab_gap, 0)
-        if _abbrev_strip:
-            # Keep single-letter labels visually consistent on compact layouts.
-            for label in (*crop_labels, *split_labels):
-                label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        else:
-            for label in (*crop_labels, *split_labels):
-                label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        _abbrev_min_w = _STRIP_ABBREV_LABEL_MIN_WIDTH_PX
-        if aspect_ratio == "4:3 (320x240)":
-            _abbrev_min_w = _320_STRIP_ABBREV_LABEL_MIN_W
-        elif aspect_ratio == "16:9 (432x243)":
-            _abbrev_min_w = 26
-        for label in (*crop_labels, *split_labels):
-            label.ensurePolished()
-            tw = fm_strip.horizontalAdvance(label.text())
-            br_w = fm_strip.boundingRect(label.text()).width()
-            text_basis = max(tw, br_w)
-            # Outer width = left inset + text + slack + right margin gap before spin.
-            w = int(
-                math.ceil(
-                    _lab_left_inset + text_basis + _STRIP_LABEL_SLACK_PX + _lab_gap
-                )
-            )
-            if _abbrev_strip:
-                w = _abbrev_min_w
-            label.setFixedWidth(w)
-
-        # Narrow Reset: width follows text metrics only (same tight padding as QSS).
-        mw.video_crop_btn_reset.ensurePolished()
-        reset_fm = self._strip_metrics_at_px(lip)
-        reset_txt = mw.video_crop_btn_reset.text()
-        metrics_gap = max(
-            reset_fm.horizontalAdvance(reset_txt),
-            reset_fm.boundingRect(reset_txt).width(),
-        )
-        self._crop_reset_min_width = int(math.ceil(metrics_gap + 16))
-
-        _strip_spins = (
-            mw.video_crop_spin_left,
-            mw.video_crop_spin_right,
-            mw.video_crop_spin_up,
-            mw.video_crop_spin_down,
-            mw.split_threshold_spin,
-            mw.split_delay_spin,
-            mw.split_loop_spin,
-            mw.split_pause_spin,
-        )
-        for sp in _strip_spins:
-            sp.setMinimumSize(0, 0)
-            sp.setMaximumSize(16777215, 16777215)
-        mw.split_type_menu_button.setMinimumSize(0, 0)
-        mw.split_type_menu_button.setMaximumSize(16777215, 16777215)
-
-        if aspect_ratio == "4:3 (320x240)":
-            strip_row_h = _STRIP_MENU_BOX_HEIGHT_320_PX
-            box_w = _STRIP_MENU_BOX_WIDTH_320_PX
-            popup_side = _STRIP_POPUP_BUTTON_SIDE_320_PX
-        elif aspect_ratio == "16:9 (432x243)":
-            strip_row_h = _STRIP_MENU_BOX_HEIGHT_PX
-            box_w = _STRIP_MENU_BOX_WIDTH_432_PX
-            popup_side = _STRIP_POPUP_BUTTON_SIDE_PX
-        else:
-            strip_row_h = _STRIP_MENU_BOX_HEIGHT_PX
-            box_w = _STRIP_MENU_BOX_WIDTH_PX
-            popup_side = _STRIP_POPUP_BUTTON_SIDE_PX
-        self._strip_row_height = strip_row_h
-        if _abbrev_strip:
-            self._crop_reset_min_width = strip_row_h
-
-        for sp in _strip_spins:
-            sp.setFixedSize(box_w, strip_row_h)
-            sp.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        self._strip_popup_side = popup_side
-        if _abbrev_strip:
-            mw.video_crop_btn_reset.setFixedSize(strip_row_h, strip_row_h)
-            mw.video_crop_btn_reset.setMinimumSize(strip_row_h, strip_row_h)
-            mw.video_crop_btn_reset.setMaximumSize(strip_row_h, strip_row_h)
-        else:
-            rw = self._crop_reset_min_width
-            mw.video_crop_btn_reset.setFixedSize(rw, strip_row_h)
-
-        mw.split_type_menu_button.setFixedSize(popup_side, popup_side)
-        if aspect_ratio == "4:3 (320x240)":
-            mw.split_type_menu_button.setMinimumSize(popup_side, popup_side)
-            mw.split_type_menu_button.setMaximumSize(popup_side, popup_side)
-        chevron_side = max(8, popup_side - 6)
-        mw.split_type_menu_button.setIconSize(QSize(chevron_side, chevron_side))
-        mw.video_crop_btn_reset.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        mw.split_type_menu_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        crop_l, crop_t, crop_r, crop_b = crop_row_margins
-        split_l, split_t, split_r, split_b = split_row_margins
-        # Visual balance: label text is inset from the left edge, so mirror that
-        # amount on the right side to keep edge distances looking equal.
-        crop_row_margins_balanced = (
-            crop_l,
-            crop_t,
-            crop_r + _lab_left_inset,
-            crop_b,
-        )
-        split_row_margins_balanced = (
-            split_l,
-            split_t,
-            split_r + _lab_left_inset,
-            split_b,
-        )
-        # Lift strip contents slightly within the grey bar across all ratios.
-        crop_row_margins_balanced = (
-            crop_row_margins_balanced[0],
-            max(0, crop_row_margins_balanced[1] - 1),
-            crop_row_margins_balanced[2],
-            crop_row_margins_balanced[3] + 1,
-        )
-        split_row_margins_balanced = (
-            split_row_margins_balanced[0],
-            max(0, split_row_margins_balanced[1] - 1),
-            split_row_margins_balanced[2],
-            split_row_margins_balanced[3] + 1,
-        )
-
-        mw.video_crop_row.setContentsMargins(*crop_row_margins_balanced)
-        mw.video_crop_row.setSpacing(crop_spacing)
-        mw.split_override_row.setContentsMargins(*split_row_margins_balanced)
-        mw.split_override_row.setSpacing(split_spacing)
-        # Keep popup-button gap visually consistent with row spacing on compact 320.
-        pause_popup_spacer = mw.split_override_row.itemAt(9)
-        if pause_popup_spacer is not None and pause_popup_spacer.spacerItem() is not None:
-            popup_gap = split_spacing if aspect_ratio == "4:3 (320x240)" else 7
-            pause_popup_spacer.spacerItem().changeSize(
-                popup_gap, 0, QSizePolicy.Fixed, QSizePolicy.Minimum
-            )
-            mw.split_override_row.invalidate()
-
-        self._shrink_both_strip_rows_if_overflow(mw)
-        # Spins / split-type button stay fixed size; re-apply in case Reset height drifted.
-        if aspect_ratio == "4:3 (320x240)":
-            h = _STRIP_MENU_BOX_HEIGHT_320_PX
-            popup_side = _STRIP_POPUP_BUTTON_SIDE_320_PX
-            box_w = _STRIP_MENU_BOX_WIDTH_320_PX
-        elif aspect_ratio == "16:9 (432x243)":
-            h = _STRIP_MENU_BOX_HEIGHT_PX
-            popup_side = _STRIP_POPUP_BUTTON_SIDE_PX
-            box_w = _STRIP_MENU_BOX_WIDTH_432_PX
-        else:
-            h = _STRIP_MENU_BOX_HEIGHT_PX
-            popup_side = _STRIP_POPUP_BUTTON_SIDE_PX
-            box_w = _STRIP_MENU_BOX_WIDTH_PX
-        self._strip_row_height = h
-        self._strip_popup_side = popup_side
-        mw.split_type_menu_button.setFixedSize(popup_side, popup_side)
-        if aspect_ratio == "4:3 (320x240)":
-            mw.split_type_menu_button.setMinimumSize(popup_side, popup_side)
-            mw.split_type_menu_button.setMaximumSize(popup_side, popup_side)
-        chevron_side = max(8, popup_side - 6)
-        mw.split_type_menu_button.setIconSize(QSize(chevron_side, chevron_side))
-        for sp in _strip_spins:
-            sp.setFixedSize(box_w, h)
-        if _abbrev_strip:
-            mw.video_crop_btn_reset.setFixedSize(h, h)
-            if aspect_ratio == "4:3 (320x240)":
-                # Hard-lock 320 strip reset ("R") as a square.
-                mw.video_crop_btn_reset.setMinimumSize(h, h)
-                mw.video_crop_btn_reset.setMaximumSize(h, h)
-                mw.video_crop_btn_reset.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        else:
-            mw.video_crop_btn_reset.setFixedHeight(h)
-
-        self._apply_bottom_panel_typography()
-
-    def _apply_bottom_panel_typography(self) -> None:
-        """Keep bottom controls on source/default typography."""
-        mw = self._main_window
-        for w in (
-            mw.screenshot_button,
-            mw.screenshot_settings_button,
-            mw.reconnect_button,
-            mw.pause_button,
-            mw.skip_button,
-            mw.undo_button,
-            mw.reset_button,
-        ):
-            w.setStyleSheet("")
-            w.setFont(mw.font())
-        # Match / highest / threshold row: inherit global stylesheet (16px), not
-        # the compact-strip or button bump — matches classic Pilgrim display.
-        for w in (
-            mw.match_percent_label,
-            mw.highest_percent_label,
-            mw.threshold_percent_label,
-            mw.match_percent,
-            mw.highest_percent,
-            mw.threshold_percent,
-            mw.percent_sign_1,
-            mw.percent_sign_2,
-            mw.percent_sign_3,
-        ):
-            w.setStyleSheet("")
-            w.setFont(mw.font())
-
-    def _shrink_strip_row_once_nonspins(
-        self,
-        row: QHBoxLayout,
-        fm_strip: Optional[QFontMetrics],
-        reset_floor: int,
-        strip_h: int,
-        *,
-        crop_row: bool,
-    ) -> bool:
-        """One pass: shrink first eligible label or crop Reset (spins/toolbutton fixed)."""
-        small_square_reset = settings.get_str("ASPECT_RATIO") in (
-            "4:3 (320x240)",
-            "16:9 (432x243)",
-        )
-        for i in range(row.count()):
-            item = row.itemAt(i)
-            if item is None:
-                continue
-            w = item.widget()
-            if w is None:
-                continue
-            if isinstance(w, (QSpinBox, QDoubleSpinBox, QToolButton)):
-                continue
-            if isinstance(w, QLabel) and fm_strip is not None:
-                cm = w.contentsMargins()
-                text_min = int(
-                    math.ceil(
-                        fm_strip.horizontalAdvance(w.text())
-                        + cm.left()
-                        + cm.right()
-                        + 1
-                    )
-                )
-                if w.width() > text_min:
-                    w.setFixedWidth(w.width() - 1)
-                    return True
-            elif isinstance(w, QPushButton) and crop_row:
-                if small_square_reset:
-                    continue
-                if w.width() > reset_floor:
-                    nw = w.width() - 1
-                    w.setMinimumWidth(nw)
-                    w.setMaximumWidth(nw)
-                    return True
-        return False
-
-    def _strip_row_inner_budget(self, panel: QWidget, row: QHBoxLayout) -> int:
-        """Pixels inside strip margins for laying out label/spin rows.
-
-        Full layouts size each strip to the viewport column width (usually
-        ``FRAME_WIDTH``). Small 16:9 uses a narrower on-screen pane
-        (``_432_DISPLAY_W``) while capture stays 432 — budget must match the pane.
-        """
-        m = row.contentsMargins()
-        if settings.get_bool("SHOW_MIN_VIEW"):
-            return max(1, panel.width() - m.left() - m.right())
-        if settings.get_str("ASPECT_RATIO") == "16:9 (432x243)":
-            fw = max(1, _432_DISPLAY_W)
-        else:
-            fw = max(1, settings.get_int("FRAME_WIDTH"))
-        return max(1, fw - m.left() - m.right())
-
-    def _strip_row_contents_minimum_width(self, row: QHBoxLayout) -> int:
-        """Minimum horizontal space for all layout items (matches ``minimumSize().width()`` logic).
-
-        Used instead of ``QLayout.minimumSize()`` alone so overflow detection stays consistent
-        right after ``activate()`` without relying on a stale cached layout min width.
-        """
-        m = row.contentsMargins()
-        sp = row.spacing()
-        total = m.left() + m.right()
-        first = True
-        for i in range(row.count()):
-            item = row.itemAt(i)
-            if item is None:
-                continue
-            if not first:
-                total += sp
-            first = False
-            total += item.minimumSize().width()
-        return total
-
-    def _shrink_both_strip_rows_if_overflow(self, mw: UIMainWindow) -> None:
-        """If strips overflow, narrow QLabel widths (and crop Reset only).
-
-        Spin boxes and the split-type toolbutton stay at fixed pixel size across ratios.
-        """
-        lip = self._strip_label_font_px
-        fm_strip = self._strip_metrics_at_px(lip) if lip is not None else None
-        is_small = settings.get_str("ASPECT_RATIO") == "4:3 (320x240)"
-        floor_btn = 22 if is_small else 28
-        crop_reset_min_w = (
-            0
-            if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)"
-            else self._crop_reset_min_width
-        )
-        reset_floor = max(floor_btn, crop_reset_min_w) if crop_reset_min_w > 0 else floor_btn
-        strip_h = self._strip_row_height
-
-        crop_panel, crop_row = mw.video_crop_panel, mw.video_crop_row
-        split_panel, split_row = mw.split_override_panel, mw.split_override_row
-
-        def strip_rows_fit() -> bool:
-            crop_row.activate()
-            split_row.activate()
-            for panel, row in ((crop_panel, crop_row), (split_panel, split_row)):
-                budget = self._strip_row_inner_budget(panel, row)
-                if budget <= 0:
-                    continue
-                required = self._strip_row_contents_minimum_width(row)
-                if required > budget:
-                    return False
-            return True
-
-        for _ in range(900):
-            if strip_rows_fit():
-                return
-            if self._shrink_strip_row_once_nonspins(
-                crop_row, fm_strip, reset_floor, strip_h, crop_row=True
-            ):
-                continue
-            if self._shrink_strip_row_once_nonspins(
-                split_row, fm_strip, reset_floor, strip_h, crop_row=False
-            ):
-                continue
-            break
-
-    def _apply_strip_local_font_styles(
-        self, mw: UIMainWindow, lip_i: int, fpx_i: int
-    ) -> None:
-        """Apply compact strip fonts on each control.
-
-        The theme stylesheet sets ``* {{ font-size: 16px }}``. On Fusion, more-specific
-        rules on the main window often still leave strip widgets at 16px. Per-widget
-        stylesheets and matching ``setPixelSize`` match the older compact UI.
-        """
-        lab_ss = f"font-size: {lip_i}px; font-weight: normal;"
-        spin_ss = f"font-size: {fpx_i}px; font-weight: normal;"
-        px_lab = max(_STRIP_FONT_METRICS_FLOOR_PX, lip_i)
-        px_spin = max(_STRIP_FONT_METRICS_FLOOR_PX, fpx_i)
-
-        for lbl in (
-            mw.video_crop_label_left,
-            mw.video_crop_label_right,
-            mw.video_crop_label_up,
-            mw.video_crop_label_down,
-            mw.split_threshold_label,
-            mw.split_delay_label,
-            mw.split_loop_label_2,
-            mw.split_pause_label,
-        ):
-            lbl.setStyleSheet(lab_ss)
-            lf = QFont(lbl.font())
-            lf.setPixelSize(px_lab)
-            lbl.setFont(lf)
-
-        for sp in (
-            mw.video_crop_spin_left,
-            mw.video_crop_spin_right,
-            mw.video_crop_spin_up,
-            mw.video_crop_spin_down,
-            mw.split_threshold_spin,
-            mw.split_delay_spin,
-            mw.split_loop_spin,
-            mw.split_pause_spin,
-        ):
-            sp.setStyleSheet(spin_ss)
-            sf = QFont(sp.font())
-            sf.setPixelSize(px_spin)
-            sp.setFont(sf)
-
-        if settings.get_str("ASPECT_RATIO") in ("4:3 (320x240)", "16:9 (432x243)"):
-            mw.video_crop_btn_reset.setStyleSheet(lab_ss + " padding: 0px;")
-        else:
-            mw.video_crop_btn_reset.setStyleSheet(lab_ss)
-        rf = QFont(mw.video_crop_btn_reset.font())
-        rf.setPixelSize(px_lab)
-        mw.video_crop_btn_reset.setFont(rf)
-
-        if settings.get_str("THEME") == "light":
-            popup_bg = "#bbbbbb"
-            popup_border = "#8f8f8f"
-        else:
-            popup_bg = "#606060"
-            popup_border = "#242424"
-
-        mw.split_type_menu_button.setStyleSheet(
-            f"""QToolButton#split_type_menu_button {{
-  font-size: {fpx_i}px;
-  font-weight: normal;
-  background-color: {popup_bg};
-  border: 1px solid {popup_border};
-  border-radius: 2px;
-  padding: 0px;
-}}
-QToolButton#split_type_menu_button::menu-indicator {{
-  image: none;
-  width: 0px;
-  height: 0px;
-  subcontrol-position: right bottom;
-}}
-"""
-        )
-        tf = QFont(mw.split_type_menu_button.font())
-        tf.setPixelSize(px_spin)
-        mw.split_type_menu_button.setFont(tf)
-
-    def _strip_metrics_at_px(self, px: float) -> QFontMetrics:
-        """Metrics consistent with strip QSS font-size (px); avoids theme mismatch."""
-        f = QFont(self._main_window.font())
-        f.setPixelSize(
-            max(_STRIP_FONT_METRICS_FLOOR_PX, int(math.ceil(px)))
-        )
-        return QFontMetrics(f)
-
-    def _append_strip_typography_css(self, style_sheet: str) -> str:
-        """Append strip spacing rules (fonts use _apply_strip_local_font_styles per widget)."""
-        if self._strip_label_font_px is None or self._strip_control_font_px is None:
-            return style_sheet
-        return (
-            style_sheet
-            + """
-/* strip-typography layout */
-QWidget#video_crop_strip QLabel,
-QWidget#split_override_strip QLabel {
-  padding: 0px;
-}
-QWidget#video_crop_strip QPushButton {
-  padding: 0px 6px;
-  min-height: 0px;
-}
-QWidget#video_crop_strip QAbstractSpinBox,
-QWidget#split_override_strip QAbstractSpinBox {
-  min-height: 0px;
-}
-QWidget#video_crop_strip QSpinBox,
-QWidget#video_crop_strip QDoubleSpinBox,
-QWidget#split_override_strip QSpinBox,
-QWidget#split_override_strip QDoubleSpinBox {
-  padding: 0px 1px 0px 0px;
-}
-QWidget#split_override_strip QToolButton#split_type_menu_button {
-  min-height: 0px;
-  padding: 0px;
-}
-"""
-        )
+        self._strip_typography.apply()
 
     def _compose_main_window_stylesheet(self) -> str:
         """Theme + dynamic hover borders + strip typography."""
         base_style = self._get_style_sheet()
         style_sheet = self._update_video_feed_css(base_style)
         style_sheet = self._update_split_image_css(style_sheet)
-        return self._append_strip_typography_css(style_sheet)
+        return self._strip_typography.append_typography_css(style_sheet)
 
     def _set_minimal_view(self) -> None:
         """Resize and show widgets so that minimal view is displayed."""
@@ -3962,7 +2347,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._main_window.video_info_overlay.setGeometry(
             QRect(75 + left, 610 + layout_dy + top, 455, 30)
         )
-        _vb = video_viewport.y() + video_viewport.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.video_crop_panel.setGeometry(
             QRect(
                 video_viewport.x() - 1,
@@ -3974,7 +2359,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
 
         split_image_geometry = sv
         self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.split_override_panel.setGeometry(
             QRect(
                 split_image_geometry.x(),
@@ -3988,7 +2373,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._set_button_and_label_text(truncate=preset.truncate_controls)
         self._main_window.setFixedSize(
             preset.window_width,
-            (preset.window_height_base - _BOTTOM_BLOCK_LIFT_PX)
+            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
             + layout_dy
             + self._main_window.HEIGHT_CORRECTION,
         )
@@ -4037,7 +2422,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._main_window.video_info_overlay.setGeometry(
             QRect(72 + left, 520 + layout_dy + top, 310, 30)
         )
-        _vb = video_viewport.y() + video_viewport.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.video_crop_panel.setGeometry(
             QRect(
                 video_viewport.x() - 1,
@@ -4047,7 +2432,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
             )
         )
         self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.split_override_panel.setGeometry(
             QRect(
                 split_image_geometry.x(),
@@ -4060,7 +2445,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._set_button_and_label_text(truncate=preset.truncate_controls)
         self._main_window.setFixedSize(
             preset.window_width,
-            (preset.window_height_base - _BOTTOM_BLOCK_LIFT_PX)
+            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
             + layout_dy
             + self._main_window.HEIGHT_CORRECTION,
         )
@@ -4108,7 +2493,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._main_window.video_info_overlay.setGeometry(
             QRect(75 + left, 538 + layout_dy + top, 493, 30)
         )
-        _vb = video_viewport.y() + video_viewport.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.video_crop_panel.setGeometry(
             QRect(
                 video_viewport.x() - 1,
@@ -4120,7 +2505,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
 
         split_image_geometry = sv
         self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.split_override_panel.setGeometry(
             QRect(
                 split_image_geometry.x(),
@@ -4134,7 +2519,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._set_button_and_label_text(truncate=preset.truncate_controls)
         self._main_window.setFixedSize(
             preset.window_width,
-            (preset.window_height_base - _BOTTOM_BLOCK_LIFT_PX)
+            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
             + layout_dy
             + self._main_window.HEIGHT_CORRECTION,
         )
@@ -4193,7 +2578,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
                 30,
             )
         )
-        _vb = video_viewport.y() + video_viewport.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.video_crop_panel.setGeometry(
             QRect(
                 video_viewport.x() - 1,
@@ -4203,7 +2588,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
             )
         )
         self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + _STRIP_GAP_BELOW_VIEWPORT_PX
+        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
         self._main_window.split_override_panel.setGeometry(
             QRect(
                 split_image_geometry.x(),
@@ -4216,7 +2601,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         self._set_button_and_label_text(truncate=preset.truncate_controls)
         self._main_window.setFixedSize(
             preset.window_width,
-            (preset.window_height_base - _BOTTOM_BLOCK_LIFT_PX)
+            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
             + layout_dy
             + self._main_window.HEIGHT_CORRECTION,
         )
@@ -4400,8 +2785,8 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
         overlay = self._main_window.video_burst_overlay
         min_view = settings.get_bool("SHOW_MIN_VIEW")
 
-        if self._burst_in_progress and not min_view:
-            remain = max(0.0, self._burst_overlay_deadline - time.monotonic())
+        if self._screenshot.in_progress and not min_view:
+            remain = max(0.0, self._screenshot.overlay_deadline - time.monotonic())
             overlay.setText(f"Taking burst... {remain:.1f}s")
             overlay.setVisible(True)
             overlay.raise_()
@@ -4729,7 +3114,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
 
         if current_split_index is None:
             # Enable screenshots if video is on
-            if video_alive and not self._burst_in_progress:
+            if video_alive and not self._screenshot.in_progress:
                 self._main_window.screenshot_button.setEnabled(True)
             else:
                 self._main_window.screenshot_button.setEnabled(False)
@@ -4754,7 +3139,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
             self._split_hotkey_enabled = True
 
             # Enable screenshots if video is on
-            if video_alive and not self._burst_in_progress:
+            if video_alive and not self._screenshot.in_progress:
                 self._main_window.screenshot_button.setEnabled(True)
                 self._main_window.pause_button.setEnabled(True)
             else:
@@ -4790,7 +3175,7 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
             else:
                 self._splitter.recording_enabled = False
 
-        self._sync_burst_aux_controls_enabled()
+        self._screenshot.sync_aux_controls_enabled()
 
     def _null_match_percent_string(self, decimals: int) -> None:
         """Return a string representing a blank match percent with the number
@@ -4991,13 +3376,13 @@ QWidget#split_override_strip QToolButton#split_type_menu_button {
             self._next_hotkey_pressed = False
 
         elif self._screenshot_hotkey_pressed:
-            if hotkey_presses_allowed and not self._burst_in_progress:
+            if hotkey_presses_allowed and not self._screenshot.in_progress:
                 self._main_window.screenshot_button.click()
             self._screenshot_hotkey_pressed = False
 
         elif self._save_peak_hotkey_pressed:
             if hotkey_presses_allowed:
-                self._save_peak_similarity_frame()
+                self._screenshot.save_peak_buffer()
             self._save_peak_hotkey_pressed = False
 
     def _react_to_settings_menu_flags(self) -> None:

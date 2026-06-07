@@ -36,7 +36,7 @@ offsets when calling ``setGeometry``.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from PyQt5.QtCore import QRect
 
@@ -79,7 +79,7 @@ STRIP_PANEL_DY_480 = 23
 STRIP_PANEL_DY_320 = 24
 STRIP_PANEL_DY_432 = 24
 
-# --- 320×240 strip typography (used by ``_apply_strip_typography``) ---------
+# --- 320×240 strip typography (used by ``strip_typography``) ----------------
 
 STRIP_320_SIZE_F = 7.0
 STRIP_320_ROW_MARGINS: Tuple[int, int, int, int] = (2, 3, 2, 3)
@@ -88,37 +88,6 @@ STRIP_320_LABEL_FONT_PX = 12.0
 STRIP_320_CONTROL_FONT_PX = 12.0
 STRIP_320_LABEL_GAP_ADJ = -14
 STRIP_320_ABBREV_LABEL_MIN_W = 26
-
-# Legacy aliases (ui_controller imports during transition).
-_VIDEO_COL_GAP_TO_SCREENSHOT_480 = VIDEO_COL_GAP_480
-_VIDEO_COL_GAP_TO_SCREENSHOT_512 = VIDEO_COL_GAP_512
-_VIDEO_COL_GAP_TO_SCREENSHOT_320 = VIDEO_COL_GAP_320
-_VIDEO_COL_GAP_TO_SCREENSHOT_432 = VIDEO_COL_GAP_432
-_VIDEO_COL_CENTER_NUDGE_432 = VIDEO_COL_CENTER_NUDGE_432
-_VIDEO_COL_CENTER_NUDGE_320 = VIDEO_COL_CENTER_NUDGE_320
-_VIDEO_COL_STATS_SPAN_W = VIDEO_COL_STATS_SPAN_W
-_VIDEO_COL_STATS_LABEL_W = VIDEO_COL_STATS_LABEL_W
-_VIDEO_COL_STATS_VALUE_X = VIDEO_COL_STATS_VALUE_X
-_VIDEO_COL_STATS_PCT_X = VIDEO_COL_STATS_PCT_X
-_VIDEO_COL_STATS_ROW_H = VIDEO_COL_STATS_ROW_H
-_VIDEO_COL_STATS_ROW_STEP = VIDEO_COL_STATS_ROW_STEP
-_VIDEO_COL_SCREENSHOT_W_FULL = VIDEO_COL_SCREENSHOT_W_FULL
-_VIDEO_COL_SCREENSHOT_W_COMPACT = VIDEO_COL_SCREENSHOT_W_COMPACT
-_VIDEO_COL_SCREENSHOT_H = VIDEO_COL_SCREENSHOT_H
-_BOTTOM_ADJ_PAIR_GAP_PX = BOTTOM_ADJ_PAIR_GAP_PX
-_BOTTOM_BLOCK_LIFT_PX = BOTTOM_BLOCK_LIFT_PX
-_STRIP_GAP_BELOW_VIEWPORT_PX = STRIP_GAP_BELOW_VIEWPORT_PX
-_432_DISPLAY_W = DISPLAY_W_432
-_480_STRIP_PANEL_LAYOUT_DY = STRIP_PANEL_DY_480
-_432_STRIP_PANEL_LAYOUT_DY = STRIP_PANEL_DY_432
-_320_STRIP_SIZE_F = STRIP_320_SIZE_F
-_320_STRIP_ROW_MARGINS = STRIP_320_ROW_MARGINS
-_320_STRIP_ROW_SPACING = STRIP_320_ROW_SPACING
-_320_STRIP_LABEL_FONT_PX = STRIP_320_LABEL_FONT_PX
-_320_STRIP_CONTROL_FONT_PX = STRIP_320_CONTROL_FONT_PX
-_320_STRIP_LABEL_GAP_ADJ = STRIP_320_LABEL_GAP_ADJ
-_320_STRIP_ABBREV_LABEL_MIN_W = STRIP_320_ABBREV_LABEL_MIN_W
-
 
 @dataclass(frozen=True)
 class ViewportDesignRect:
@@ -149,20 +118,6 @@ class SplitColumnBottomPreset:
 
 
 @dataclass(frozen=True)
-class VideoColumnFixedCoords:
-    """Design-space X coords for the video-column bottom row (before ``left`` correction).
-
-    Used when the stats+screenshot block is wider than the video viewport — centering
-    would shove Screenshot into the split column (``4:3 (320x240)``).
-    """
-
-    label_design_x: int
-    value_design_x: int
-    pct_design_x: int
-    screenshot_design_x: int
-
-
-@dataclass(frozen=True)
 class VideoColumnBottomPreset:
     """How the stats + screenshot row is placed under the video pane."""
 
@@ -170,7 +125,6 @@ class VideoColumnBottomPreset:
     screenshot_w: int
     centered_under_viewport: bool = True
     center_nudge_x: int = 0
-    fixed: Optional[VideoColumnFixedCoords] = None
 
 
 @dataclass(frozen=True)

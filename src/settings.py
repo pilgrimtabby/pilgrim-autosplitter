@@ -317,7 +317,7 @@ def set_program_vals(
         ):
             set_value("BURST_SHOTS_BASE_DIR", home_dir, settings)
 
-    # Save peak sim hotkey (added after initial release; unset reads as "None")
+    # Snap Peak hotkey (added after initial release; unset reads as "None")
     for key in ("SAVE_PEAK_HOTKEY_NAME", "SAVE_PEAK_HOTKEY_CODE"):
         if not settings.contains(key) or get_str(key, settings) == "None":
             set_value(key, "", settings)
