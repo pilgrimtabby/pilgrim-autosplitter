@@ -32,8 +32,21 @@ import os
 import platform
 import sys
 import time
+import traceback
 
 import paths
+
+
+def _install_excepthook() -> None:
+    """Log uncaught exceptions to stderr before the default handler runs."""
+    _default = sys.excepthook
+
+    def _hook(exc_type, exc_value, exc_tb) -> None:
+        print("[Pilgrim Autosplitter] Uncaught exception:", file=sys.stderr)
+        traceback.print_exception(exc_type, exc_value, exc_tb, file=sys.stderr)
+        _default(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _hook
 
 
 class PilgrimAutosplitter:
@@ -103,6 +116,7 @@ class PilgrimAutosplitter:
 
 def main() -> None:
     """Initialize PilgrimAutosplitter."""
+    _install_excepthook()
     os.system("cls || clear")  # Cross-platform clear screen
 
     print("Welcome to Pilgrim Autosplitter!")

@@ -52,7 +52,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ui.screenshot_capture import SNAP_PEAK_HOTKEY_LABEL
+from ui.labels import SNAP_PEAK_HOTKEY_LABEL
 
 
 class UISettingsWindow(QDialog):

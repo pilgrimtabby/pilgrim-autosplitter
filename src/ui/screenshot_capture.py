@@ -71,6 +71,7 @@ from ui.labels import (
     SNAP_PEAK_HOTKEY_LABEL,
 )
 from ui.screenshot_settings_dialog import exec_screenshot_settings_dialog
+from ui.slot_errors import log_slot_error
 
 if TYPE_CHECKING:
     from ui.ui_controller import UIController
@@ -554,6 +555,12 @@ class ScreenshotCapture:
 
     def burst_capture_tick(self) -> None:
         """Queue one frame per tick until burst quota is done."""
+        try:
+            self._burst_capture_tick_body()
+        except Exception as exc:
+            log_slot_error("Burst capture", exc)
+
+    def _burst_capture_tick_body(self) -> None:
         self.drain_burst_write_results()
         if self._burst_finishing:
             if self._burst_pending_writes <= 0:

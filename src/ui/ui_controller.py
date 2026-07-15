@@ -107,6 +107,7 @@ from ui.strip_typography import (
     StripTypographyApplier,
 )
 from ui.screenshot_capture import SNAP_PEAK_HOTKEY_LABEL, ScreenshotCapture
+from ui.slot_errors import log_slot_error
 
 # Slightly larger than global theme for bottom stats + main action buttons only.
 _BOTTOM_PANEL_FONT_PX = 17
@@ -2707,21 +2708,24 @@ class UIController:
         and splitter. Also keeps the computer's display awake if the splitter
         is active.
         """
-        self._update_video_feed()
-        self._update_video_record_overlay()
-        self._update_video_info_overlay()
-        self._update_video_burst_overlay()
-        self._update_video_title()
-        self._update_split_and_video_css()
-        self._update_split_image_labels()
-        self._update_split_delay_suspend()
-        self._update_match_percents()
-        self._update_pause_button()
-        self._set_buttons_and_hotkeys_enabled()
-        self._react_to_hotkey_flags()
-        self._react_to_settings_menu_flags()
-        self._react_to_split_flags()
-        self._wake_display()
+        try:
+            self._update_video_feed()
+            self._update_video_record_overlay()
+            self._update_video_info_overlay()
+            self._update_video_burst_overlay()
+            self._update_video_title()
+            self._update_split_and_video_css()
+            self._update_split_image_labels()
+            self._update_split_delay_suspend()
+            self._update_match_percents()
+            self._update_pause_button()
+            self._set_buttons_and_hotkeys_enabled()
+            self._react_to_hotkey_flags()
+            self._react_to_settings_menu_flags()
+            self._react_to_split_flags()
+            self._wake_display()
+        except Exception as exc:
+            log_slot_error("UI poll", exc)
 
     def _update_video_feed(self) -> None:
         """Clear video if video is down; update video if video is alive."""
@@ -3237,6 +3241,14 @@ class UIController:
             key: Wrapper containing info about the key that was pressed. For
                 more information, see the ui_keyboard_controller module.
         """
+        try:
+            self._handle_key_press_body(key)
+        except Exception as exc:
+            log_slot_error("Hotkey listener", exc)
+
+    def _handle_key_press_body(
+        self, key: Union["pynput.keyboard.key", "keyboard.KeyboardEvent"]
+    ) -> None:
         # Get the key's name and internal value. If the key is not an
         # alphanumeric key, the try block throws AttributeError.
         key_name, key_code = self._keyboard.parse_key_info(key)
