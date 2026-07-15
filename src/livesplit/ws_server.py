@@ -35,8 +35,7 @@ import json
 import threading
 from typing import Callable, Optional, Any
 
-import websockets
-from websockets.server import serve
+from websockets.asyncio.server import serve
 
 _WS_PATH = "/livesplit"
 _DEFAULT_HOST = "127.0.0.1"
@@ -180,9 +179,8 @@ class LiveSplitWebSocketServer:
             await self._server.wait_closed()
 
     async def _connection_handler(self, websocket: Any) -> None:
-        path = websocket.path
-        if hasattr(websocket, "request") and websocket.request is not None:
-            path = websocket.request.path
+        request = getattr(websocket, "request", None)
+        path = request.path if request is not None else getattr(websocket, "path", "")
         if path != _WS_PATH:
             await websocket.close(1008, "Invalid path")
             return
