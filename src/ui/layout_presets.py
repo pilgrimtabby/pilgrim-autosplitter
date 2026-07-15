@@ -103,6 +103,44 @@ class ViewportDesignRect:
 
 
 @dataclass(frozen=True)
+class ChromeDesignRect:
+    """Fixed chrome widget rect in design space (before edge corrections)."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def to_rect(self, left: int, top: int, *, extra_y: int = 0) -> QRect:
+        return QRect(self.x + left, self.y + top + extra_y, self.width, self.height)
+
+
+@dataclass(frozen=True)
+class LayoutChromePreset:
+    """Top chrome + overlays for one aspect ratio (design coords)."""
+
+    split_directory_box: ChromeDesignRect
+    split_dir_button: ChromeDesignRect
+    min_view_button: ChromeDesignRect
+    split_name_label: ChromeDesignRect
+    split_loop_label: ChromeDesignRect
+    video_title: ChromeDesignRect
+    next_source_button: ChromeDesignRect
+    previous_button: ChromeDesignRect
+    next_button: ChromeDesignRect
+    video_record_overlay: ChromeDesignRect
+    video_info: ChromeDesignRect
+    video_title_center_in_viewport: bool = False
+    video_title_viewport_width: int = 231
+    next_source_right_of_viewport: bool = False
+    next_source_offset_from_right: int = 124
+    nav_buttons_on_split_viewport: bool = False
+    prev_button_split_offset_x: int = 12
+    next_button_split_offset_from_right: int = 43
+    video_info_anchor_viewport: bool = False
+
+
+@dataclass(frozen=True)
 class SplitColumnBottomPreset:
     """Pause / reset / undo / skip under the split-image pane."""
 
@@ -123,7 +161,6 @@ class VideoColumnBottomPreset:
 
     gap_stats_to_screenshot: int
     screenshot_w: int
-    centered_under_viewport: bool = True
     center_nudge_x: int = 0
 
 
@@ -139,6 +176,7 @@ class AspectLayoutPreset:
     bottom_row2_design: int
     split_column: SplitColumnBottomPreset
     video_column: VideoColumnBottomPreset
+    chrome: LayoutChromePreset
     window_width: int
     window_height_base: int
     truncate_controls: bool
@@ -163,6 +201,69 @@ _SPLIT_320 = SplitColumnBottomPreset(
     gap_stats_to_screenshot=VIDEO_COL_GAP_320,
 )
 
+_CHROME_COMMON_DIR = ChromeDesignRect(60, 225, 180, 30)
+_CHROME_COMMON_MIN = ChromeDesignRect(60, 270, 100, 31)
+
+_CHROME_480 = LayoutChromePreset(
+    split_directory_box=ChromeDesignRect(247, 225, 785, 30),
+    split_dir_button=_CHROME_COMMON_DIR,
+    min_view_button=_CHROME_COMMON_MIN,
+    split_name_label=ChromeDesignRect(584, 255, 415, 31),
+    split_loop_label=ChromeDesignRect(584, 280, 415, 31),
+    video_title=ChromeDesignRect(260, 272, 80, 31),
+    next_source_button=ChromeDesignRect(422, 272, 118, 31),
+    previous_button=ChromeDesignRect(566, 270, 31, 31),
+    next_button=ChromeDesignRect(1000, 270, 31, 31),
+    video_record_overlay=ChromeDesignRect(497, 329, 24, 24),
+    video_info=ChromeDesignRect(75, 610, 455, 30),
+)
+
+_CHROME_512 = LayoutChromePreset(
+    split_directory_box=ChromeDesignRect(247, 225, 848, 30),
+    split_dir_button=_CHROME_COMMON_DIR,
+    min_view_button=_CHROME_COMMON_MIN,
+    split_name_label=ChromeDesignRect(613, 255, 450, 31),
+    split_loop_label=ChromeDesignRect(613, 280, 450, 31),
+    video_title=ChromeDesignRect(276, 272, 80, 31),
+    next_source_button=ChromeDesignRect(454, 272, 118, 31),
+    previous_button=ChromeDesignRect(596, 270, 31, 31),
+    next_button=ChromeDesignRect(1064, 270, 31, 31),
+    video_record_overlay=ChromeDesignRect(542, 321, 19, 19),
+    video_info=ChromeDesignRect(75, 538, 493, 30),
+)
+
+_CHROME_320 = LayoutChromePreset(
+    split_directory_box=ChromeDesignRect(247, 225, 464, 30),
+    split_dir_button=_CHROME_COMMON_DIR,
+    min_view_button=_CHROME_COMMON_MIN,
+    split_name_label=ChromeDesignRect(424, 255, 254, 31),
+    split_loop_label=ChromeDesignRect(424, 280, 254, 31),
+    video_title=ChromeDesignRect(180, 272, 80, 31),
+    next_source_button=ChromeDesignRect(280, 272, 100, 31),
+    previous_button=ChromeDesignRect(390, 270, 31, 31),
+    next_button=ChromeDesignRect(680, 270, 31, 31),
+    video_record_overlay=ChromeDesignRect(351, 323, 16, 16),
+    video_info=ChromeDesignRect(72, 520, 310, 30),
+)
+
+_CHROME_432 = LayoutChromePreset(
+    split_directory_box=ChromeDesignRect(247, 225, 688, 30),
+    split_dir_button=_CHROME_COMMON_DIR,
+    min_view_button=_CHROME_COMMON_MIN,
+    split_name_label=ChromeDesignRect(534, 255, 371, 31),
+    split_loop_label=ChromeDesignRect(534, 280, 371, 31),
+    video_title=ChromeDesignRect(0, 272, 231, 31),
+    next_source_button=ChromeDesignRect(0, 272, 118, 31),
+    previous_button=ChromeDesignRect(0, 270, 31, 31),
+    next_button=ChromeDesignRect(0, 270, 31, 31),
+    video_record_overlay=ChromeDesignRect(467, 319, 16, 16),
+    video_info=ChromeDesignRect(0, 524, 310, 30),
+    video_title_center_in_viewport=True,
+    next_source_right_of_viewport=True,
+    nav_buttons_on_split_viewport=True,
+    video_info_anchor_viewport=True,
+)
+
 LAYOUT_PRESET_480 = AspectLayoutPreset(
     aspect_ratio="4:3 (480x360)",
     video_viewport=ViewportDesignRect(60, 310, 480, 360),
@@ -180,8 +281,8 @@ LAYOUT_PRESET_480 = AspectLayoutPreset(
     video_column=VideoColumnBottomPreset(
         gap_stats_to_screenshot=VIDEO_COL_GAP_480,
         screenshot_w=VIDEO_COL_SCREENSHOT_W_FULL,
-        centered_under_viewport=True,
     ),
+    chrome=_CHROME_480,
     window_width=1002,
     window_height_base=570,
     truncate_controls=False,
@@ -204,8 +305,8 @@ LAYOUT_PRESET_512 = AspectLayoutPreset(
     video_column=VideoColumnBottomPreset(
         gap_stats_to_screenshot=VIDEO_COL_GAP_512,
         screenshot_w=VIDEO_COL_SCREENSHOT_W_FULL,
-        centered_under_viewport=True,
     ),
+    chrome=_CHROME_512,
     window_width=1064,
     window_height_base=497,
     truncate_controls=False,
@@ -222,9 +323,9 @@ LAYOUT_PRESET_320 = AspectLayoutPreset(
     video_column=VideoColumnBottomPreset(
         gap_stats_to_screenshot=VIDEO_COL_GAP_320,
         screenshot_w=VIDEO_COL_SCREENSHOT_W_COMPACT,
-        centered_under_viewport=True,
         center_nudge_x=VIDEO_COL_CENTER_NUDGE_320,
     ),
+    chrome=_CHROME_320,
     window_width=682,
     window_height_base=450,
     truncate_controls=True,
@@ -245,11 +346,11 @@ LAYOUT_PRESET_432 = AspectLayoutPreset(
         gap_stats_to_screenshot=VIDEO_COL_GAP_432,
     ),
     video_column=VideoColumnBottomPreset(
-        centered_under_viewport=True,
         gap_stats_to_screenshot=VIDEO_COL_GAP_432,
         screenshot_w=VIDEO_COL_SCREENSHOT_W_COMPACT,
         center_nudge_x=VIDEO_COL_CENTER_NUDGE_432,
     ),
+    chrome=_CHROME_432,
     window_width=904,
     window_height_base=452,
     truncate_controls=True,

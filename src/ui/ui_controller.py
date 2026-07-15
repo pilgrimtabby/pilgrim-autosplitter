@@ -88,6 +88,7 @@ from ui.layout_presets import (
     LAYOUT_PRESET_432,
     LAYOUT_PRESET_480,
     LAYOUT_PRESET_512,
+    LAYOUT_PRESETS,
     SplitColumnBottomPreset,
     STRIP_GAP_BELOW_VIEWPORT_PX,
     VIDEO_CROP_STRIP_LAYOUT_DY,
@@ -106,41 +107,15 @@ from ui.strip_typography import (
     STRIP_MENU_BOX_HEIGHT_PX,
     StripTypographyApplier,
 )
-from ui.screenshot_capture import SNAP_PEAK_HOTKEY_LABEL, ScreenshotCapture
+from ui.layout_apply import apply_aspect_layout
+from ui.profile_store import ProfileStore
+from ui.video_crop import VideoCropController
+from ui.labels import SNAP_PEAK_HOTKEY_LABEL
+from ui.screenshot_capture import ScreenshotCapture
 from ui.slot_errors import log_slot_error
 
 # Slightly larger than global theme for bottom stats + main action buttons only.
 _BOTTOM_PANEL_FONT_PX = 17
-
-
-_MAX_VIDEO_CROP_UNDO = 100
-_PROFILE_SCHEMA_VERSION = 1
-_PROFILE_RECENTS_MAX = 5
-_PROFILE_SETTING_KEYS = (
-    "LAST_IMAGE_DIR",
-    "DEFAULT_THRESHOLD",
-    "DEFAULT_DELAY",
-    "DEFAULT_PAUSE",
-    "DEFAULT_RESET_WAIT",
-    "FPS",
-    "MATCH_PERCENT_DECIMALS",
-    "ASPECT_RATIO",
-    "SHOW_MIN_VIEW",
-    "VIDEO_CROP_INSET_LEFT",
-    "VIDEO_CROP_INSET_RIGHT",
-    "VIDEO_CROP_INSET_TOP",
-    "VIDEO_CROP_INSET_BOTTOM",
-    "OPEN_SCREENSHOT_ON_CAPTURE",
-)
-_PROFILE_BURST_SETTING_KEYS = (
-    "BURST_MODE_ENABLED",
-    "BURST_DATED_SESSION_FOLDERS",
-    "BURST_DURATION_SEC",
-    "BURST_FPS",
-    "BURST_SHOTS_BASE_DIR",
-)
-
-
 
 
 class UIController:
@@ -179,6 +154,8 @@ class UIController:
         self._settings_window = UISettingsWindow()
         self._strip_typography = StripTypographyApplier(self)
         self._screenshot = ScreenshotCapture(self)
+        self._profiles = ProfileStore(self)
+        self._video_crop = VideoCropController(self)
         self._livesplit_ws_server: Optional[Any] = None
         self._lso = LiveSplitTimerSync()
         self._livesplit_menu_linked: Optional[bool] = None
@@ -262,10 +239,6 @@ class UIController:
         self._caffeinate_thread = Thread(target=self._caffeinate)
         self._caffeinate_thread_finished = True
 
-        self._video_crop_undo_stack: List[Tuple[int, int, int, int]] = []
-        self._video_crop_redo_stack: List[Tuple[int, int, int, int]] = []
-        self._video_crop_snapshot: Tuple[int, int, int, int] = (0, 0, 0, 0)
-        self._video_crop_undo_guard = False
         self._split_override_guard = False
         self._split_override_sync_key: Optional[Tuple[int, str]] = None
 
@@ -278,15 +251,6 @@ class UIController:
         # Set layout
         self._set_main_window_layout()
 
-        self._video_crop_undo_shortcut = QShortcut(QKeySequence.Undo, self._main_window)
-        self._video_crop_undo_shortcut.setContext(Qt.WindowShortcut)
-        self._video_crop_undo_shortcut.activated.connect(self._video_crop_undo)
-
-        self._video_crop_redo_shortcut = QShortcut(QKeySequence.Redo, self._main_window)
-        self._video_crop_redo_shortcut.setContext(Qt.WindowShortcut)
-        self._video_crop_redo_shortcut.activated.connect(self._video_crop_redo)
-
-        self._sync_video_crop_widgets_from_settings()
         self._main_window.setWindowFlag(
             Qt.WindowStaysOnTopHint, settings.get_bool("ALWAYS_ON_TOP")
         )
@@ -335,7 +299,7 @@ class UIController:
         # Reload video button
         self._main_window.reconnect_button.clicked.connect(self._splitter.restart)
 
-        self._wire_video_crop_controls()
+        self._video_crop.wire_controls()
         self._wire_split_override_controls()
 
         # Pause comparison / unpause comparison button
@@ -364,12 +328,12 @@ class UIController:
             lambda: self._open_url(settings.USER_MANUAL_URL)
         )
         self._main_window.profile_load_action.triggered.connect(
-            self._load_profile_via_dialog
+            self._profiles.load_profile_via_dialog
         )
         self._main_window.profile_save_action.triggered.connect(
-            self._save_profile_via_dialog
+            self._profiles.save_profile_via_dialog
         )
-        self._refresh_recent_profile_actions()
+        self._profiles.refresh_recent_profile_actions()
 
         self._main_window.connect_disconnect_action.triggered.connect(
             self.stop_livesplit_ws_server
@@ -659,418 +623,6 @@ class UIController:
         dlg.setFocusPolicy(Qt.StrongFocus)
         QTimer.singleShot(0, clear_focus)
 
-    def _profile_saves_dir(self) -> Path:
-        root = Path(__file__).resolve().parents[2]
-        configured = settings.get_str("PROFILE_SAVE_DIR")
-        if configured not in ("", "None", None):
-            path = Path(configured)
-        else:
-            path = root / "saves"
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    def _profile_recent_paths(self) -> List[str]:
-        raw = settings.get_str("RECENT_PROFILE_PATHS")
-        if raw in ("None", "", None):
-            return []
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            return []
-        if not isinstance(parsed, list):
-            return []
-        out: List[str] = []
-        for item in parsed:
-            if isinstance(item, str) and item:
-                out.append(item)
-        return out[:_PROFILE_RECENTS_MAX]
-
-    def _set_profile_recent_paths(self, paths: List[str]) -> None:
-        deduped: List[str] = []
-        for path in paths:
-            if path and path not in deduped:
-                deduped.append(path)
-        settings.set_value("RECENT_PROFILE_PATHS", json.dumps(deduped[:_PROFILE_RECENTS_MAX]))
-
-    def _push_recent_profile_path(self, path: str) -> None:
-        existing = [p for p in self._profile_recent_paths() if p != path]
-        self._set_profile_recent_paths([path] + existing)
-        self._refresh_recent_profile_actions()
-
-    def _refresh_recent_profile_actions(self) -> None:
-        existing = [p for p in self._profile_recent_paths() if Path(p).is_file()]
-        self._set_profile_recent_paths(existing)
-        for i, action in enumerate(self._main_window.profile_recent_actions):
-            if i < len(existing):
-                p = Path(existing[i])
-                action.setText(p.stem)
-                action.setToolTip(str(p))
-                action.setEnabled(True)
-                action.setData(str(p))
-                try:
-                    action.triggered.disconnect()
-                except TypeError:
-                    pass
-                action.triggered.connect(
-                    lambda _checked=False, path=str(p): self._load_profile_from_path(path)
-                )
-            else:
-                action.setText("(empty)")
-                action.setToolTip("")
-                action.setEnabled(False)
-                action.setData(None)
-                try:
-                    action.triggered.disconnect()
-                except TypeError:
-                    pass
-
-    def _profile_payload(self, profile_name: str) -> dict:
-        qsettings = settings.settings
-        settings_map = {
-            key: settings.get_str(key)
-            for key in _PROFILE_SETTING_KEYS
-            if qsettings.contains(key)
-        }
-        burst_settings = {
-            key: settings.get_str(key)
-            for key in _PROFILE_BURST_SETTING_KEYS
-            if qsettings.contains(key)
-        }
-        split_dir = Path(settings.get_str("LAST_IMAGE_DIR"))
-        try:
-            rel_split = str(split_dir.relative_to(Path(__file__).resolve().parents[2]))
-        except ValueError:
-            rel_split = None
-        split_files = []
-        if split_dir.is_dir():
-            for child in sorted(split_dir.iterdir()):
-                if child.is_file():
-                    split_files.append(
-                        {"name": child.name, "size": child.stat().st_size}
-                    )
-        return {
-            "schema_version": _PROFILE_SCHEMA_VERSION,
-            "profile_name": profile_name,
-            "created_at": datetime.datetime.now().isoformat(timespec="seconds"),
-            "app_version": settings.VERSION_NUMBER,
-            "settings": settings_map,
-            "burst_settings": burst_settings,
-            "split_dir": {
-                "absolute": str(split_dir),
-                "relative_to_project": rel_split,
-                "files": split_files,
-            },
-        }
-
-    def _sanitize_profile_name(self, text: str) -> str:
-        cleaned = re.sub(r"[^A-Za-z0-9._ -]+", "", text).strip()
-        cleaned = re.sub(r"\s+", " ", cleaned)
-        return cleaned[:80]
-
-    def _existing_profile_names(self, saves_dir: Optional[Path] = None) -> List[str]:
-        saves = saves_dir or self._profile_saves_dir()
-        files = [p for p in saves.glob("*.json") if p.is_file()]
-        files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-        return [p.stem for p in files]
-
-    def _display_profile_dir(self, path: Path) -> str:
-        """Shorten folder label by hiding /Users/<name>/ when applicable."""
-        p = path.expanduser().resolve()
-        home = Path.home().resolve()
-        try:
-            rel = p.relative_to(home)
-        except ValueError:
-            return str(p)
-        rel_parts = rel.parts
-        if rel_parts:
-            return str(Path(*rel_parts))
-        return str(p)
-
-    def _save_profile_via_dialog(self) -> None:
-        default_name = "New profile"
-        current_dir = self._profile_saves_dir()
-
-        dlg = QDialog(self._main_window)
-        dlg.setWindowTitle("Save Profile")
-        dlg.setStyleSheet(self._get_style_sheet())
-        dlg.setFixedWidth(390)
-        root = QVBoxLayout(dlg)
-        root.setContentsMargins(10, 10, 10, 10)
-        root.setSpacing(0)
-
-        border_frame = QFrame(dlg)
-        border_frame.setObjectName("border")
-        inner = QVBoxLayout(border_frame)
-        inner.setContentsMargins(10, 10, 10, 10)
-        inner.setSpacing(6)
-
-        profile_name_label = QLabel("Profile name", border_frame)
-        profile_name_row = QHBoxLayout()
-        profile_name_row.setContentsMargins(0, 0, 0, 0)
-        profile_name_row.addWidget(profile_name_label)
-        profile_name_row.addStretch(1)
-        inner.addLayout(profile_name_row)
-        name_row = QHBoxLayout()
-        name_combo = QComboBox(border_frame)
-        name_combo.setEditable(True)
-        name_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        name_combo.setFixedHeight(name_combo.sizeHint().height())
-        arrow_path = str(
-            (paths.resources_dir() / "icons" / "chevron_down_white.svg").resolve()
-        ).replace("\\", "/")
-        name_combo.setStyleSheet(
-            "QComboBox { padding: 2px 0px 2px 2px; }"
-            "QComboBox QLineEdit { border: 0px; padding: 0px; margin: 0px; }"
-            "QComboBox::down-arrow {"
-            f" image: url({arrow_path});"
-            " width: 14px; height: 14px;"
-            " position: relative; left: 1px;"
-            "}"
-            "QComboBox::drop-down {"
-            " border: 0px;"
-            " subcontrol-origin: padding;"
-            " subcontrol-position: center right;"
-            " width: 22px;"
-            "}"
-        )
-        btn_minus = QPushButton("-", border_frame)
-        btn_minus.setFocusPolicy(Qt.NoFocus)
-        btn_minus.setDefault(False)
-        btn_minus.setAutoDefault(False)
-        btn_minus.setToolTip("Delete selected profile")
-        box_size = name_combo.sizeHint().height()
-        btn_minus.setFixedSize(box_size, box_size)
-        btn_minus.setStyleSheet("font-weight: normal; padding-bottom: 2px;")
-        name_row.addWidget(name_combo)
-        name_row.addWidget(btn_minus)
-        inner.addLayout(name_row)
-
-        dir_label = QLabel(self._display_profile_dir(current_dir), border_frame)
-        dir_label.setStyleSheet("color: #888888; font-size: 12px; font-style: italic;")
-        dir_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        path_row = QHBoxLayout()
-        path_row.setContentsMargins(0, 0, 0, 0)
-        path_row.addWidget(dir_label)
-        path_row.addStretch(1)
-        inner.addLayout(path_row)
-
-        def refresh_names() -> None:
-            current_text = name_combo.currentText().strip()
-            names = self._existing_profile_names(current_dir)
-            name_combo.blockSignals(True)
-            name_combo.clear()
-            if default_name not in names:
-                name_combo.addItem(default_name)
-            for n in names:
-                name_combo.addItem(n)
-            name_combo.blockSignals(False)
-            if current_text:
-                name_combo.setEditText(current_text)
-            else:
-                name_combo.setCurrentText(default_name)
-
-        refresh_names()
-
-        button_row = QHBoxLayout()
-        btn_select_folder = QPushButton("Select folder", border_frame)
-        btn_select_folder.setFocusPolicy(Qt.NoFocus)
-        btn_select_folder.setDefault(False)
-        btn_select_folder.setAutoDefault(False)
-        btn_select_folder.setMinimumWidth(
-            btn_select_folder.fontMetrics().horizontalAdvance("Select folder") + 24
-        )
-        btn_cancel = QPushButton("Cancel", border_frame)
-        btn_cancel.setFocusPolicy(Qt.NoFocus)
-        btn_cancel.setDefault(False)
-        btn_cancel.setAutoDefault(False)
-        btn_ok = QPushButton("Save", border_frame)
-        btn_ok.setFocusPolicy(Qt.NoFocus)
-        btn_ok.setDefault(False)
-        btn_ok.setAutoDefault(False)
-        button_font = btn_ok.font()
-        btn_select_folder.setFont(button_font)
-        btn_cancel.setFont(button_font)
-        button_row.setContentsMargins(0, 0, 0, 0)
-        button_row.setSpacing(10)
-        button_row.addWidget(btn_select_folder)
-        button_row.addStretch(1)
-        button_row.addWidget(btn_cancel)
-        button_row.addWidget(btn_ok)
-        inner.addSpacing(4)
-        inner.addLayout(button_row)
-
-        root.addWidget(border_frame)
-
-        btn_cancel.clicked.connect(dlg.reject)
-        btn_ok.clicked.connect(dlg.accept)
-
-        def on_select_folder() -> None:
-            nonlocal current_dir
-            picked = QFileDialog.getExistingDirectory(
-                dlg,
-                "Select profile folder",
-                str(current_dir),
-            )
-            if not picked:
-                return
-            current_dir = Path(picked)
-            current_dir.mkdir(parents=True, exist_ok=True)
-            dir_label.setText(self._display_profile_dir(current_dir))
-            refresh_names()
-
-        btn_select_folder.clicked.connect(on_select_folder)
-
-        def on_delete_profile() -> None:
-            """Delete an existing profile file; does not save anything."""
-            name = self._sanitize_profile_name(name_combo.currentText())
-            if not name:
-                return
-            target = current_dir / f"{name}.json"
-            if not target.is_file():
-                QMessageBox.information(
-                    dlg,
-                    "Delete Profile",
-                    "Select an existing profile from the dropdown to delete.",
-                )
-                return
-
-            msg = QMessageBox(dlg)
-            msg.setWindowTitle("Delete profile?")
-            msg.setIcon(QMessageBox.Warning)
-            msg.setText("Delete this profile?")
-            msg.setInformativeText(name)
-            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-            msg.setDefaultButton(QMessageBox.No)
-            if msg.exec() != QMessageBox.Yes:
-                return
-
-            try:
-                target.unlink()
-            except OSError:
-                QMessageBox.warning(dlg, "Delete failed", "Could not delete profile.")
-                return
-
-            # Remove from recents (best-effort) and refresh menu + dropdown.
-            self._set_profile_recent_paths(
-                [p for p in self._profile_recent_paths() if p != str(target)]
-            )
-            self._refresh_recent_profile_actions()
-            refresh_names()
-
-        btn_minus.clicked.connect(on_delete_profile)
-        dlg.setFixedHeight(dlg.sizeHint().height())
-        self._clear_dialog_focus_after_show(dlg)
-
-        while True:
-            if dlg.exec() != QDialog.Accepted:
-                return
-            profile_name = self._sanitize_profile_name(name_combo.currentText())
-            if not profile_name:
-                QMessageBox.warning(
-                    dlg,
-                    "Invalid profile name",
-                    "Profile name must contain letters, numbers, spaces, dot, dash or underscore.",
-                )
-                continue
-            target = current_dir / f"{profile_name}.json"
-            if target.exists():
-                msg = QMessageBox(dlg)
-                msg.setWindowTitle("Overwrite profile?")
-                msg.setIcon(QMessageBox.Warning)
-                msg.setText("Do you want to overwrite it?")
-                msg.setInformativeText(f"Profile '{profile_name}' already exists.")
-                msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                msg.setDefaultButton(QMessageBox.No)
-                answer = msg.exec()
-                if answer != QMessageBox.Yes:
-                    # Stay in save dialog so user can pick another name.
-                    continue
-            settings.set_value("PROFILE_SAVE_DIR", str(current_dir))
-            payload = self._profile_payload(profile_name)
-            tmp = target.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-            tmp.replace(target)
-            self._push_recent_profile_path(str(target))
-            return
-
-    def _load_profile_via_dialog(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self._main_window,
-            "Load Profile",
-            str(self._profile_saves_dir()),
-            "JSON files (*.json)",
-        )
-        if not path:
-            return
-        self._load_profile_from_path(path)
-
-    def _load_profile_from_path(self, path: str) -> None:
-        p = Path(path)
-        try:
-            payload = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            QMessageBox.warning(
-                self._main_window,
-                "Failed to load profile",
-                "Profile file could not be read.",
-            )
-            return
-        if not isinstance(payload, dict):
-            QMessageBox.warning(
-                self._main_window, "Invalid profile", "Profile format is invalid."
-            )
-            return
-        try:
-            schema_version = int(payload.get("schema_version", 0))
-        except (TypeError, ValueError):
-            schema_version = 0
-        if schema_version != _PROFILE_SCHEMA_VERSION:
-            QMessageBox.warning(
-                self._main_window,
-                "Unsupported profile version",
-                "This profile uses an unsupported schema version.",
-            )
-            return
-        raw_settings = payload.get("settings")
-        if not isinstance(raw_settings, dict):
-            QMessageBox.warning(
-                self._main_window, "Invalid profile", "Profile settings are missing."
-            )
-            return
-        before_strip = self._strip_layout_settings_tuple()
-        for key, value in raw_settings.items():
-            if isinstance(key, str) and key in _PROFILE_SETTING_KEYS:
-                settings.set_value(key, value)
-        settings.set_program_vals(align_burst_fps_to_main=False)
-        self._apply_profile_burst_settings(payload)
-        after_strip = self._strip_layout_settings_tuple()
-        view_layout_changed = before_strip[:4] != after_strip[:4]
-        theme_changed = before_strip[4] != after_strip[4]
-        poller_was_active = self._poller.isActive()
-        if poller_was_active:
-            self._poller.stop()
-        try:
-            self._apply_profile_runtime_state(
-                payload,
-                view_layout_changed=view_layout_changed,
-                theme_changed=theme_changed,
-            )
-        finally:
-            if poller_was_active:
-                self._poller.start()
-        self._push_recent_profile_path(str(p))
-
-    def _apply_profile_burst_settings(self, payload: dict) -> None:
-        """Restore saved Burst screenshot settings after settings normalization."""
-        burst_settings = payload.get("burst_settings")
-        if not isinstance(burst_settings, dict):
-            burst_settings = payload.get("settings")
-        if not isinstance(burst_settings, dict):
-            return
-        for key in _PROFILE_BURST_SETTING_KEYS:
-            if key in burst_settings:
-                settings.set_value(key, burst_settings[key])
-
     def _strip_layout_settings_tuple(self) -> Tuple[bool, str, int, int, str]:
         """Snapshot settings that drive main-window geometry and strip typography.
 
@@ -1094,7 +646,7 @@ class UIController:
     ) -> None:
         self._poller.setInterval(self._get_interval())
         self._splitter.target_fps = settings.get_int("FPS")
-        self._sync_video_crop_widgets_from_settings()
+        self._video_crop.sync_from_settings()
         self._splitter.splits.set_default_threshold()
         self._splitter.splits.set_default_delay()
         self._splitter.splits.set_default_pause()
@@ -1116,44 +668,12 @@ class UIController:
         self._update_pause_button()
         split_meta = payload.get("split_dir")
         if isinstance(split_meta, dict):
-            self._resolve_split_dir_after_load(split_meta)
+            self._profiles.resolve_split_dir_after_load(split_meta)
         self._set_split_directory_box_text()
         self._reset_settings()
         self._request_reset_splits()
         if self._splitter.capture_thread.is_alive():
             self._splitter.restart()
-
-    def _resolve_split_dir_after_load(self, split_meta: dict) -> None:
-        abs_path = split_meta.get("absolute")
-        rel_path = split_meta.get("relative_to_project")
-        root = Path(__file__).resolve().parents[2]
-        candidate_paths = []
-        if isinstance(abs_path, str) and abs_path:
-            candidate_paths.append(Path(abs_path))
-        if isinstance(rel_path, str) and rel_path:
-            candidate_paths.append(root / rel_path)
-        for candidate in candidate_paths:
-            if candidate.is_dir():
-                settings.set_value("LAST_IMAGE_DIR", str(candidate))
-                return
-
-    def _wire_video_crop_controls(self) -> None:
-        """Crop inset spinboxes (pixels trimmed per capture edge before resize)."""
-        mw = self._main_window
-        mw.video_crop_spin_left.valueChanged.connect(self._on_video_crop_spin_changed)
-        mw.video_crop_spin_right.valueChanged.connect(self._on_video_crop_spin_changed)
-        mw.video_crop_spin_up.valueChanged.connect(self._on_video_crop_spin_changed)
-        mw.video_crop_spin_down.valueChanged.connect(self._on_video_crop_spin_changed)
-        mw.video_crop_btn_reset.clicked.connect(self._video_crop_reset_insets)
-
-        mw.setTabOrder(mw.video_crop_spin_left, mw.video_crop_spin_right)
-        mw.setTabOrder(mw.video_crop_spin_right, mw.video_crop_spin_up)
-        mw.setTabOrder(mw.video_crop_spin_up, mw.video_crop_spin_down)
-        mw.setTabOrder(mw.video_crop_spin_down, mw.split_threshold_spin)
-        mw.setTabOrder(mw.split_threshold_spin, mw.split_delay_spin)
-        mw.setTabOrder(mw.split_delay_spin, mw.split_loop_spin)
-        mw.setTabOrder(mw.split_loop_spin, mw.split_pause_spin)
-        mw.setTabOrder(mw.split_pause_spin, mw.split_type_menu_button)
 
     def _wire_split_override_controls(self) -> None:
         mw = self._main_window
@@ -1336,10 +856,6 @@ class UIController:
         left: int,
     ) -> None:
         vc = preset.video_column
-        if not vc.centered_under_viewport:
-            raise ValueError(
-                f"Layout preset {preset.aspect_ratio!r} must use centered video column"
-            )
         self._place_video_column_from_preset(video_viewport, row1, row2, vc)
 
     def _sync_split_override_controls(self) -> None:
@@ -1472,147 +988,6 @@ class UIController:
         self._redraw_split_labels = True
         self._split_override_sync_key = None
         self._sync_split_override_controls()
-
-    def _video_crop_tuple_from_widgets(self) -> Tuple[int, int, int, int]:
-        mw = self._main_window
-        return (
-            int(mw.video_crop_spin_left.value()),
-            int(mw.video_crop_spin_right.value()),
-            int(mw.video_crop_spin_up.value()),
-            int(mw.video_crop_spin_down.value()),
-        )
-
-    def _persist_video_crop_tuple(self, tup: Tuple[int, int, int, int]) -> None:
-        l_, r_, t_, b_ = tup
-        settings.set_value("VIDEO_CROP_INSET_LEFT", l_)
-        settings.set_value("VIDEO_CROP_INSET_RIGHT", r_)
-        settings.set_value("VIDEO_CROP_INSET_TOP", t_)
-        settings.set_value("VIDEO_CROP_INSET_BOTTOM", b_)
-
-    def _apply_video_crop_tuple_to_widgets(
-        self, tup: Tuple[int, int, int, int]
-    ) -> None:
-        mw = self._main_window
-        l_, r_, t_, b_ = tup
-        spins = (
-            mw.video_crop_spin_left,
-            mw.video_crop_spin_right,
-            mw.video_crop_spin_up,
-            mw.video_crop_spin_down,
-        )
-        vals = (l_, r_, t_, b_)
-        for spin, val in zip(spins, vals):
-            spin.blockSignals(True)
-            spin.setValue(val)
-            spin.blockSignals(False)
-
-    def _trim_video_crop_undo_stack(self) -> None:
-        while len(self._video_crop_undo_stack) > _MAX_VIDEO_CROP_UNDO:
-            self._video_crop_undo_stack.pop(0)
-
-    def _trim_video_crop_redo_stack(self) -> None:
-        while len(self._video_crop_redo_stack) > _MAX_VIDEO_CROP_UNDO:
-            self._video_crop_redo_stack.pop(0)
-
-    def _update_video_crop_undo_redo_shortcuts(self) -> None:
-        self._video_crop_undo_shortcut.setEnabled(bool(self._video_crop_undo_stack))
-        self._video_crop_redo_shortcut.setEnabled(bool(self._video_crop_redo_stack))
-
-    def _update_video_crop_reset_enabled(self) -> None:
-        self._main_window.video_crop_btn_reset.setEnabled(
-            self._video_crop_tuple_from_widgets() != (0, 0, 0, 0)
-        )
-
-    def _on_video_crop_spin_changed(self, _value: int) -> None:
-        """Persist crop edits from the main-window strip."""
-        if self._video_crop_undo_guard:
-            return
-        curr = self._video_crop_tuple_from_widgets()
-        if curr == self._video_crop_snapshot:
-            return
-        self._video_crop_redo_stack.clear()
-        self._video_crop_undo_stack.append(self._video_crop_snapshot)
-        self._trim_video_crop_undo_stack()
-        self._video_crop_snapshot = curr
-        self._persist_video_crop_tuple(curr)
-        self._update_video_crop_undo_redo_shortcuts()
-        self._update_video_crop_reset_enabled()
-
-    def _video_crop_undo(self) -> None:
-        """Restore previous crop values (Undo / Cmd+Z / Ctrl+Z)."""
-        if not self._video_crop_undo_stack:
-            return
-        curr = self._video_crop_snapshot
-        self._video_crop_redo_stack.append(curr)
-        self._trim_video_crop_redo_stack()
-        prev = self._video_crop_undo_stack.pop()
-        self._video_crop_undo_guard = True
-        try:
-            self._apply_video_crop_tuple_to_widgets(prev)
-            self._video_crop_snapshot = prev
-            self._persist_video_crop_tuple(prev)
-        finally:
-            self._video_crop_undo_guard = False
-        self._update_video_crop_undo_redo_shortcuts()
-        self._update_video_crop_reset_enabled()
-
-    def _video_crop_redo(self) -> None:
-        """Re-apply crop after Undo (Redo / Cmd+Shift+Z / standard platform redo)."""
-        if not self._video_crop_redo_stack:
-            return
-        curr = self._video_crop_snapshot
-        self._video_crop_undo_stack.append(curr)
-        self._trim_video_crop_undo_stack()
-        nxt = self._video_crop_redo_stack.pop()
-        self._video_crop_undo_guard = True
-        try:
-            self._apply_video_crop_tuple_to_widgets(nxt)
-            self._video_crop_snapshot = nxt
-            self._persist_video_crop_tuple(nxt)
-        finally:
-            self._video_crop_undo_guard = False
-        self._update_video_crop_undo_redo_shortcuts()
-        self._update_video_crop_reset_enabled()
-
-    def _video_crop_reset_insets(self) -> None:
-        """All-zero insets means full frame (no crop)."""
-        self._video_crop_redo_stack.clear()
-        if self._video_crop_snapshot != (0, 0, 0, 0):
-            self._video_crop_undo_stack.append(self._video_crop_snapshot)
-            self._trim_video_crop_undo_stack()
-
-        self._video_crop_undo_guard = True
-        try:
-            self._apply_video_crop_tuple_to_widgets((0, 0, 0, 0))
-            self._video_crop_snapshot = (0, 0, 0, 0)
-            self._persist_video_crop_tuple(self._video_crop_snapshot)
-        finally:
-            self._video_crop_undo_guard = False
-        self._update_video_crop_undo_redo_shortcuts()
-        self._update_video_crop_reset_enabled()
-
-    def _sync_video_crop_widgets_from_settings(self) -> None:
-        """Load crop spinboxes from persisted settings without emitting signals."""
-        mw = self._main_window
-        mapping = (
-            (mw.video_crop_spin_left, "VIDEO_CROP_INSET_LEFT"),
-            (mw.video_crop_spin_right, "VIDEO_CROP_INSET_RIGHT"),
-            (mw.video_crop_spin_up, "VIDEO_CROP_INSET_TOP"),
-            (mw.video_crop_spin_down, "VIDEO_CROP_INSET_BOTTOM"),
-        )
-        self._video_crop_undo_guard = True
-        try:
-            for spin, key in mapping:
-                spin.blockSignals(True)
-                spin.setValue(settings.get_int_nonneg(key))
-                spin.blockSignals(False)
-            self._video_crop_snapshot = self._video_crop_tuple_from_widgets()
-            self._video_crop_undo_stack.clear()
-            self._video_crop_redo_stack.clear()
-        finally:
-            self._video_crop_undo_guard = False
-        self._update_video_crop_undo_redo_shortcuts()
-        self._update_video_crop_reset_enabled()
 
     def _attempt_undo_hotkey(self) -> None:
         """Undo button: sync LiveSplit One when connected, else hotkey or Pilgrim."""
@@ -2218,15 +1593,9 @@ class UIController:
         if settings.get_bool("SHOW_MIN_VIEW"):
             self._set_minimal_view()
         else:
-            aspect_ratio = settings.get_str("ASPECT_RATIO")
-            if aspect_ratio == "4:3 (480x360)":
-                self._set_480x360_view()
-            elif aspect_ratio == "4:3 (320x240)":
-                self._set_320x240_view()
-            elif aspect_ratio == "16:9 (512x288)":
-                self._set_512x288_view()
-            elif aspect_ratio == "16:9 (432x243)":
-                self._set_432x243_view()
+            preset = LAYOUT_PRESETS.get(settings.get_str("ASPECT_RATIO"))
+            if preset is not None:
+                self._apply_layout_from_preset(preset)
 
         # Split labels will be refreshed after this call finishes
         self._redraw_split_labels = True
@@ -2305,307 +1674,9 @@ class UIController:
             345, 179 + self._main_window.HEIGHT_CORRECTION
         )
 
-    def _set_480x360_view(self) -> None:
-        """Resize and show widgets so the 480x360 display is shown."""
-        preset = LAYOUT_PRESET_480
-        left = self._main_window.LEFT_EDGE_CORRECTION
-        top = self._main_window.TOP_EDGE_CORRECTION
-        layout_dy = preset.strip_panel_layout_dy
-        self._main_window.split_directory_box.setGeometry(
-            QRect(247 + left, 225 + top, 785, 30)
-        )
-        self._main_window.video_title.setGeometry(QRect(260 + left, 272 + top, 80, 31))
-        self._main_window.split_name_label.setGeometry(
-            QRect(584 + left, 255 + top, 415, 31)
-        )
-        self._main_window.split_loop_label.setGeometry(
-            QRect(584 + left, 280 + top, 415, 31)
-        )
-        self._main_window.split_dir_button.setGeometry(
-            QRect(60 + left, 225 + top, 180, 30)
-        )
-        self._main_window.min_view_button.setGeometry(
-            QRect(60 + left, 270 + top, 100, 31)
-        )
-        vw = preset.video_viewport.to_rect(left, top)
-        vy1 = preset.bottom_row1(layout_dy, top)
-        vy2 = preset.bottom_row2(layout_dy, top)
-        self._apply_video_column_layout(preset, vw, vy1, vy2, left)
-        sv = preset.split_viewport.to_rect(left, top)
-        self._main_window.previous_button.setGeometry(
-            QRect(566 + left, 270 + top, 31, 31)
-        )
-        self._main_window.next_button.setGeometry(QRect(1000 + left, 270 + top, 31, 31))
-        self._place_split_column_from_preset(sv, vy1, vy2, preset.split_column)
-        video_viewport = vw
-        self._set_video_viewport_geometry(video_viewport)
-        self._main_window.next_source_button.setGeometry(
-            QRect(422 + left, 272 + top, 118, 31)
-        )
-        self._main_window.video_record_overlay.setGeometry(
-            QRect(497 + left, 329 + top, 24, 24)
-        )
-        self._main_window.video_info_overlay.setGeometry(
-            QRect(75 + left, 610 + layout_dy + top, 455, 30)
-        )
-        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.video_crop_panel.setGeometry(
-            QRect(
-                video_viewport.x() - 1,
-                _vb,
-                video_viewport.width() + 2,
-                layout_dy,
-            )
-        )
-
-        split_image_geometry = sv
-        self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.split_override_panel.setGeometry(
-            QRect(
-                split_image_geometry.x(),
-                _sb,
-                split_image_geometry.width(),
-                layout_dy,
-            )
-        )
-
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=preset.truncate_controls)
-        self._main_window.setFixedSize(
-            preset.window_width,
-            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
-            + layout_dy
-            + self._main_window.HEIGHT_CORRECTION,
-        )
-
-    def _set_320x240_view(self) -> None:
-        """Resize and show widgets so the 320x240 display is shown."""
-        preset = LAYOUT_PRESET_320
-        left = self._main_window.LEFT_EDGE_CORRECTION
-        top = self._main_window.TOP_EDGE_CORRECTION
-        layout_dy = preset.strip_panel_layout_dy
-        row1 = preset.bottom_row1(layout_dy, top)
-        row2 = preset.bottom_row2(layout_dy, top)
-        self._main_window.split_directory_box.setGeometry(
-            QRect(247 + left, 225 + top, 464, 30)
-        )
-        self._main_window.split_name_label.setGeometry(
-            QRect(424 + left, 255 + top, 254, 31)
-        )
-        self._main_window.split_loop_label.setGeometry(
-            QRect(424 + left, 280 + top, 254, 31)
-        )
-        self._main_window.split_dir_button.setGeometry(
-            QRect(60 + left, 225 + top, 180, 30)
-        )
-        self._main_window.min_view_button.setGeometry(
-            QRect(60 + left, 270 + top, 100, 31)
-        )
-        self._main_window.video_title.setGeometry(QRect(180 + left, 272 + top, 80, 31))
-        self._main_window.next_source_button.setGeometry(
-            QRect(280 + left, 272 + top, 100, 31)
-        )
-        video_viewport = preset.video_viewport.to_rect(left, top)
-        self._apply_video_column_layout(preset, video_viewport, row1, row2, left)
-        split_image_geometry = preset.split_viewport.to_rect(left, top)
-        self._main_window.previous_button.setGeometry(
-            QRect(390 + left, 270 + top, 31, 31)
-        )
-        self._main_window.next_button.setGeometry(QRect(680 + left, 270 + top, 31, 31))
-        self._place_split_column_from_preset(
-            split_image_geometry, row1, row2, preset.split_column
-        )
-        self._set_video_viewport_geometry(video_viewport)
-        self._main_window.video_record_overlay.setGeometry(
-            QRect(351 + left, 323 + top, 16, 16)
-        )
-        self._main_window.video_info_overlay.setGeometry(
-            QRect(72 + left, 520 + layout_dy + top, 310, 30)
-        )
-        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.video_crop_panel.setGeometry(
-            QRect(
-                video_viewport.x() - 1,
-                _vb,
-                video_viewport.width() + 2,
-                layout_dy,
-            )
-        )
-        self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.split_override_panel.setGeometry(
-            QRect(
-                split_image_geometry.x(),
-                _sb,
-                split_image_geometry.width(),
-                layout_dy,
-            )
-        )
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=preset.truncate_controls)
-        self._main_window.setFixedSize(
-            preset.window_width,
-            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
-            + layout_dy
-            + self._main_window.HEIGHT_CORRECTION,
-        )
-
-    def _set_512x288_view(self) -> None:
-        """Resize and show widgets so the 512x288 display is shown."""
-        preset = LAYOUT_PRESET_512
-        left = self._main_window.LEFT_EDGE_CORRECTION
-        top = self._main_window.TOP_EDGE_CORRECTION
-        layout_dy = preset.strip_panel_layout_dy
-        self._main_window.split_directory_box.setGeometry(
-            QRect(247 + left, 225 + top, 848, 30)
-        )
-        self._main_window.video_title.setGeometry(QRect(276 + left, 272 + top, 80, 31))
-        self._main_window.split_name_label.setGeometry(
-            QRect(613 + left, 255 + top, 450, 31)
-        )
-        self._main_window.split_loop_label.setGeometry(
-            QRect(613 + left, 280 + top, 450, 31)
-        )
-        self._main_window.split_dir_button.setGeometry(
-            QRect(60 + left, 225 + top, 180, 30)
-        )
-        self._main_window.min_view_button.setGeometry(
-            QRect(60 + left, 270 + top, 100, 31)
-        )
-        vw = preset.video_viewport.to_rect(left, top)
-        vy1 = preset.bottom_row1(layout_dy, top)
-        vy2 = preset.bottom_row2(layout_dy, top)
-        self._apply_video_column_layout(preset, vw, vy1, vy2, left)
-        sv = preset.split_viewport.to_rect(left, top)
-        self._main_window.previous_button.setGeometry(
-            QRect(596 + left, 270 + top, 31, 31)
-        )
-        self._main_window.next_button.setGeometry(QRect(1064 + left, 270 + top, 31, 31))
-        self._place_split_column_from_preset(sv, vy1, vy2, preset.split_column)
-        video_viewport = vw
-        self._set_video_viewport_geometry(video_viewport)
-        self._main_window.next_source_button.setGeometry(
-            QRect(454 + left, 272 + top, 118, 31)
-        )
-        self._main_window.video_record_overlay.setGeometry(
-            QRect(542 + left, 321 + top, 19, 19)
-        )
-        self._main_window.video_info_overlay.setGeometry(
-            QRect(75 + left, 538 + layout_dy + top, 493, 30)
-        )
-        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.video_crop_panel.setGeometry(
-            QRect(
-                video_viewport.x() - 1,
-                _vb,
-                video_viewport.width() + 2,
-                VIDEO_CROP_STRIP_LAYOUT_DY,
-            )
-        )
-
-        split_image_geometry = sv
-        self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.split_override_panel.setGeometry(
-            QRect(
-                split_image_geometry.x(),
-                _sb,
-                split_image_geometry.width(),
-                VIDEO_CROP_STRIP_LAYOUT_DY,
-            )
-        )
-
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=preset.truncate_controls)
-        self._main_window.setFixedSize(
-            preset.window_width,
-            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
-            + layout_dy
-            + self._main_window.HEIGHT_CORRECTION,
-        )
-
-    def _set_432x243_view(self) -> None:
-        """Resize and show widgets so the 432x243 display is shown."""
-        preset = LAYOUT_PRESET_432
-        left = self._main_window.LEFT_EDGE_CORRECTION
-        top = self._main_window.TOP_EDGE_CORRECTION
-        layout_dy = preset.strip_panel_layout_dy
-        row1 = preset.bottom_row1(layout_dy, top)
-        row2 = preset.bottom_row2(layout_dy, top)
-        self._main_window.split_directory_box.setGeometry(
-            QRect(247 + left, 225 + top, 688, 30)
-        )
-        self._main_window.split_name_label.setGeometry(
-            QRect(534 + left, 255 + top, 371, 31)
-        )
-        self._main_window.split_loop_label.setGeometry(
-            QRect(534 + left, 280 + top, 371, 31)
-        )
-        video_viewport = preset.video_viewport.to_rect(left, top)
-        vt_w = 231
-        self._main_window.video_title.setGeometry(
-            QRect(video_viewport.x() + (video_viewport.width() - vt_w) // 2, 272 + top, vt_w, 31)
-        )
-        self._main_window.split_dir_button.setGeometry(
-            QRect(60 + left, 225 + top, 180, 30)
-        )
-        self._main_window.min_view_button.setGeometry(
-            QRect(60 + left, 270 + top, 100, 31)
-        )
-        self._main_window.next_source_button.setGeometry(
-            QRect(video_viewport.x() + video_viewport.width() - 124, 272 + top, 118, 31)
-        )
-        self._apply_video_column_layout(preset, video_viewport, row1, row2, left)
-        split_image_geometry = preset.split_viewport.to_rect(left, top)
-        self._main_window.previous_button.setGeometry(
-            QRect(split_image_geometry.x() + 12, 270 + top, 31, 31)
-        )
-        self._main_window.next_button.setGeometry(
-            QRect(split_image_geometry.x() + split_image_geometry.width() - 43, 270 + top, 31, 31)
-        )
-        self._place_split_column_from_preset(
-            split_image_geometry, row1, row2, preset.split_column
-        )
-        self._set_video_viewport_geometry(video_viewport)
-        self._main_window.video_record_overlay.setGeometry(
-            QRect(467 + left, 319 + top, 16, 16)
-        )
-        self._main_window.video_info_overlay.setGeometry(
-            QRect(
-                video_viewport.x() + 10,
-                524 + layout_dy + top,
-                max(180, video_viewport.width() - 20),
-                30,
-            )
-        )
-        _vb = video_viewport.y() + video_viewport.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.video_crop_panel.setGeometry(
-            QRect(
-                video_viewport.x() - 1,
-                _vb,
-                video_viewport.width() + 2,
-                layout_dy,
-            )
-        )
-        self._set_split_viewport_geometry(split_image_geometry)
-        _sb = split_image_geometry.y() + split_image_geometry.height() + STRIP_GAP_BELOW_VIEWPORT_PX
-        self._main_window.split_override_panel.setGeometry(
-            QRect(
-                split_image_geometry.x(),
-                _sb,
-                split_image_geometry.width(),
-                layout_dy,
-            )
-        )
-        self._set_nonessential_widgets_visible(True)
-        self._set_button_and_label_text(truncate=preset.truncate_controls)
-        self._main_window.setFixedSize(
-            preset.window_width,
-            (preset.window_height_base - BOTTOM_BLOCK_LIFT_PX)
-            + layout_dy
-            + self._main_window.HEIGHT_CORRECTION,
-        )
+    def _apply_layout_from_preset(self, preset: AspectLayoutPreset) -> None:
+        """Apply chrome, viewports, and bottom rows from ``preset``."""
+        apply_aspect_layout(self, preset)
 
     def _layout_uses_truncated_control_text(self) -> bool:
         """Return True when the current layout uses short control labels.
