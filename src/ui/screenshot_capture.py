@@ -41,7 +41,7 @@ from threading import Thread
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import cv2
-from PyQt5.QtCore import QEvent, QObject, QLocale, Qt, QTimer
+from PyQt5.QtCore import QEvent, QObject, QLocale, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
@@ -79,6 +79,8 @@ if TYPE_CHECKING:
 class _ScreenshotCountdownRing(QWidget):
     """Circular stroke ring; active arc shrinks clockwise as auto-close time runs out."""
 
+    finished = pyqtSignal()
+
     _DIAMETER = 22
     _STROKE = 2.25
     _START_ANGLE = 90 * 16  # 12 o'clock (top)
@@ -96,10 +98,17 @@ class _ScreenshotCountdownRing(QWidget):
         self._start = time.monotonic()
         self._remaining_color = remaining_color
         self._elapsed_color = elapsed_color
+        self._finished_emitted = False
         self.setFixedSize(self._DIAMETER, self._DIAMETER)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
+
+    def start(self) -> None:
+        """Begin the countdown when the popup is actually visible."""
+        self._start = time.monotonic()
+        self._finished_emitted = False
         self._timer.start(40)
+        self.update()
 
     def _remaining_fraction(self) -> float:
         elapsed_ms = (time.monotonic() - self._start) * 1000
@@ -108,10 +117,18 @@ class _ScreenshotCountdownRing(QWidget):
     def _tick(self) -> None:
         if self._remaining_fraction() <= 0:
             self._timer.stop()
+            if not self._finished_emitted:
+                self._finished_emitted = True
+                self.finished.emit()
         self.update()
 
-    def stop(self) -> None:
+    def stop(self, *, complete: bool = False) -> None:
+        """Stop ticking. If ``complete``, snap the ring empty for close/fade."""
         self._timer.stop()
+        if complete:
+            self._start = time.monotonic() - self._duration_ms
+            self._finished_emitted = True
+        self.update()
 
     def paintEvent(self, event) -> None:
         del event
@@ -538,23 +555,27 @@ class ScreenshotCapture:
         self._ctrl._clear_dialog_focus_after_show(dlg)
 
         def _close_dialog() -> None:
-            countdown_ring.stop()
-            dlg.done(0)
+            try:
+                countdown_ring.finished.disconnect(_close_dialog)
+            except TypeError:
+                pass
+            # Empty the ring before close so it is not still ticking during fade.
+            countdown_ring.stop(complete=True)
+            QApplication.processEvents()
+            try:
+                if dlg.isVisible():
+                    dlg.done(0)
+            except RuntimeError:
+                pass
 
         def _open_folder() -> None:
             self._ctrl._open_file_or_dir(open_folder_path)
 
         open_folder_btn.clicked.connect(_open_folder)
         ok_btn.clicked.connect(_close_dialog)
-
-        def _auto_close() -> None:
-            try:
-                if dlg.isVisible():
-                    _close_dialog()
-            except RuntimeError:
-                pass
-
-        QTimer.singleShot(auto_close_ms, _auto_close)
+        # Close only when the ring finishes — not a separate timer that can drift.
+        countdown_ring.finished.connect(_close_dialog)
+        countdown_ring.start()
 
     def show_burst_complete_dialog(
         self, folder: str, saved_count: int, failed_count: int = 0
