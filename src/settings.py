@@ -182,19 +182,25 @@ def set_program_vals(
 
     # Unset hotkeys if upgrading from <=v1.0.6 because of hotkey implementation
     # updates. Set a default reset wait for the same reason.
-    last_version = get_str("LAST_VERSION", settings)
-    if last_version == "None":
-        last_version = "v1.0.0"
-    if not version_ge(last_version, "v1.0.7"):
-        unset_hotkey_bindings()
-        set_value("DEFAULT_RESET_WAIT", 0.0, settings)
+    #
+    # Important: get_str() turns a missing QSettings value into the literal
+    # string "None". Treating that as v1.0.0 wiped hotkeys whenever prefs failed
+    # to read (macOS AccessError / cfprefsd glitches). Only clear binds when we
+    # have a real stored version that is older than v1.0.7.
+    if settings.contains("LAST_VERSION"):
+        last_version = get_str("LAST_VERSION", settings)
+        if last_version not in ("", "None") and not version_ge(
+            last_version, "v1.0.7"
+        ):
+            unset_hotkey_bindings(settings)
+            set_value("DEFAULT_RESET_WAIT", 0.0, settings)
 
     if not get_bool("SETTINGS_SET", settings):
         # Indicate that default settings have been populated
         set_value("SETTINGS_SET", True, settings)
 
         # Set hotkeys to default values
-        unset_hotkey_bindings()
+        unset_hotkey_bindings(settings)
 
         # Turn off recording splits as clips by default
         set_value("RECORD_CLIPS", False, settings)
@@ -382,7 +388,7 @@ def _ensure_video_crop_defaults(settings: QSettings = settings) -> None:
             set_value(key, value, settings=settings)
 
 
-def unset_hotkey_bindings() -> None:
+def unset_hotkey_bindings(settings: QSettings = settings) -> None:
     """Unset all hotkey bindings."""
     # Text values
     set_value("SPLIT_HOTKEY_NAME", "", settings)

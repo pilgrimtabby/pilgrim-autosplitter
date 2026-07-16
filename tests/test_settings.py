@@ -225,6 +225,30 @@ class TestSettingsFunctionsWithDummySettings:
             and settings.get_int("FRAME_HEIGHT", settings=self.dummy_settings) == 243
         )
 
+    def test_missing_last_version_does_not_wipe_hotkeys(self):
+        """Regression: missing LAST_VERSION must not wipe existing binds.
+
+        get_str turns unset QSettings values into ``"None"``. The old upgrade
+        path treated that as v1.0.0 and called unset_hotkey_bindings().
+        """
+        settings.set_program_vals(settings=self.dummy_settings)
+        settings.set_value("SPLIT_HOTKEY_NAME", "Num 0", settings=self.dummy_settings)
+        settings.set_value("SPLIT_HOTKEY_CODE", "82", settings=self.dummy_settings)
+        self.dummy_settings.remove("LAST_VERSION")
+        assert not self.dummy_settings.contains("LAST_VERSION")
+        settings.set_program_vals(settings=self.dummy_settings)
+        assert settings.get_str("SPLIT_HOTKEY_NAME", settings=self.dummy_settings) == "Num 0"
+        assert settings.get_str("SPLIT_HOTKEY_CODE", settings=self.dummy_settings) == "82"
+
+    def test_old_last_version_still_wipes_hotkeys(self):
+        settings.set_program_vals(settings=self.dummy_settings)
+        settings.set_value("SPLIT_HOTKEY_NAME", "Num 0", settings=self.dummy_settings)
+        settings.set_value("SPLIT_HOTKEY_CODE", "82", settings=self.dummy_settings)
+        settings.set_value("LAST_VERSION", "v1.0.6", settings=self.dummy_settings)
+        settings.set_program_vals(settings=self.dummy_settings)
+        assert settings.get_str("SPLIT_HOTKEY_NAME", settings=self.dummy_settings) == ""
+        assert settings.get_str("SPLIT_HOTKEY_CODE", settings=self.dummy_settings) == ""
+
 
 def test_get_latest_version():
     latest_version = settings.get_latest_version()
