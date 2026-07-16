@@ -57,7 +57,6 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -494,9 +493,6 @@ class ScreenshotCapture:
         text_col.addStretch(1)
 
         btn_row = QHBoxLayout()
-        if preview_lbl is None:
-            # No preview: keep Open folder on the left of the action row.
-            btn_row.addWidget(open_folder_btn, 0, Qt.AlignVCenter)
         btn_row.addStretch(1)
         if settings.get_str("THEME") == "light":
             ring_remaining = QColor("#202020")
@@ -515,7 +511,10 @@ class ScreenshotCapture:
         ok_btn.setDefault(False)
         ok_btn.setAutoDefault(False)
 
+        # Bottom actions: countdown, then Open folder, then OK.
         btn_row.addWidget(countdown_ring, 0, Qt.AlignVCenter)
+        btn_row.addSpacing(8)
+        btn_row.addWidget(open_folder_btn, 0, Qt.AlignVCenter)
         btn_row.addSpacing(8)
         btn_row.addWidget(ok_btn)
         text_col.addLayout(btn_row)
@@ -526,16 +525,7 @@ class ScreenshotCapture:
         content.addWidget(text_host, 1)
 
         if preview_lbl is not None:
-            # Left cluster: preview, then Open folder immediately to its right.
-            left_row = QHBoxLayout()
-            left_row.setContentsMargins(0, 0, 0, 0)
-            left_row.setSpacing(content_spacing)
-            left_row.addWidget(preview_lbl, 0, Qt.AlignVCenter)
-            left_row.addWidget(open_folder_btn, 0, Qt.AlignVCenter)
-            left_host = QWidget(border_frame)
-            left_host.setLayout(left_row)
-            left_host.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-            content.insertWidget(0, left_host, 0)
+            content.insertWidget(0, preview_lbl, 0, Qt.AlignVCenter)
 
         inner.addLayout(content)
 

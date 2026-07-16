@@ -78,6 +78,12 @@ style_sheet_dark = Template(
     QComboBox:hover {
         background-color: #5e5e5e;
     }
+    QComboBox QLineEdit,
+    QComboBox QLineEdit:hover,
+    QComboBox QLineEdit:focus {
+        border: none;
+        border-radius: 0px;
+    }
     QComboBox QAbstractItemView {
         border: 3px solid $text_and_borders;
         background: $default_background;
@@ -298,6 +304,12 @@ style_sheet_light = Template(
     QComboBox {
         background-color: #aaaaaa;
         selection-background-color: $default_background;
+    }
+    QComboBox QLineEdit,
+    QComboBox QLineEdit:hover,
+    QComboBox QLineEdit:focus {
+        border: none;
+        border-radius: 0px;
     }
     QComboBox QAbstractItemView {
         border: 3px solid $text_and_borders;

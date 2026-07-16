@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QComboBox,
     QDialog,
@@ -244,6 +245,13 @@ class ProfileStore:
         name_combo.setEditable(True)
         name_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         name_combo.setFixedHeight(name_combo.sizeHint().height())
+        # Editable combo embeds a QLineEdit; dialog QLineEdit rules (radius) still
+        # win unless set on the editor itself — that is what makes the divider notches.
+        line_edit = name_combo.lineEdit()
+        if line_edit is not None:
+            line_edit.setStyleSheet(
+                "border: none; border-radius: 0px; background: transparent;"
+            )
         # Quote the url() path so Windows paths with spaces (e.g. "Program Files",
         # "Test Cursor") still load in Qt stylesheets.
         arrow_path = str(
@@ -251,11 +259,10 @@ class ProfileStore:
         ).replace("\\", "/")
         name_combo.setStyleSheet(
             "QComboBox { padding: 2px 0px 2px 2px; }"
-            "QComboBox QLineEdit { border: 0px; padding: 0px; margin: 0px; }"
+            "QComboBox QLineEdit { border: 0px; border-radius: 0px; padding: 0px; margin: 0px; }"
             "QComboBox::down-arrow {"
             f' image: url("{arrow_path}");'
             " width: 14px; height: 14px;"
-            " position: relative; left: 1px;"
             "}"
             "QComboBox::drop-down {"
             " border: 0px;"
@@ -264,14 +271,17 @@ class ProfileStore:
             " width: 22px;"
             "}"
         )
-        btn_minus = QPushButton("-", border_frame)
+        btn_minus = QPushButton("\u2212", border_frame)
         btn_minus.setFocusPolicy(Qt.NoFocus)
         btn_minus.setDefault(False)
         btn_minus.setAutoDefault(False)
         btn_minus.setToolTip("Delete selected profile")
         box_size = name_combo.sizeHint().height()
         btn_minus.setFixedSize(box_size, box_size)
-        btn_minus.setStyleSheet("font-weight: normal; padding-bottom: 2px;")
+        minus_font = QFont(btn_minus.font())
+        minus_font.setBold(True)
+        btn_minus.setFont(minus_font)
+        btn_minus.setStyleSheet("padding: 0px;")
         name_row.addWidget(name_combo)
         name_row.addWidget(btn_minus)
         inner.addLayout(name_row)

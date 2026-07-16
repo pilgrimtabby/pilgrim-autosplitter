@@ -130,6 +130,7 @@ class Splitter:
         self.match_percent = None
         self.highest_percent = None
         self._highest_percent_frame = None
+        self._highest_percent_value = 0.0
         self._highest_peak_lock = threading.Lock()
         self.split_delay_remaining = None
         self.reset_delay_remaining = None
@@ -313,12 +314,17 @@ class Splitter:
                 if self._highest_percent_frame is not None
                 else None
             )
-            peak = float(self.highest_percent or 0.0)
+            # Use the value stored with the frame. ``highest_percent`` is cleared
+            # to None when a match ends the compare loop, which used to make
+            # Snap Peak report High: 0% even though the peak frame was kept.
+            peak = float(self._highest_percent_value)
 
         if frame is None and self.comparison_frame is not None:
             frame = self.comparison_frame.copy()
             if self.match_percent is not None:
                 peak = float(self.match_percent)
+            elif self.suspend_display_highest is not None:
+                peak = float(self.suspend_display_highest)
 
         index = self.splits.current_image_index
         if index is None or index >= len(self.splits.list):
@@ -775,6 +781,7 @@ class Splitter:
         self.highest_percent = 0
         with self._highest_peak_lock:
             self._highest_percent_frame = None
+            self._highest_percent_value = 0.0
         self._compare_split_queue = Queue(10)  # Get rid of old images
 
         while not self._compare_split_thread_finished:
@@ -843,6 +850,7 @@ class Splitter:
             self.highest_percent = self.match_percent
             with self._highest_peak_lock:
                 self._highest_percent_frame = frame.copy()
+                self._highest_percent_value = float(self.match_percent)
 
         # Image match is above threshold
         if (
