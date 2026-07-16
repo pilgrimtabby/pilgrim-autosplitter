@@ -250,13 +250,13 @@ def set_program_vals(
 
         # Whether the program should try to open video on startup, or wait for
         # the user to press "reconnect video"
-        set_value("START_WITH_VIDEO", False, settings)
+        set_value("START_WITH_VIDEO", True, settings)
 
         # Whether the minimal view should be showing
         set_value("SHOW_MIN_VIEW", False, settings)
 
-        # Whether global hotkeys are enabled (default) or only local hotkeys
-        set_value("GLOBAL_HOTKEYS_ENABLED", True, settings)
+        # Whether global hotkeys are enabled or only local hotkeys
+        set_value("GLOBAL_HOTKEYS_ENABLED", False, settings)
 
         # Whether program checks for updates on launch
         set_value("CHECK_FOR_UPDATES", True, settings)
