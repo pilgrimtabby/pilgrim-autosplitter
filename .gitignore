@@ -11,3 +11,4 @@ pilgrim_autosplitter.spec
 **/.pytest_cache
 saves/
 .vendor/
+.tools-gh
