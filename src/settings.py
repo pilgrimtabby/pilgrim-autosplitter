@@ -212,7 +212,7 @@ def set_program_vals(
         set_value("DEFAULT_DELAY", 0.0, settings)
 
         # The default pause (seconds) after a split
-        set_value("DEFAULT_PAUSE", 1.0, settings)
+        set_value("DEFAULT_PAUSE", 10.0, settings)
 
         # The default wait time before looking for reset image
         set_value("DEFAULT_RESET_WAIT", 0.0, settings)
