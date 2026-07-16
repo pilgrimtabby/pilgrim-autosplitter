@@ -246,20 +246,29 @@ class ProfileStore:
         name_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         name_combo.setFixedHeight(name_combo.sizeHint().height())
         # Editable combo embeds a QLineEdit; dialog QLineEdit rules (radius) still
-        # win unless set on the editor itself — that is what makes the divider notches.
+        # win unless set on the editor itself — that is what makes rounded notches.
         line_edit = name_combo.lineEdit()
         if line_edit is not None:
             line_edit.setStyleSheet(
                 "border: none; border-radius: 0px; background: transparent;"
             )
-        # Quote the url() path so Windows paths with spaces (e.g. "Program Files",
-        # "Test Cursor") still load in Qt stylesheets.
-        arrow_path = str(
-            (paths.resources_dir() / "icons" / "chevron_down_white.svg").resolve()
-        ).replace("\\", "/")
+        theme = settings.get_str("THEME")
+        chevron_name = (
+            "chevron_down_dark.svg"
+            if theme == "light"
+            else "chevron_down_white.svg"
+        )
+        icons_dir = paths.resources_dir() / "icons"
+        # Quote the url() path so Windows paths with spaces still load in CSS.
+        arrow_path = str((icons_dir / chevron_name).resolve()).replace("\\", "/")
         name_combo.setStyleSheet(
-            "QComboBox { padding: 2px 0px 2px 2px; }"
-            "QComboBox QLineEdit { border: 0px; border-radius: 0px; padding: 0px; margin: 0px; }"
+            "QComboBox {"
+            " border-radius: 0px;"
+            " padding: 2px 0px 2px 2px;"
+            "}"
+            "QComboBox QLineEdit {"
+            " border: 0px; border-radius: 0px; padding: 0px; margin: 0px;"
+            "}"
             "QComboBox::down-arrow {"
             f' image: url("{arrow_path}");'
             " width: 14px; height: 14px;"
@@ -271,19 +280,30 @@ class ProfileStore:
             " width: 22px;"
             "}"
         )
-        btn_minus = QPushButton("\u2212", border_frame)
-        btn_minus.setFocusPolicy(Qt.NoFocus)
-        btn_minus.setDefault(False)
-        btn_minus.setAutoDefault(False)
-        btn_minus.setToolTip("Delete selected profile")
-        box_size = name_combo.sizeHint().height()
-        btn_minus.setFixedSize(box_size, box_size)
-        minus_font = QFont(btn_minus.font())
+        combo_h = max(1, name_combo.sizeHint().height())
+        name_combo.setFixedHeight(combo_h)
+        btn_delete = QPushButton("\u2212", border_frame)
+        btn_delete.setFocusPolicy(Qt.NoFocus)
+        btn_delete.setDefault(False)
+        btn_delete.setAutoDefault(False)
+        btn_delete.setToolTip("Delete selected profile")
+        btn_delete.setFixedSize(combo_h, combo_h)
+        minus_font = QFont(btn_delete.font())
         minus_font.setBold(True)
-        btn_minus.setFont(minus_font)
-        btn_minus.setStyleSheet("padding: 0px;")
+        minus_font.setWeight(QFont.Bold)
+        minus_font.setPointSize(max(minus_font.pointSize() + 2, 16))
+        btn_delete.setFont(minus_font)
+        btn_delete.setStyleSheet(
+            "QPushButton {"
+            " padding: 0px; margin: 0px;"
+            f" min-height: {combo_h}px; max-height: {combo_h}px;"
+            f" min-width: {combo_h}px; max-width: {combo_h}px;"
+            " font-weight: 700;"
+            "}"
+        )
+        name_row.setAlignment(Qt.AlignVCenter)
         name_row.addWidget(name_combo)
-        name_row.addWidget(btn_minus)
+        name_row.addWidget(btn_delete)
         inner.addLayout(name_row)
 
         dir_label = QLabel(self.display_profile_dir(current_dir), border_frame)
@@ -398,7 +418,7 @@ class ProfileStore:
             self.refresh_recent_profile_actions()
             refresh_names()
 
-        btn_minus.clicked.connect(on_delete_profile)
+        btn_delete.clicked.connect(on_delete_profile)
         dlg.setFixedHeight(dlg.sizeHint().height())
         self._ctrl._clear_dialog_focus_after_show(dlg)
 
