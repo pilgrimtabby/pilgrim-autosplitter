@@ -14,12 +14,25 @@ def _exe_icon():
     return [str(p)] if p.is_file() else None
 
 
+# pynput loads platform backends dynamically; list them so frozen Windows
+# builds still start the keyboard listener. Darwin backends are harmless extras
+# when building on Windows, and help if this onedir spec is used on macOS.
+_PYNPUT_HIDDENIMPORTS = [
+    'pynput.keyboard._win32',
+    'pynput.mouse._win32',
+    'pynput._util.win32',
+    'pynput.keyboard._darwin',
+    'pynput.mouse._darwin',
+    'pynput._util.darwin',
+]
+
+
 a = Analysis(
     ['src/pilgrim_autosplitter.py'],
     pathex=['src'],
     binaries=[],
     datas=[('resources', 'resources')],
-    hiddenimports=[],
+    hiddenimports=_PYNPUT_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

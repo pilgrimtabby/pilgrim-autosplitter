@@ -1524,7 +1524,13 @@ class UIController:
             return
 
         if platform.system() == "Windows":
-            os.startfile(path)
+            try:
+                os.startfile(path)
+            except OSError:
+                msg = self._main_window.err_not_found_msg
+                msg.setStyleSheet(self._get_style_sheet())
+                msg.show()
+                QTimer.singleShot(10000, lambda: msg.done(0))
         elif platform.system() == "Darwin":
             subprocess.Popen(["open", path])
         else:

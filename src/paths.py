@@ -34,9 +34,30 @@ import sys
 from pathlib import Path
 
 
+def is_frozen() -> bool:
+    """True when running from a PyInstaller (or similar) frozen bundle."""
+    return bool(getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"))
+
+
+def project_root() -> Path:
+    """Source-tree project root (parent of ``src/``). Not used when frozen."""
+    return Path(__file__).resolve().parent.parent
+
+
 def resources_dir() -> Path:
     """Directory containing ``icon-macos.png``, ``demo.gif``, ``icons/``, etc."""
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    if is_frozen():
         return Path(sys._MEIPASS) / "resources"
-    # Running from source: this file is ``src/paths.py``.
-    return Path(__file__).resolve().parent.parent / "resources"
+    return project_root() / "resources"
+
+
+def default_saves_dir() -> Path:
+    """Default profile-save folder (persistent even in frozen Windows builds).
+
+    Frozen apps unpack under ``_MEIPASS`` (temp). Writing ``saves/`` there would
+    lose profiles on quit. Prefer ``~/Documents/Pilgrim Autosplitter/saves``.
+    From source, keep the repo ``saves/`` directory.
+    """
+    if is_frozen():
+        return Path.home() / "Documents" / "Pilgrim Autosplitter" / "saves"
+    return project_root() / "saves"

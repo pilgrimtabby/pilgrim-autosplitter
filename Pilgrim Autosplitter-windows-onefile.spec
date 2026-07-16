@@ -9,12 +9,21 @@ def _win_icon():
     return str(p) if p.is_file() else None
 
 
+# pynput loads platform backends dynamically; without these, frozen Windows
+# builds often fail when the global hotkey listener starts.
+_PYNPUT_WIN_HIDDENIMPORTS = [
+    'pynput.keyboard._win32',
+    'pynput.mouse._win32',
+    'pynput._util.win32',
+]
+
+
 a = Analysis(
     ['src/pilgrim_autosplitter.py'],
     pathex=['src'],
     binaries=[],
     datas=[('resources', 'resources')],
-    hiddenimports=[],
+    hiddenimports=_PYNPUT_WIN_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

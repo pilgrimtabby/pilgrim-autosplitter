@@ -90,12 +90,11 @@ class ProfileStore:
         self._ctrl = controller
 
     def profile_saves_dir(self) -> Path:
-        root = Path(__file__).resolve().parents[2]
         configured = settings.get_str("PROFILE_SAVE_DIR")
         if configured not in ("", "None", None):
             path = Path(configured)
         else:
-            path = root / "saves"
+            path = paths.default_saves_dir()
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -168,7 +167,7 @@ class ProfileStore:
         }
         split_dir = Path(settings.get_str("LAST_IMAGE_DIR"))
         try:
-            rel_split = str(split_dir.relative_to(Path(__file__).resolve().parents[2]))
+            rel_split = str(split_dir.relative_to(paths.project_root()))
         except ValueError:
             rel_split = None
         split_files = []
@@ -245,6 +244,8 @@ class ProfileStore:
         name_combo.setEditable(True)
         name_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         name_combo.setFixedHeight(name_combo.sizeHint().height())
+        # Quote the url() path so Windows paths with spaces (e.g. "Program Files",
+        # "Test Cursor") still load in Qt stylesheets.
         arrow_path = str(
             (paths.resources_dir() / "icons" / "chevron_down_white.svg").resolve()
         ).replace("\\", "/")
@@ -252,7 +253,7 @@ class ProfileStore:
             "QComboBox { padding: 2px 0px 2px 2px; }"
             "QComboBox QLineEdit { border: 0px; padding: 0px; margin: 0px; }"
             "QComboBox::down-arrow {"
-            f" image: url({arrow_path});"
+            f' image: url("{arrow_path}");'
             " width: 14px; height: 14px;"
             " position: relative; left: 1px;"
             "}"
@@ -504,12 +505,16 @@ class ProfileStore:
     def resolve_split_dir_after_load(self, split_meta: dict) -> None:
         abs_path = split_meta.get("absolute")
         rel_path = split_meta.get("relative_to_project")
-        root = Path(__file__).resolve().parents[2]
         candidate_paths = []
         if isinstance(abs_path, str) and abs_path:
             candidate_paths.append(Path(abs_path))
-        if isinstance(rel_path, str) and rel_path:
-            candidate_paths.append(root / rel_path)
+        # Relative paths only make sense from a source checkout, not _MEIPASS.
+        if (
+            isinstance(rel_path, str)
+            and rel_path
+            and not paths.is_frozen()
+        ):
+            candidate_paths.append(paths.project_root() / rel_path)
         for candidate in candidate_paths:
             if candidate.is_dir():
                 settings.set_value("LAST_IMAGE_DIR", str(candidate))
