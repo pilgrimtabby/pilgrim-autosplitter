@@ -397,6 +397,22 @@ class ScreenshotCapture:
         lbl.setWordWrap(False)
         return lbl
 
+    def folder_to_open_from_saved(
+        self, location_path: str, preview_path: Optional[str] = None
+    ) -> str:
+        """Folder revealed by ``Open folder``: preview's parent, else location."""
+        if preview_path:
+            preview = Path(preview_path).expanduser()
+            if preview.is_file():
+                return str(preview.parent.resolve())
+            if preview.is_dir():
+                return str(preview.resolve())
+        loc = Path(location_path).expanduser()
+        try:
+            return str(loc.resolve())
+        except OSError:
+            return location_path
+
     def show_saved_dialog(
         self,
         *,
@@ -446,6 +462,12 @@ class ScreenshotCapture:
                 preview_lbl.setPixmap(scaled)
                 preview_lbl.setFixedSize(scaled.size())
 
+        open_folder_btn = QPushButton("Open folder", border_frame)
+        open_folder_btn.setFocusPolicy(Qt.NoFocus)
+        open_folder_btn.setDefault(False)
+        open_folder_btn.setAutoDefault(False)
+        open_folder_path = self.folder_to_open_from_saved(location_path, preview_path)
+
         text_col = QVBoxLayout()
         text_col.setSpacing(6)
         text_col.setContentsMargins(0, 0, 0, 0)
@@ -472,6 +494,9 @@ class ScreenshotCapture:
         text_col.addStretch(1)
 
         btn_row = QHBoxLayout()
+        if preview_lbl is None:
+            # No preview: keep Open folder on the left of the action row.
+            btn_row.addWidget(open_folder_btn, 0, Qt.AlignVCenter)
         btn_row.addStretch(1)
         if settings.get_str("THEME") == "light":
             ring_remaining = QColor("#202020")
@@ -501,15 +526,16 @@ class ScreenshotCapture:
         content.addWidget(text_host, 1)
 
         if preview_lbl is not None:
-            preview_col = QVBoxLayout()
-            preview_col.setContentsMargins(0, 0, 0, 0)
-            preview_col.addStretch(1)
-            preview_col.addWidget(preview_lbl, 0, Qt.AlignLeft | Qt.AlignVCenter)
-            preview_col.addStretch(1)
-            preview_host = QWidget(border_frame)
-            preview_host.setLayout(preview_col)
-            preview_host.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-            content.insertWidget(0, preview_host, 0)
+            # Left cluster: preview, then Open folder immediately to its right.
+            left_row = QHBoxLayout()
+            left_row.setContentsMargins(0, 0, 0, 0)
+            left_row.setSpacing(content_spacing)
+            left_row.addWidget(preview_lbl, 0, Qt.AlignVCenter)
+            left_row.addWidget(open_folder_btn, 0, Qt.AlignVCenter)
+            left_host = QWidget(border_frame)
+            left_host.setLayout(left_row)
+            left_host.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+            content.insertWidget(0, left_host, 0)
 
         inner.addLayout(content)
 
@@ -525,6 +551,10 @@ class ScreenshotCapture:
             countdown_ring.stop()
             dlg.done(0)
 
+        def _open_folder() -> None:
+            self._ctrl._open_file_or_dir(open_folder_path)
+
+        open_folder_btn.clicked.connect(_open_folder)
         ok_btn.clicked.connect(_close_dialog)
 
         def _auto_close() -> None:
@@ -548,7 +578,7 @@ class ScreenshotCapture:
             window_title="Burst complete",
             title="Burst completed",
             summary=summary,
-            location_path=self.saved_display_dir(),
+            location_path=folder,
             preview_path=self._burst_last_path,
             auto_close_ms=7000,
         )

@@ -135,3 +135,18 @@ def test_save_peak_buffer_no_op_without_frame(screenshot_capture):
     with patch("ui.screenshot_capture.cv2.imwrite") as mock_imwrite:
         screenshot_capture.save_peak_buffer()
         mock_imwrite.assert_not_called()
+
+
+def test_folder_to_open_from_saved_prefers_preview_parent(screenshot_capture, tmp_path):
+    preview = tmp_path / PEAK_BUFFER_SUBDIR / "snap.png"
+    preview.parent.mkdir(parents=True)
+    preview.write_bytes(b"x")
+    opened = screenshot_capture.folder_to_open_from_saved(
+        str(tmp_path), str(preview)
+    )
+    assert Path(opened) == preview.parent.resolve()
+
+
+def test_folder_to_open_from_saved_falls_back_to_location(screenshot_capture, tmp_path):
+    opened = screenshot_capture.folder_to_open_from_saved(str(tmp_path), None)
+    assert Path(opened) == tmp_path.resolve()
