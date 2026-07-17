@@ -81,6 +81,38 @@ def _pynput_numpad_display_name(vk: int) -> Optional[str]:
     return None
 
 
+_darwin_pynput_events_patched = False
+
+
+def _patch_darwin_pynput_listener_events() -> None:
+    """Drop NSSystemDefined from pynput's macOS event mask.
+
+    pynput converts NSSystemDefined CGEvents via NSEvent.eventWithCGEvent_ on
+    the listener thread. On modern macOS that path can hit Caps Lock /
+    Text Input Source APIs that require the main queue and abort with
+    SIGTRAP (_dispatch_assert_queue_fail). We do not need media keys as
+    hotkeys, so exclude that event type. See pynput#596.
+    """
+    global _darwin_pynput_events_patched
+    if _darwin_pynput_events_patched or platform.system() != "Darwin":
+        return
+    from Quartz import (
+        CGEventMaskBit,
+        kCGEventFlagsChanged,
+        kCGEventKeyDown,
+        kCGEventKeyUp,
+    )
+
+    # Intentionally omit CGEventMaskBit(NSSystemDefined): that is what triggers
+    # NSEvent.eventWithCGEvent_ for media keys / some Caps Lock system events.
+    pynput_keyboard.Listener._EVENTS = (
+        CGEventMaskBit(kCGEventKeyDown)
+        | CGEventMaskBit(kCGEventKeyUp)
+        | CGEventMaskBit(kCGEventFlagsChanged)
+    )
+    _darwin_pynput_events_patched = True
+
+
 class UIKeyboardController:
     """Basic frontend wrapper for controlling the keyboard cross-platform.
 
@@ -120,6 +152,7 @@ class UIKeyboardController:
             on_release = self._do_nothing
 
         if platform.system() == "Windows" or platform.system() == "Darwin":
+            _patch_darwin_pynput_listener_events()
             keyboard_listener = pynput_keyboard.Listener(
                 on_press=on_press, on_release=on_release
             )
