@@ -59,9 +59,10 @@ BOTTOM_ROW_STEP_PX = VIDEO_COL_SCREENSHOT_H + BOTTOM_ADJ_PAIR_GAP_PX
 BOTTOM_RESET_H_PX = VIDEO_COL_SCREENSHOT_H * 2 + BOTTOM_ADJ_PAIR_GAP_PX
 
 # Gap from stats block to screenshot column; also used as Pause→Reset gap.
-VIDEO_COL_GAP_480 = 19
-VIDEO_COL_GAP_512 = 51
-VIDEO_COL_GAP_320 = 29
+# Keep multiples of BOTTOM_ADJ_PAIR_GAP_PX (9) so bottom-row spacing stays on-grid.
+VIDEO_COL_GAP_480 = 18
+VIDEO_COL_GAP_512 = 54
+VIDEO_COL_GAP_320 = 27
 VIDEO_COL_GAP_432 = 18
 
 # 432×243: geometric center reads slightly right on macOS.
