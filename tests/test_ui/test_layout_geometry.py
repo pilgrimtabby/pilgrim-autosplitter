@@ -37,9 +37,9 @@ from ui.layout_presets import (
     LAYOUT_PRESET_432,
     LAYOUT_PRESET_480,
     LAYOUT_PRESET_512,
-    MAIN_WINDOW_LEFT_EDGE_CORRECTION,
     VIDEO_COL_CENTER_NUDGE_320,
     VIDEO_COL_CENTER_NUDGE_432,
+    VIDEO_COL_SCREENSHOT_H,
     VIDEO_COL_STATS_SPAN_W,
     split_viewport_for_tests,
     video_viewport_for_tests,
@@ -63,15 +63,8 @@ def main_window(qapp):
 
 def _placer(main_window: UIMainWindow):
     obj = type("_Placer", (), {"_main_window": main_window})()
-
-    def _layout_screenshot_burst_controls(_self, shot_rect: QRect) -> None:
-        main_window.screenshot_button.setGeometry(shot_rect)
-        main_window.reconnect_button.setGeometry(
-            QRect(shot_rect.x(), shot_rect.y() + 50, shot_rect.width(), shot_rect.height())
-        )
-
-    obj._layout_screenshot_burst_controls = _layout_screenshot_burst_controls.__get__(
-        obj, type(obj)
+    obj._layout_screenshot_burst_controls = (
+        UIController._layout_screenshot_burst_controls.__get__(obj, type(obj))
     )
     return obj
 
@@ -153,8 +146,8 @@ def test_split_column_undo_skip_gap(main_window, preset):
     assert skip.x() - undo.x() - undo.width() == BOTTOM_ADJ_PAIR_GAP_PX
 
 
-def test_320_pause_width_matches_undo_skip_row(main_window):
-    preset = LAYOUT_PRESET_320
+@pytest.mark.parametrize("preset", _SPLIT_LAYOUT_PRESETS, ids=lambda p: p.aspect_ratio)
+def test_pause_width_matches_undo_skip_row(main_window, preset):
     sc = preset.split_column
     placer = _placer(main_window)
     UIController._place_split_column_bottom_controls(
@@ -172,6 +165,7 @@ def test_320_pause_width_matches_undo_skip_row(main_window):
     undo = main_window.undo_button.geometry()
     skip = main_window.skip_button.geometry()
     assert pause.width() == skip.x() + skip.width() - undo.x()
+    assert pause.width() == sc.undo_w + BOTTOM_ADJ_PAIR_GAP_PX + sc.skip_w
 
 
 _CENTERED_VIDEO_PRESETS = (
@@ -180,6 +174,31 @@ _CENTERED_VIDEO_PRESETS = (
     LAYOUT_PRESET_320,
     LAYOUT_PRESET_432,
 )
+
+
+@pytest.mark.parametrize("preset", _CENTERED_VIDEO_PRESETS, ids=lambda p: p.aspect_ratio)
+def test_screenshot_gear_gap_matches_row_gap(main_window, preset):
+    """Screenshot↔gear horizontal gap equals Screenshot↔Reconnect vertical gap."""
+    vc = preset.video_column
+    row1, row2 = 200, 200 + VIDEO_COL_SCREENSHOT_H + BOTTOM_ADJ_PAIR_GAP_PX
+    placer = _placer(main_window)
+    UIController._place_video_column_stats_and_screenshot_row(
+        placer,
+        video_viewport_for_tests(preset),
+        row1=row1,
+        row2=row2,
+        gap_stats_to_screenshot=vc.gap_stats_to_screenshot,
+        screenshot_w=vc.screenshot_w,
+        center_nudge_x=vc.center_nudge_x,
+    )
+    shot = main_window.screenshot_button.geometry()
+    gear = main_window.screenshot_settings_button.geometry()
+    reconnect = main_window.reconnect_button.geometry()
+    h_gap = gear.x() - shot.x() - shot.width()
+    v_gap = reconnect.y() - shot.y() - shot.height()
+    assert h_gap == BOTTOM_ADJ_PAIR_GAP_PX
+    assert v_gap == BOTTOM_ADJ_PAIR_GAP_PX
+    assert h_gap == v_gap
 
 
 @pytest.mark.parametrize("preset", _CENTERED_VIDEO_PRESETS, ids=lambda p: p.aspect_ratio)
@@ -224,23 +243,29 @@ def test_320_video_column_nudge_clears_split_column(main_window):
     assert screenshot_right <= split.x()
 
 
-def test_320_center_nudge_matches_legacy_fixed_positions(main_window):
-    """Nudge 69 reproduces the former hand-tuned 320 coords."""
+def test_320_center_nudge_keeps_block_formula(main_window):
+    """320 nudge stays applied; screenshot column follows the shared block formula."""
     preset = LAYOUT_PRESET_320
-    left = MAIN_WINDOW_LEFT_EDGE_CORRECTION
     vc = preset.video_column
+    video = video_viewport_for_tests(preset)
     placer = _placer(main_window)
     UIController._place_video_column_stats_and_screenshot_row(
         placer,
-        video_viewport_for_tests(preset),
+        video,
         row1=200,
         row2=250,
         gap_stats_to_screenshot=vc.gap_stats_to_screenshot,
         screenshot_w=vc.screenshot_w,
         center_nudge_x=VIDEO_COL_CENTER_NUDGE_320,
     )
-    assert main_window.match_percent_label.geometry().x() == -50 + left
-    assert main_window.screenshot_button.geometry().x() == 220 + left
+    block_w = VIDEO_COL_STATS_SPAN_W + vc.gap_stats_to_screenshot + vc.screenshot_w
+    expected_left = (
+        video.x() + (video.width() - block_w) // 2 - VIDEO_COL_CENTER_NUDGE_320
+    )
+    expected_shot_x = expected_left + VIDEO_COL_STATS_SPAN_W + vc.gap_stats_to_screenshot
+    assert main_window.match_percent_label.geometry().x() == expected_left
+    assert main_window.screenshot_button.geometry().x() == expected_shot_x
+    assert expected_shot_x == main_window.reconnect_button.geometry().x()
 
 
 def test_video_column_block_centered_under_viewport(main_window):

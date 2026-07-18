@@ -37,7 +37,8 @@ from PyQt5.QtCore import QRect
 VIDEO_CROP_STRIP_LAYOUT_DY = 24
 STRIP_GAP_BELOW_VIEWPORT_PX = 2
 BOTTOM_BLOCK_LIFT_PX = -4
-BOTTOM_ADJ_PAIR_GAP_PX = 5
+# Shared interstitial for screenshot↔gear, undo↔skip, and row1↔row2.
+BOTTOM_ADJ_PAIR_GAP_PX = 9
 
 # Small 16:9 on-screen pane width (capture frame width stays 432).
 DISPLAY_W_432 = 432
@@ -50,9 +51,12 @@ VIDEO_COL_STATS_VALUE_X = 165
 VIDEO_COL_STATS_PCT_X = 220
 VIDEO_COL_STATS_ROW_H = 31
 VIDEO_COL_STATS_ROW_STEP = 30
-VIDEO_COL_SCREENSHOT_W_FULL = 171
-VIDEO_COL_SCREENSHOT_W_COMPACT = 131
+VIDEO_COL_SCREENSHOT_W_FULL = 187
+VIDEO_COL_SCREENSHOT_W_COMPACT = 147
 VIDEO_COL_SCREENSHOT_H = 41
+# Row2 y = row1 y + this; Reset height = two buttons + one gap.
+BOTTOM_ROW_STEP_PX = VIDEO_COL_SCREENSHOT_H + BOTTOM_ADJ_PAIR_GAP_PX
+BOTTOM_RESET_H_PX = VIDEO_COL_SCREENSHOT_H * 2 + BOTTOM_ADJ_PAIR_GAP_PX
 
 # Gap from stats block to screenshot column; also used as Pause→Reset gap.
 VIDEO_COL_GAP_480 = 19
@@ -185,8 +189,17 @@ class AspectLayoutPreset:
 
 
 _UNDO_SKIP_320 = 56
+_UNDO_SKIP_FULL = 90
+_UNDO_SKIP_432 = 75
+
+
+def _pause_w(undo_w: int, skip_w: int) -> int:
+    """Pause spans Undo + gap + Skip exactly (avoids a short right edge)."""
+    return undo_w + BOTTOM_ADJ_PAIR_GAP_PX + skip_w
+
+
 _SPLIT_320 = SplitColumnBottomPreset(
-    pause_w=_UNDO_SKIP_320 + BOTTOM_ADJ_PAIR_GAP_PX + _UNDO_SKIP_320,
+    pause_w=_pause_w(_UNDO_SKIP_320, _UNDO_SKIP_320),
     reset_w=121,
     undo_w=_UNDO_SKIP_320,
     skip_w=_UNDO_SKIP_320,
@@ -264,10 +277,10 @@ LAYOUT_PRESET_480 = AspectLayoutPreset(
     bottom_row1_design=680,
     bottom_row2_design=730,
     split_column=SplitColumnBottomPreset(
-        pause_w=185,
+        pause_w=_pause_w(_UNDO_SKIP_FULL, _UNDO_SKIP_FULL),
         reset_w=191,
-        undo_w=90,
-        skip_w=90,
+        undo_w=_UNDO_SKIP_FULL,
+        skip_w=_UNDO_SKIP_FULL,
         gap_stats_to_screenshot=VIDEO_COL_GAP_480,
     ),
     video_column=VideoColumnBottomPreset(
@@ -288,10 +301,10 @@ LAYOUT_PRESET_512 = AspectLayoutPreset(
     bottom_row1_design=608,
     bottom_row2_design=658,
     split_column=SplitColumnBottomPreset(
-        pause_w=185,
+        pause_w=_pause_w(_UNDO_SKIP_FULL, _UNDO_SKIP_FULL),
         reset_w=191,
-        undo_w=90,
-        skip_w=90,
+        undo_w=_UNDO_SKIP_FULL,
+        skip_w=_UNDO_SKIP_FULL,
         gap_stats_to_screenshot=VIDEO_COL_GAP_512,
     ),
     video_column=VideoColumnBottomPreset(
@@ -331,10 +344,10 @@ LAYOUT_PRESET_432 = AspectLayoutPreset(
     bottom_row1_design=563,
     bottom_row2_design=613,
     split_column=SplitColumnBottomPreset(
-        pause_w=155,
+        pause_w=_pause_w(_UNDO_SKIP_432, _UNDO_SKIP_432),
         reset_w=181,
-        undo_w=75,
-        skip_w=75,
+        undo_w=_UNDO_SKIP_432,
+        skip_w=_UNDO_SKIP_432,
         gap_stats_to_screenshot=VIDEO_COL_GAP_432,
     ),
     video_column=VideoColumnBottomPreset(

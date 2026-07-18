@@ -76,6 +76,7 @@ from ui.layout_presets import (
     AspectLayoutPreset,
     BOTTOM_ADJ_PAIR_GAP_PX,
     BOTTOM_BLOCK_LIFT_PX,
+    BOTTOM_RESET_H_PX,
     LAYOUT_PRESET_320,
     LAYOUT_PRESET_432,
     LAYOUT_PRESET_480,
@@ -798,10 +799,10 @@ class UIController:
         pause_x = split_viewport.x() + (split_viewport.width() - cluster_w) // 2
         reset_x = pause_x + pause_w + gap_pause_to_reset
         skip_x = pause_x + undo_w + BOTTOM_ADJ_PAIR_GAP_PX
-        row_h = 41
+        row_h = VIDEO_COL_SCREENSHOT_H
         mw = self._main_window
         mw.pause_button.setGeometry(QRect(pause_x, row1, pause_w, row_h))
-        mw.reset_button.setGeometry(QRect(reset_x, row1, reset_w, 91))
+        mw.reset_button.setGeometry(QRect(reset_x, row1, reset_w, BOTTOM_RESET_H_PX))
         mw.undo_button.setGeometry(QRect(pause_x, row2, undo_w, row_h))
         mw.skip_button.setGeometry(QRect(skip_x, row2, skip_w, row_h))
 
@@ -1473,7 +1474,8 @@ class UIController:
 
         sbr = sb.geometry()
         gear_side = max(1, sbr.height())
-        tb.setGeometry(QRect(sbr.right() + gap, sbr.y(), gear_side, gear_side))
+        # Use exclusive right edge (x+width), not QRect.right() (x+width-1).
+        tb.setGeometry(QRect(sbr.x() + sbr.width() + gap, sbr.y(), gear_side, gear_side))
 
         _ico = max(12, min(gear_side - 8, int(gear_side * 0.42)))
         tb.setIconSize(QSize(_ico, _ico))
