@@ -48,63 +48,66 @@ def apply_aspect_layout(ctrl: "UIController", preset: AspectLayoutPreset) -> Non
 
     mw.split_directory_box.setGeometry(chrome.split_directory_box.to_rect(left, top))
     mw.split_dir_button.setGeometry(chrome.split_dir_button.to_rect(left, top))
-    mw.min_view_button.setGeometry(chrome.min_view_button.to_rect(left, top))
-    mw.split_name_label.setGeometry(chrome.split_name_label.to_rect(left, top))
-    mw.split_loop_label.setGeometry(chrome.split_loop_label.to_rect(left, top))
 
     video_viewport = preset.video_viewport.to_rect(left, top)
     split_viewport = preset.split_viewport.to_rect(left, top)
+
+    # Shared chrome row: same y/height; outer edges match viewport white outline
+    # (border widget is content±1; +1 more for the 1px line thickness).
+    outline_outset = 2
+    mv = chrome.min_view_button
+    ns = chrome.next_source_button
+    pb = chrome.previous_button
+    nb = chrome.next_button
+    row_y = mv.y + top
+    row_h = mv.height
+
+    mw.min_view_button.setGeometry(
+        QRect(video_viewport.x() - outline_outset, row_y, mv.width, row_h)
+    )
 
     if chrome.video_title_center_in_viewport:
         vt_w = chrome.video_title_viewport_width
         mw.video_title.setGeometry(
             QRect(
                 video_viewport.x() + (video_viewport.width() - vt_w) // 2,
-                chrome.video_title.y + top,
+                row_y,
                 vt_w,
-                chrome.video_title.height,
+                row_h,
             )
         )
     else:
-        mw.video_title.setGeometry(chrome.video_title.to_rect(left, top))
+        mw.video_title.setGeometry(
+            QRect(chrome.video_title.x + left, row_y, chrome.video_title.width, row_h)
+        )
 
-    if chrome.next_source_right_of_viewport:
-        ns = chrome.next_source_button
-        mw.next_source_button.setGeometry(
-            QRect(
-                video_viewport.x() + video_viewport.width() - chrome.next_source_offset_from_right,
-                ns.y + top,
-                ns.width,
-                ns.height,
-            )
+    mw.next_source_button.setGeometry(
+        QRect(
+            video_viewport.x() + video_viewport.width() + outline_outset - ns.width,
+            row_y,
+            ns.width,
+            row_h,
         )
-    else:
-        mw.next_source_button.setGeometry(chrome.next_source_button.to_rect(left, top))
+    )
 
     ctrl._apply_video_column_layout(preset, video_viewport, row1, row2, left)
 
-    if chrome.nav_buttons_on_split_viewport:
-        pb = chrome.previous_button
-        nb = chrome.next_button
-        mw.previous_button.setGeometry(
-            QRect(
-                split_viewport.x() + chrome.prev_button_split_offset_x,
-                pb.y + top,
-                pb.width,
-                pb.height,
-            )
-        )
-        mw.next_button.setGeometry(
-            QRect(
-                split_viewport.x() + split_viewport.width() - chrome.next_button_split_offset_from_right,
-                nb.y + top,
-                nb.width,
-                nb.height,
-            )
-        )
-    else:
-        mw.previous_button.setGeometry(chrome.previous_button.to_rect(left, top))
-        mw.next_button.setGeometry(chrome.next_button.to_rect(left, top))
+    prev_x = split_viewport.x() - outline_outset
+    next_x = split_viewport.x() + split_viewport.width() + outline_outset - nb.width
+    mw.previous_button.setGeometry(QRect(prev_x, row_y, pb.width, row_h))
+    mw.next_button.setGeometry(QRect(next_x, row_y, nb.width, row_h))
+
+    # Labels sit between the arrows (flush — no side gap).
+    label_x = prev_x + pb.width
+    label_w = max(1, next_x - label_x)
+    mw.split_name_label.setGeometry(
+        QRect(label_x, chrome.split_name_label.y + top, label_w, chrome.split_name_label.height)
+    )
+    mw.split_loop_label.setGeometry(
+        QRect(label_x, chrome.split_loop_label.y + top, label_w, chrome.split_loop_label.height)
+    )
+    mw.previous_button.raise_()
+    mw.next_button.raise_()
 
     ctrl._place_split_column_from_preset(split_viewport, row1, row2, preset.split_column)
     ctrl._set_video_viewport_geometry(video_viewport)
