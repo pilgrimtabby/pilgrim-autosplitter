@@ -2,7 +2,7 @@
 
 Finally, a multi-platform image-based speedrun autosplitter!
 
-<img src="resources/demo-v4.gif" alt="Demonstration GIF" width="100%">
+<img src="resources/demo-v5.gif" alt="Demonstration GIF" width="100%">
 
 Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which generally only run on Windows.
 
