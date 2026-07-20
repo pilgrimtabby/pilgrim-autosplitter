@@ -25,6 +25,7 @@ from __future__ import annotations
 import datetime
 import json
 import re
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
@@ -457,38 +458,36 @@ class ProfileStore:
             return
         self.load_profile_from_path(path)
 
-    def load_profile_from_path(self, path: str) -> None:
+    def load_profile_from_path(self, path: str, *, silent: bool = False) -> None:
         p = Path(path)
+
+        def _fail(title: str, message: str) -> None:
+            if silent:
+                print(f"[Pilgrim Autosplitter] {title}: {message}", file=sys.stderr)
+                return
+            QMessageBox.warning(self._ctrl._main_window, title, message)
+
         try:
             payload = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            QMessageBox.warning(
-                self._ctrl._main_window,
-                "Failed to load profile",
-                "Profile file could not be read.",
-            )
+            _fail("Failed to load profile", "Profile file could not be read.")
             return
         if not isinstance(payload, dict):
-            QMessageBox.warning(
-                self._ctrl._main_window, "Invalid profile", "Profile format is invalid."
-            )
+            _fail("Invalid profile", "Profile format is invalid.")
             return
         try:
             schema_version = int(payload.get("schema_version", 0))
         except (TypeError, ValueError):
             schema_version = 0
         if schema_version != PROFILE_SCHEMA_VERSION:
-            QMessageBox.warning(
-                self._ctrl._main_window,
+            _fail(
                 "Unsupported profile version",
                 "This profile uses an unsupported schema version.",
             )
             return
         raw_settings = payload.get("settings")
         if not isinstance(raw_settings, dict):
-            QMessageBox.warning(
-                self._ctrl._main_window, "Invalid profile", "Profile settings are missing."
-            )
+            _fail("Invalid profile", "Profile settings are missing.")
             return
         before_strip = self._ctrl._strip_layout_settings_tuple()
         for key, value in raw_settings.items():

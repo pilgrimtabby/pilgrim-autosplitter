@@ -30,6 +30,7 @@ import paths
 import platform
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 from threading import Lock, Thread
@@ -63,6 +64,7 @@ from PyQt5.QtWidgets import (
 )
 
 import settings
+from livesplit.desktop_stdio import DesktopStdioSession, is_auto_controlled
 from livesplit.timer_sync import LiveSplitTimerSync
 from splitter.splitter import Splitter
 from ui.split_navigation import navigate_to_next_split, navigate_to_previous_split
@@ -152,6 +154,8 @@ class UIController:
         self._livesplit_ws_server: Optional[Any] = None
         self._lso = LiveSplitTimerSync()
         self._livesplit_menu_linked: Optional[bool] = None
+        self._desktop = DesktopStdioSession()
+        self._desktop_auto_controlled = is_auto_controlled()
 
         style = self._get_style_sheet()
         self._main_window.setStyleSheet(style)
@@ -336,6 +340,11 @@ class UIController:
         )
         self._update_connect_menu_state()
 
+        if self._desktop_auto_controlled:
+            # LiveSplit Desktop owns the timer; skip WebSocket server UI.
+            self._main_window.connect_start_server_action.setEnabled(False)
+            self._desktop.start(self._on_desktop_stdio_line)
+
         ##########################
         #                        #
         # Settings Window Config #
@@ -384,6 +393,73 @@ class UIController:
             self._livesplit_ws_server = None
         self._lso.set_server(None)
         self._update_connect_menu_state()
+
+    def stop_desktop_stdio(self) -> None:
+        """Stop the LiveSplit Desktop stdin listener if it is running."""
+        self._desktop.stop()
+
+    def _desktop_linked(self) -> bool:
+        return self._desktop.active
+
+    def _timer_linked(self) -> bool:
+        """True when linked to LiveSplit One (WS) or LiveSplit Desktop (stdio)."""
+        return self._lso.linked or self._desktop_linked()
+
+    def _after_manual_timer_nav(self) -> None:
+        if self._desktop_linked():
+            self._desktop.after_manual_navigation()
+        if self._lso.linked:
+            self._lso.after_manual_navigation()
+
+    def _autosplit_may_send_timer(self) -> bool:
+        if self._desktop_linked() and not self._desktop.autosplit_may_send():
+            return False
+        if self._lso.linked and not self._lso.autosplit_may_send():
+            return False
+        return True
+
+    def _on_desktop_stdio_line(self, line: str) -> None:
+        """Handle a command from LiveSplit Desktop over stdin."""
+        if line.startswith("settings"):
+            # AutoSplit uses "settings|path" or "settings<path>" after 8 chars.
+            path = line[8:].lstrip("|").strip()
+            if path:
+                self._profiles.load_profile_from_path(path, silent=True)
+            return
+        match line:
+            case "start":
+                # User started the timer in LiveSplit — ensure comparison is active.
+                self._desktop_ensure_comparing()
+            case "split" | "skip":
+                self._after_manual_timer_nav()
+                self._pilgrim_skip()
+            case "undo":
+                self._after_manual_timer_nav()
+                self._pilgrim_undo()
+            case "reset":
+                self._after_manual_timer_nav()
+                self._request_reset_splits()
+            case "kill":
+                self._application.quit()
+            case _:
+                print(f"[Pilgrim Autosplitter] Unknown LiveSplit command: {line!r}", file=sys.stderr)
+
+    def _desktop_ensure_comparing(self) -> None:
+        """Resume comparison if paused; start compare threads if needed."""
+        splitter = self._splitter
+        if not splitter.capture_thread.is_alive():
+            return
+        if len(splitter.splits.list) == 0:
+            return
+        # match_percent is None when compare_split is not running (paused or stopped).
+        if splitter.match_percent is None:
+            if not splitter.compare_split_thread.is_alive():
+                splitter.restart_compare_split_thread()
+                if splitter.splits.reset_image is not None:
+                    splitter.restart_compare_reset_thread()
+            else:
+                # Suspended: toggle to resume.
+                splitter.toggle_suspended()
 
     def _update_connect_menu_state(self) -> None:
         linked = self._lso.linked
@@ -508,8 +584,17 @@ class UIController:
         )
 
     def _notify_livesplit(self, command: str, suppressed: bool) -> None:
-        if not suppressed:
-            self._lso.send(command)
+        if suppressed:
+            return
+        if self._desktop_linked():
+            # Desktop stdio uses plain tokens: undo/skip map to undo/skip lines.
+            desktop_cmd = {
+                "undoSplit": "undo",
+                "skipSplit": "skip",
+            }.get(command, command)
+            self._desktop.emit(desktop_cmd)
+            return
+        self._lso.send(command)
 
     def _dismiss_reset_overlay_if_showing(self) -> bool:
         if not self._viewing_reset_image():
@@ -528,9 +613,9 @@ class UIController:
         self._request_next_split_preserving_recording_on_dummy()
 
     def _manual_undo(self, *, via_button: bool = False) -> None:
-        if self._lso.linked:
+        if self._timer_linked():
             self._notify_livesplit("undoSplit", self._livesplit_undo_suppressed())
-            self._lso.after_manual_navigation()
+            self._after_manual_timer_nav()
             self._pilgrim_undo()
             return
         if via_button:
@@ -542,9 +627,9 @@ class UIController:
 
     def _manual_skip(self, *, via_button: bool = False) -> None:
         self._prepare_skip_recording_flags()
-        if self._lso.linked:
+        if self._timer_linked():
             self._notify_livesplit("skipSplit", self._livesplit_skip_suppressed())
-            self._lso.after_manual_navigation()
+            self._after_manual_timer_nav()
             self._pilgrim_skip()
             return
         if via_button:
@@ -555,9 +640,12 @@ class UIController:
         self._pilgrim_skip()
 
     def _manual_reset(self, *, via_button: bool = False) -> None:
-        if self._lso.linked:
-            self._lso.send("reset")
-            self._lso.after_manual_navigation()
+        if self._timer_linked():
+            if self._desktop_linked():
+                self._desktop.emit("reset")
+            else:
+                self._lso.send("reset")
+            self._after_manual_timer_nav()
         elif via_button:
             key_code = settings.get_str("RESET_HOTKEY_CODE")
             if len(key_code) > 0:
@@ -566,7 +654,14 @@ class UIController:
         self._request_reset_splits()
 
     def _autosplit_normal_split(self) -> None:
-        if self._lso.linked and not self._lso.autosplit_may_send():
+        if self._timer_linked() and not self._autosplit_may_send_timer():
+            self._request_next_split()
+            return
+        if self._desktop_linked():
+            # No separate start image: always emit "split" (LSO uses splitOrStart).
+            # Use livesplit-desktop-integration (patched AutoSplit Integration) so
+            # the first match start-or-splits when the timer is not running.
+            self._desktop.emit("split")
             self._request_next_split()
             return
         if self._lso.send("splitOrStart"):
@@ -581,6 +676,11 @@ class UIController:
         )
 
     def _autosplit_reset(self) -> None:
+        if self._desktop_linked():
+            self._desktop.emit("reset")
+            self._after_manual_timer_nav()
+            self._request_reset_splits()
+            return
         if self._lso.linked:
             self._lso.send("reset")
             self._lso.after_manual_navigation()
@@ -2518,9 +2618,12 @@ class UIController:
         # Pause split (press pause hotkey)
         if self._splitter.pause_split_action:
             self._splitter.pause_split_action = False
-            key_code = settings.get_str("PAUSE_HOTKEY_CODE")
-            if len(key_code) > 0:
-                self._keyboard.press_and_release(key_code)
+            if self._desktop_linked():
+                self._desktop.emit("pause")
+            else:
+                key_code = settings.get_str("PAUSE_HOTKEY_CODE")
+                if len(key_code) > 0:
+                    self._keyboard.press_and_release(key_code)
             self._request_next_split()
 
         # Dummy split (silently advance to next split image)

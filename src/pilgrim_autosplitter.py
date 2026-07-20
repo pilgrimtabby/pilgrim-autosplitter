@@ -73,12 +73,16 @@ class PilgrimAutosplitter:
 
         _res = paths.resources_dir()
 
+        from livesplit.desktop_stdio import strip_auto_controlled_flag
+
         if platform.system() == "Windows":
             # Force title bar to follow system theme
             extra_args = ["-platform", "windows:darkmode=1"]
         else:
             extra_args = []
-        self.app = QApplication(sys.argv + extra_args)
+        # Drop LiveSplit's --auto-controlled so Qt does not treat it as a file path.
+        qt_argv = strip_auto_controlled_flag(sys.argv) + extra_args
+        self.app = QApplication(qt_argv)
         self.app.setStyle("fusion")
         self.app.setApplicationName("Pilgrim Autosplitter")
 
@@ -109,11 +113,25 @@ class PilgrimAutosplitter:
 def main() -> None:
     """Initialize PilgrimAutosplitter."""
     _install_excepthook()
-    os.system("cls || clear")  # Cross-platform clear screen
 
-    print("Welcome to Pilgrim Autosplitter!")
-    print("You may minimize this window, but DO NOT close it.\n")
-    print("Loading Pilgrim Autosplitter (this may take a few minutes)...")
+    from livesplit.desktop_stdio import is_auto_controlled, print_handshake
+    import settings
+
+    auto_controlled = is_auto_controlled()
+    if auto_controlled:
+        # LiveSplit.AutoSplitIntegration requires version + PID as the first
+        # two stdout lines. Keep all other chatter on stderr.
+        print_handshake(settings.VERSION_NUMBER)
+        print(
+            "Pilgrim Autosplitter: LiveSplit Desktop (--auto-controlled).",
+            file=sys.stderr,
+        )
+        print("Loading...", file=sys.stderr)
+    else:
+        os.system("cls || clear")  # Cross-platform clear screen
+        print("Welcome to Pilgrim Autosplitter!")
+        print("You may minimize this window, but DO NOT close it.\n")
+        print("Loading Pilgrim Autosplitter (this may take a few minutes)...")
 
     pilgrim_autosplitter = PilgrimAutosplitter()
 
@@ -127,13 +145,19 @@ def main() -> None:
     pilgrim_autosplitter.app.aboutToQuit.connect(
         pilgrim_autosplitter.ui_controller.stop_livesplit_ws_server
     )
+    pilgrim_autosplitter.app.aboutToQuit.connect(
+        pilgrim_autosplitter.ui_controller.stop_desktop_stdio
+    )
     # Wait for any singleshot QTimers started by widgets to finish.
     # Right now, this includes only the double click timer in some
     # ui_main_window widgets. If we quit while a timer is running, it
     # can cause a segfault, so we want to prevent that.
     pilgrim_autosplitter.app.aboutToQuit.connect(lambda sec=0.2: time.sleep(sec))
 
-    print("Starting...")
+    if auto_controlled:
+        print("Starting...", file=sys.stderr)
+    else:
+        print("Starting...")
     pilgrim_autosplitter.app.exec()
 
 

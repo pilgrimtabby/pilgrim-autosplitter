@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	IMPORTANT: comments must stay OUTSIDE <updates>. The updater parses EVERY child node of
+	<updates> as an <update> (reading its "version" attribute), inside a silent catch-all.
+	A comment (or any non-<update> node) there throws and aborts parsing → zero updates are
+	offered, with no error. Keep all notes here, above the root element.
+
+	`path` is concatenated onto the factory's UpdateURL (…/releases/), so it must be the
+	version-pinned asset URL: download/v<version>/<asset>.
+
+	Only the NEWEST <update> may list files. On update the updater collects the file changes
+	of EVERY entry newer than the installed version and downloads them sequentially, each into
+	its localPath. Because the version is baked into `path`, each version is a distinct
+	download key (no de-duplication), yet the same asset always targets the same localPath, so
+	multiple listed versions would download to the same destination and the last write wins.
+	Worse, that order follows document order (newest first), so the OLDEST download lands last
+	and a multi-version jump would install a stale binary. Older entries therefore carry the
+	changelog only (empty <files>). The changelog is aggregated separately, so it still shows.
+
+	Unreleased changes are staged in the version="0.0.0" <update> block. 0.0.0 is below every
+	real install, so the updater never offers it and never shows its changelog. Add user-facing
+  changes there as you develop. At release, rename that	block to the new version and give it the
+  download/v<version>/ file paths, then add a fresh	empty 0.0.0 block for the next cycle.
+  See CONTRIBUTING.md.
+-->
+<updates>
+  <update version="0.0.0">
+    <files />
+    <changelog>
+    </changelog>
+  </update>
+  <update version="1.8.3">
+    <files>
+      <file path="download/v1.8.3/LiveSplit.AutoSplitIntegration.dll" localPath="Components/LiveSplit.AutoSplitIntegration.dll" status="changed" />
+      <file path="download/v1.8.3/LiveSplit.AutoSplitIntegration.pdb" localPath="Components/LiveSplit.AutoSplitIntegration.pdb" status="added" />
+    </files>
+    <changelog>
+      <change>Rebuilt on .NET Framework 4.8.1.</change>
+      <change>Fixed a `System.NullReferenceException` when setting a "Settings Path" without first starting AutoSplit.</change>
+      <change>Fixed the auto-update source.</change>
+    </changelog>
+  </update>
+  <update version="1.8.2">
+    <files />
+    <changelog>
+      <change>Fixes AutoSplit being reopened on clicking “Cancel”.</change>
+    </changelog>
+  </update>
+  <update version="1.8.1">
+    <files />
+    <changelog>
+      <change>Fixes AutoSplit not being opened correctly.</change>
+    </changelog>
+  </update>
+</updates>

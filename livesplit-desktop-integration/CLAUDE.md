@@ -1,0 +1,3 @@
+@AGENTS.md
+@CONTRIBUTING.md
+@lib/README.md

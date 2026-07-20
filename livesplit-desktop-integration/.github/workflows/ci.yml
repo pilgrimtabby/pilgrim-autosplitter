@@ -1,0 +1,46 @@
+name: CI
+
+# PR / branch validation only. Publishing (and its validation) lives in release.yml.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel previous runs for the same PR
+  # Don't cancel successive pushes to main
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Pinned (not windows-latest) so a runner image bump can't silently drop the
+    # .NET Framework 4.8.1 targeting pack this build needs.
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - run: dotnet build --configuration Debug
+
+      - run: dotnet build tools/PreviewSettings/PreviewSettings.csproj --configuration Debug
+
+      - run: dotnet format --verify-no-changes --no-restore
+
+      - run: dotnet format tools/PreviewSettings/PreviewSettings.csproj --verify-no-changes --no-restore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiveSplit.AutoSplitIntegration
+          path: |
+            bin/Debug/*/LiveSplit.AutoSplitIntegration.dll
+            bin/Debug/*/LiveSplit.AutoSplitIntegration.pdb
+          if-no-files-found: error
