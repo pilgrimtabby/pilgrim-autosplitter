@@ -80,7 +80,7 @@ class PilgrimAutosplitter:
             extra_args = ["-platform", "windows:darkmode=1"]
         else:
             extra_args = []
-        # Drop LiveSplit's --auto-controlled so Qt does not treat it as a file path.
+        # Drop --auto-controlled so Qt does not treat it as a file path.
         qt_argv = strip_auto_controlled_flag(sys.argv) + extra_args
         self.app = QApplication(qt_argv)
         self.app.setStyle("fusion")
@@ -119,13 +119,7 @@ def main() -> None:
 
     auto_controlled = is_auto_controlled()
     if auto_controlled:
-        # LiveSplit.AutoSplitIntegration requires version + PID as the first
-        # two stdout lines. Keep all other chatter on stderr.
         print_handshake(settings.VERSION_NUMBER)
-        print(
-            "Pilgrim Autosplitter: LiveSplit Desktop (--auto-controlled).",
-            file=sys.stderr,
-        )
         print("Loading...", file=sys.stderr)
     else:
         os.system("cls || clear")  # Cross-platform clear screen

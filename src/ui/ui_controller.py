@@ -354,7 +354,6 @@ class UIController:
         self._update_connect_menu_state()
 
         if self._desktop_auto_controlled:
-            # LiveSplit Desktop owns the timer; skip WebSocket server UI.
             self._main_window.connect_start_server_action.setEnabled(False)
             self._desktop.start(self._on_desktop_stdio_line)
 
@@ -400,7 +399,6 @@ class UIController:
     ##################
 
     def stop_livesplit_ws_server(self) -> None:
-        """Stop the LiveSplit One WebSocket server if it is running."""
         if self._livesplit_ws_server is not None:
             self._livesplit_ws_server.stop()
             self._livesplit_ws_server = None
@@ -408,14 +406,12 @@ class UIController:
         self._update_connect_menu_state()
 
     def stop_desktop_stdio(self) -> None:
-        """Stop the LiveSplit Desktop stdin listener if it is running."""
         self._desktop.stop()
 
     def _desktop_linked(self) -> bool:
         return self._desktop.active
 
     def _timer_linked(self) -> bool:
-        """True when linked to LiveSplit One (WS) or LiveSplit Desktop (stdio)."""
         return self._lso.linked or self._desktop_linked()
 
     def _after_manual_timer_nav(self) -> None:
@@ -432,21 +428,16 @@ class UIController:
         return True
 
     def _on_desktop_stdio_line(self, line: str) -> None:
-        """Handle a command from LiveSplit Desktop over stdin."""
         if line.startswith("settings"):
-            # AutoSplit uses "settings|path" or "settings<path>" after 8 chars.
             path = line[8:].lstrip("|").strip()
             if path:
                 self._profiles.load_profile_from_path(path, silent=True)
             return
         match line:
             case "start":
-                # User started the timer in LiveSplit — ensure comparison is active.
                 self._desktop.set_timer_running(True)
                 self._desktop_ensure_comparing()
             case "split":
-                # One LiveSplit segment: advance a loop cycle, or skip the group
-                # on the last cycle (dummies are invisible to LiveSplit).
                 self._desktop.set_timer_running(True)
                 self._after_manual_timer_nav()
                 self._pilgrim_timer_split()
@@ -467,20 +458,17 @@ class UIController:
                 print(f"[Pilgrim Autosplitter] Unknown LiveSplit command: {line!r}", file=sys.stderr)
 
     def _desktop_ensure_comparing(self) -> None:
-        """Resume comparison if paused; start compare threads if needed."""
         splitter = self._splitter
         if not splitter.capture_thread.is_alive():
             return
         if len(splitter.splits.list) == 0:
             return
-        # match_percent is None when compare_split is not running (paused or stopped).
         if splitter.match_percent is None:
             if not splitter.compare_split_thread.is_alive():
                 splitter.restart_compare_split_thread()
                 if splitter.splits.reset_image is not None:
                     splitter.restart_compare_reset_thread()
             else:
-                # Suspended: toggle to resume.
                 splitter.toggle_suspended()
 
     def _update_connect_menu_state(self) -> None:
@@ -611,8 +599,6 @@ class UIController:
         self._request_next_split()
 
     def _livesplit_undo_suppressed(self) -> bool:
-        # Only block timer sync while viewing the reset overlay (Toufool-style
-        # dummy groups still send undo/skip to the timer).
         return self._viewing_reset_image()
 
     def _livesplit_skip_suppressed(self) -> bool:
@@ -622,7 +608,6 @@ class UIController:
         if suppressed:
             return
         if self._desktop_linked():
-            # Desktop stdio uses plain tokens: undo/skip map to undo/skip lines.
             desktop_cmd = {
                 "undoSplit": "undo",
                 "skipSplit": "skip",
@@ -638,11 +623,6 @@ class UIController:
         return True
 
     def _pilgrim_undo(self) -> None:
-        """Undo one image/loop cycle, or undo a dummy group when timer-linked.
-
-        ``navigate_undo_split_group`` alone ignores ``@N@`` and returns no-op in
-        the first group — so LiveSplit undo looked dead while skip still moved.
-        """
         if self._dismiss_reset_overlay_if_showing():
             return
         splits = self._splitter.splits
@@ -663,23 +643,14 @@ class UIController:
         if navigate_undo_split_group(self._splitter):
             self._redraw_split_labels = True
             return
-        # First dummy group: group-undo is a no-op — still retreat one image.
         if splits.current_image_index > 0:
             navigate_to_previous_split(self._splitter)
             self._redraw_split_labels = True
 
     def _pilgrim_timer_split(self) -> None:
-        """Handle inbound LiveSplit split (same loop rules as linked skip)."""
         self._pilgrim_skip()
 
     def _pilgrim_skip(self) -> None:
-        """Skip one image/loop cycle, or skip a dummy group when timer-linked.
-
-        Without LiveSplit, Skip matches classic Pilgrim: ``next_split_image``
-        (one ``@N@`` cycle or the next image). Dummy-group jumping is only for
-        timer sync — LiveSplit has no segments for dummies. Skipping while on a
-        dummy ignores the dummy and skips one cycle of the group's real split.
-        """
         if self._dismiss_reset_overlay_if_showing():
             return
         splits = self._splitter.splits
@@ -701,7 +672,6 @@ class UIController:
         self._request_skip_split_group()
 
     def _request_timer_skip_from_dummy(self) -> None:
-        """From a dummy: skip one LS segment of the following real (not whole @N@)."""
         splits = self._splitter.splits
         index = splits.current_image_index
         if index is None:
@@ -716,7 +686,6 @@ class UIController:
             self._redraw_split_labels = True
 
     def _request_skip_split_group(self) -> None:
-        """Skip dummy group (or single real), preserving recording across dummies."""
         splits = self._splitter.splits
         index = splits.current_image_index
         if index is None:
@@ -772,24 +741,19 @@ class UIController:
         self._request_reset_splits()
 
     def _try_linked_timer_split_or_start(self) -> bool:
-        """Start-or-split on a linked timer. False when no timer link handled it."""
         if self._desktop_linked():
-            # Stock AutoSplit Integration: "start" if not running, else "split".
             return self._desktop.emit_split_or_start()
         if self._lso.linked:
             return self._lso.send("splitOrStart")
         return False
 
     def _autosplit_normal_split(self) -> None:
-        """Fire start-or-split for Desktop, LiveSplit One, or the Split hotkey."""
         if self._timer_linked() and not self._autosplit_may_send_timer():
             self._request_next_split()
             return
         if self._try_linked_timer_split_or_start():
             self._request_next_split()
             return
-        # No LiveSplit link: press Split. LiveSplit's usual shared Start/Split
-        # hotkey starts the timer when it is not running.
         press_hotkey_or_fallback(
             settings.get_str("SPLIT_HOTKEY_CODE"),
             self._keyboard.press_and_release,

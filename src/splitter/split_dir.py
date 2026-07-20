@@ -105,24 +105,12 @@ class SplitDir:
         end_of_loops: bool = False,
         loop: Optional[int] = None,
     ) -> bool:
-        """Jump to a split image index.
-
-        Args:
-            index: Target split image index.
-            end_of_loops: If True, land on the last ``@N@`` cycle of that image
-                (used when undoing into a previous split). Ignored when ``loop``
-                is set.
-            loop: Explicit ``@N@`` cycle to land on (clamped to 1..loops).
-
-        Returns:
-            False if past the end (parks on the last image at its final loop).
-        """
+        """Jump to a split image index. False if past the end."""
         if len(self.list) == 0 or self.current_image_index is None:
             return False
         if index < 0:
             return False
         if index >= len(self.list):
-            # Past last image: park on last split at its final loop.
             self.current_image_index = len(self.list) - 1
             self.current_loop = self.list[self.current_image_index].loops
             return False

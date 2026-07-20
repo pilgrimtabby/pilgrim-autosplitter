@@ -18,15 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Thread-safe split index changes while compare_split may be active.
-
-Dummy grouping matches Toufool AutoSplit: consecutive dummies plus the following
-real split form one group. When LiveSplit is linked, Skip/Undo jump by group
-for non-looping reals; mid-``@N@`` advances one cycle. Skipping while on a
-dummy ignores the dummy and skips one cycle of that group's real split (so a
-``@N@`` loop is not exited in one go). Without a timer link, Skip/Next both
-move one image or loop cycle (classic Pilgrim).
-"""
+"""Thread-safe split index changes while compare_split may be active."""
 
 from __future__ import annotations
 
@@ -38,7 +30,6 @@ _CHANGE_POLL_S = 0.001
 
 
 def _change_split_image(splitter, move: Callable[[], None]) -> None:
-    """Pause compare_split if active, change index, then release the pause."""
     if splitter.match_percent is None:
         move()
         return
@@ -54,7 +45,7 @@ def _change_split_image(splitter, move: Callable[[], None]) -> None:
 
 
 def build_dummy_groups(splits: Sequence) -> List[List[int]]:
-    """Group split indices: dummies + following real split (Toufool-compatible)."""
+    """Group indices: dummies plus the following real split."""
     if not splits:
         return []
     groups: List[List[int]] = []
@@ -72,7 +63,6 @@ def build_dummy_groups(splits: Sequence) -> List[List[int]]:
 
 
 def skip_group_target_index(groups: Sequence[Sequence[int]], current_index: int) -> Optional[int]:
-    """Index after the current group, or None if current_index is unknown."""
     for group in groups:
         if current_index in group:
             return group[-1] + 1
@@ -80,7 +70,6 @@ def skip_group_target_index(groups: Sequence[Sequence[int]], current_index: int)
 
 
 def undo_group_target_index(groups: Sequence[Sequence[int]], current_index: int) -> Optional[int]:
-    """Last index of the previous group, or None if already in the first group."""
     for i, group in enumerate(groups):
         if current_index in group:
             if i == 0:
@@ -90,7 +79,6 @@ def undo_group_target_index(groups: Sequence[Sequence[int]], current_index: int)
 
 
 def group_contains_dummy(groups: Sequence[Sequence[int]], splits: Sequence, current_index: int) -> bool:
-    """True if the group containing current_index includes a dummy split."""
     for group in groups:
         if current_index in group:
             return any(getattr(splits[i], "dummy_flag", False) for i in group)
@@ -98,7 +86,6 @@ def group_contains_dummy(groups: Sequence[Sequence[int]], splits: Sequence, curr
 
 
 def group_real_index(groups: Sequence[Sequence[int]], current_index: int) -> Optional[int]:
-    """Index of the real split closing the group that contains current_index."""
     for group in groups:
         if current_index in group:
             return group[-1]
@@ -106,22 +93,14 @@ def group_real_index(groups: Sequence[Sequence[int]], current_index: int) -> Opt
 
 
 def timer_split_should_advance_loop(current_loop: int, total_loops: int) -> bool:
-    """True when a LiveSplit timer split should move to the next loop cycle.
-
-    Each ``@N@`` loop is one LiveSplit segment. Mid-loop splits advance the
-    cycle; the last cycle (and non-looping images) skip the dummy group so
-    Pilgrim stays aligned with LiveSplit's visible segments.
-    """
     return current_loop < total_loops
 
 
 def timer_undo_should_retreat_loop(current_loop: int) -> bool:
-    """True when undo should go back one ``@N@`` cycle instead of a group jump."""
     return current_loop > 1
 
 
 def navigate_to_previous_split(splitter) -> None:
-    """Move to the previous split image (one image / loop — not a dummy group)."""
     splitter.safe_exit_record_thread()
     _change_split_image(splitter, splitter.splits.previous_split_image)
     splitter.restart_record_thread()
@@ -133,11 +112,7 @@ def navigate_to_next_split(
     continue_recording: bool,
     split_hotkey_pressed: bool,
 ) -> bool:
-    """Move to the next split image, or stop compare threads on final split.
-
-    Returns:
-        True when the split index changed and split labels should redraw.
-    """
+    """Move to the next split image, or stop compare on the final split."""
     if not continue_recording:
         splitter.safe_exit_record_thread()
 
@@ -166,11 +141,6 @@ def navigate_to_next_split(
 
 
 def navigate_skip_split_group(splitter, *, continue_recording: bool) -> bool:
-    """Skip the current dummy group (or single real split), Toufool-style.
-
-    Returns:
-        True when split labels should redraw.
-    """
     splits = splitter.splits
     index = splits.current_image_index
     if index is None or len(splits.list) == 0:
@@ -204,11 +174,6 @@ def navigate_skip_split_group(splitter, *, continue_recording: bool) -> bool:
 
 
 def navigate_timer_skip_from_dummy(splitter, *, continue_recording: bool) -> bool:
-    """Timer skip while on a dummy: ignore dummies, skip one real LS segment.
-
-    For a looping real (``@N@``), land on that image at loop 2 (first cycle
-    skipped). For a non-looping real, skip past the whole group.
-    """
     splits = splitter.splits
     index = splits.current_image_index
     if index is None or len(splits.list) == 0:
@@ -244,11 +209,6 @@ def navigate_timer_skip_from_dummy(splitter, *, continue_recording: bool) -> boo
 
 
 def navigate_undo_split_group(splitter) -> bool:
-    """Undo to the previous dummy group's real split (Toufool-style).
-
-    Returns:
-        True when the index changed and labels should redraw.
-    """
     splits = splitter.splits
     index = splits.current_image_index
     if index is None or len(splits.list) == 0:

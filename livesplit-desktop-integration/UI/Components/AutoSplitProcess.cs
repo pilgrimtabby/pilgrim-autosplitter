@@ -122,9 +122,7 @@ namespace LiveSplit.UI.Components
                     settings.OnStart();
                     return;
                 case Commands.Split:
-                    // Pilgrim (and AutoSplit without a start image) always emits
-                    // "split". Treat it as start-or-split so the first match can
-                    // start the timer (same idea as LiveSplit One splitOrStart).
+                    // start-or-split (Pilgrim has no separate start image)
                     if (state.CurrentPhase == TimerPhase.NotRunning)
                     {
                         component.IgnoreNext(Commands.Start);
