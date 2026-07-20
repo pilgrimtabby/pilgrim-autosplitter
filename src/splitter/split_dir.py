@@ -98,6 +98,21 @@ class SplitDir:
         else:
             self.current_loop -= 1
 
+    def jump_to_split_image(self, index: int) -> bool:
+        """Jump to a split image index (loop 1). Returns False if past the end."""
+        if len(self.list) == 0 or self.current_image_index is None:
+            return False
+        if index < 0:
+            return False
+        if index >= len(self.list):
+            # Past last image: park on last split at its final loop.
+            self.current_image_index = len(self.list) - 1
+            self.current_loop = self.list[self.current_image_index].loops
+            return False
+        self.current_image_index = index
+        self.current_loop = 1
+        return True
+
     def reset_split_images(self) -> None:
         """Rebuild split image list, refresh reset image, and reset flags."""
         new_list, new_reset_image = self._get_split_images()

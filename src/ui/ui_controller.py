@@ -67,7 +67,14 @@ import settings
 from livesplit.desktop_stdio import DesktopStdioSession, is_auto_controlled
 from livesplit.timer_sync import LiveSplitTimerSync
 from splitter.splitter import Splitter
-from ui.split_navigation import navigate_to_next_split, navigate_to_previous_split
+from ui.split_navigation import (
+    build_dummy_groups,
+    group_contains_dummy,
+    navigate_skip_split_group,
+    navigate_to_next_split,
+    navigate_to_previous_split,
+    navigate_undo_split_group,
+)
 from ui.timer_hotkey import press_hotkey_or_fallback
 from ui.ui_connect_dialog import UIConnectWebSocketDialog
 from ui.ui_keyboard_controller import UIKeyboardController
@@ -574,14 +581,12 @@ class UIController:
         self._request_next_split()
 
     def _livesplit_undo_suppressed(self) -> bool:
-        return self._viewing_reset_image() or self._current_split_is_dummy()
+        # Only block timer sync while viewing the reset overlay (Toufool-style
+        # dummy groups still send undo/skip to the timer).
+        return self._viewing_reset_image()
 
     def _livesplit_skip_suppressed(self) -> bool:
-        return (
-            self._viewing_reset_image()
-            or self._on_first_split_image()
-            or self._current_split_is_dummy()
-        )
+        return self._viewing_reset_image()
 
     def _notify_livesplit(self, command: str, suppressed: bool) -> None:
         if suppressed:
@@ -605,12 +610,28 @@ class UIController:
     def _pilgrim_undo(self) -> None:
         if self._dismiss_reset_overlay_if_showing():
             return
-        self._request_previous_split()
+        if navigate_undo_split_group(self._splitter):
+            self._redraw_split_labels = True
 
     def _pilgrim_skip(self) -> None:
         if self._dismiss_reset_overlay_if_showing():
             return
-        self._request_next_split_preserving_recording_on_dummy()
+        self._request_skip_split_group()
+
+    def _request_skip_split_group(self) -> None:
+        """Skip dummy group (or single real), preserving recording across dummies."""
+        splits = self._splitter.splits
+        index = splits.current_image_index
+        if index is None:
+            return
+        groups = build_dummy_groups(splits.list)
+        continue_recording = group_contains_dummy(groups, splits.list, index)
+        if continue_recording:
+            self._splitter.continue_recording = True
+        if navigate_skip_split_group(
+            self._splitter, continue_recording=continue_recording
+        ):
+            self._redraw_split_labels = True
 
     def _manual_undo(self, *, via_button: bool = False) -> None:
         if self._timer_linked():
@@ -698,8 +719,9 @@ class UIController:
         split_index = self._splitter.splits.current_image_index
         if split_index is None:
             return
-        split = self._splitter.splits.list[split_index]
-        if split.dummy_flag:
+        splits = self._splitter.splits.list
+        groups = build_dummy_groups(splits)
+        if group_contains_dummy(groups, splits, split_index):
             self._splitter.continue_recording = True
         else:
             self._splitter.save_recording = True
