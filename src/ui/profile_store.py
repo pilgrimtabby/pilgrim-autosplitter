@@ -44,6 +44,12 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
 )
 
+from ui.window_chrome import (
+    disable_context_help,
+    message_information,
+    message_warning,
+)
+
 import paths
 import settings
 
@@ -215,6 +221,7 @@ class ProfileStore:
 
         dlg = QDialog(self._ctrl._main_window)
         dlg.setWindowTitle("Save Profile")
+        disable_context_help(dlg)
         dlg.setStyleSheet(self._ctrl._get_style_sheet())
         dlg.setFixedWidth(390)
         root = QVBoxLayout(dlg)
@@ -381,7 +388,7 @@ class ProfileStore:
                 return
             target = current_dir / f"{name}.json"
             if not target.is_file():
-                QMessageBox.information(
+                message_information(
                     dlg,
                     "Delete Profile",
                     "Select an existing profile from the dropdown to delete.",
@@ -389,6 +396,7 @@ class ProfileStore:
                 return
 
             msg = QMessageBox(dlg)
+            disable_context_help(msg)
             msg.setWindowTitle("Delete profile?")
             msg.setIcon(QMessageBox.Warning)
             msg.setText("Delete this profile?")
@@ -401,7 +409,7 @@ class ProfileStore:
             try:
                 target.unlink()
             except OSError:
-                QMessageBox.warning(dlg, "Delete failed", "Could not delete profile.")
+                message_warning(dlg, "Delete failed", "Could not delete profile.")
                 return
 
             # Remove from recents (best-effort) and refresh menu + dropdown.
@@ -420,7 +428,7 @@ class ProfileStore:
                 return
             profile_name = self.sanitize_profile_name(name_combo.currentText())
             if not profile_name:
-                QMessageBox.warning(
+                message_warning(
                     dlg,
                     "Invalid profile name",
                     "Profile name must contain letters, numbers, spaces, dot, dash or underscore.",
@@ -429,6 +437,7 @@ class ProfileStore:
             target = current_dir / f"{profile_name}.json"
             if target.exists():
                 msg = QMessageBox(dlg)
+                disable_context_help(msg)
                 msg.setWindowTitle("Overwrite profile?")
                 msg.setIcon(QMessageBox.Warning)
                 msg.setText("Do you want to overwrite it?")
@@ -465,7 +474,7 @@ class ProfileStore:
             if silent:
                 print(f"[Pilgrim Autosplitter] {title}: {message}", file=sys.stderr)
                 return
-            QMessageBox.warning(self._ctrl._main_window, title, message)
+            message_warning(self._ctrl._main_window, title, message)
 
         try:
             payload = json.loads(p.read_text(encoding="utf-8"))

@@ -23,7 +23,6 @@ and should be provided in a controller class.
 """
 
 
-import platform
 from typing import Optional
 
 from PyQt5.QtCore import QEvent, QObject, QRect, Qt, QTimer
@@ -45,6 +44,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.labels import SNAP_PEAK_HOTKEY_LABEL
+from ui.window_chrome import disable_context_help
 
 
 class UISettingsWindow(QDialog):
@@ -125,8 +125,7 @@ class UISettingsWindow(QDialog):
         self.setFocusPolicy(Qt.NoFocus)
 
         # Hide question mark button in top right on Windows
-        if platform.system() == "Windows":
-            self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        disable_context_help(self)
 
         # Shift all widgets, except the frame, this many pixels right
         self._LEFT = 0

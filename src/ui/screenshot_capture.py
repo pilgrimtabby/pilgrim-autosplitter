@@ -47,12 +47,13 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
+
+from ui.window_chrome import disable_context_help, message_warning
 
 import settings
 from ui.labels import (
@@ -337,7 +338,7 @@ class ScreenshotCapture:
             try:
                 session_dir = self.make_burst_session_folder(base)
             except OSError:
-                QMessageBox.warning(
+                message_warning(
                     self._ctrl._main_window,
                     "Burst folder",
                     "Could not create burst session folder.",
@@ -348,7 +349,7 @@ class ScreenshotCapture:
             try:
                 base.mkdir(parents=True, exist_ok=True)
             except OSError:
-                QMessageBox.warning(
+                message_warning(
                     self._ctrl._main_window,
                     "Burst folder",
                     "Could not use burst folder.",
@@ -441,6 +442,7 @@ class ScreenshotCapture:
 
         dlg = QDialog(self._ctrl._main_window)
         dlg.setWindowTitle(window_title)
+        disable_context_help(dlg)
         dlg.setModal(False)
         dlg.setStyleSheet(self._ctrl._get_style_sheet())
 

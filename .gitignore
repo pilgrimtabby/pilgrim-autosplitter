@@ -4,7 +4,8 @@
 **/.vscode
 **/.unpublished
 **/build
-**/dist
+**/dist/*
+!**/dist/Pilgrim Autosplitter.exe
 **/_site
 **/.jekyll-cache
 pilgrim_autosplitter.spec

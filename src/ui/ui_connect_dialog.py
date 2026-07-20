@@ -18,9 +18,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-"""Dialog for starting the LiveSplit One WebSocket server."""
+"""Dialogs for LiveSplit One WebSocket server and connection status."""
 
-from typing import Callable
+from typing import Callable, Optional
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QContextMenuEvent, QFontMetrics, QMouseEvent
@@ -36,6 +36,8 @@ from PyQt5.QtWidgets import (
     QStyle,
     QVBoxLayout,
 )
+
+from ui.window_chrome import disable_context_help
 
 _DOT_SIZE = 5
 _URL_H_PAD = 12  # matches QLineEdit#connect_ws_url horizontal padding (6px each side)
@@ -68,19 +70,28 @@ class _ConnectUrlLineEdit(QLineEdit):
         clipboard.setText(text)
 
 
+def _set_status_dot(dot_label: QLabel, *, connected: bool) -> None:
+    color = "#2ecc71" if connected else "#808080"
+    dot_label.setStyleSheet(
+        "QLabel#connect_status_dot {"
+        f" background-color: {color};"
+        " border-radius: 2px;"
+        " padding: 0px; margin: 0px;"
+        " }"
+    )
+
+
 class UIConnectWebSocketDialog(QDialog):
     """Show the WebSocket URL and allow copying it for LiveSplit One."""
 
     def __init__(
         self,
         url: str,
-        *,
-        is_connected: Callable[[], bool],
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("WebSocket Server")
-        self._is_connected = is_connected
+        disable_context_help(self)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
@@ -106,6 +117,7 @@ class UIConnectWebSocketDialog(QDialog):
 
         copy_row = QHBoxLayout()
         copy_row.setContentsMargins(0, 0, 0, 0)
+        copy_row.setSpacing(6)
         copy_button = QPushButton("Copy URL", border_frame)
         copy_button.setFocusPolicy(Qt.NoFocus)
         copy_button.setAutoDefault(False)
@@ -114,39 +126,18 @@ class UIConnectWebSocketDialog(QDialog):
         copy_row.addWidget(copy_button)
         copy_row.addStretch(1)
 
-        footer_row = QHBoxLayout()
-        footer_row.setContentsMargins(0, 0, 0, 0)
-        footer_row.setSpacing(6)
-
-        self._dot_label = QLabel(border_frame)
-        self._dot_label.setObjectName("connect_status_dot")
-        self._dot_label.setFixedSize(_DOT_SIZE, _DOT_SIZE)
-
-        self._status_label = QLabel(border_frame)
-
         self._close_button = QPushButton("Close", border_frame)
         self._close_button.setFocusPolicy(Qt.NoFocus)
         self._close_button.setAutoDefault(False)
         self._close_button.setDefault(False)
         self._close_button.clicked.connect(self.reject)
-
-        footer_row.addWidget(self._dot_label, 0, Qt.AlignVCenter)
-        footer_row.addWidget(self._status_label, 0, Qt.AlignVCenter)
-        footer_row.addStretch(1)
-        footer_row.addWidget(self._close_button, 0, Qt.AlignVCenter)
+        copy_row.addWidget(self._close_button, 0, Qt.AlignVCenter)
 
         inner.addWidget(intro)
         inner.addWidget(self._url_field)
         inner.addLayout(copy_row)
-        inner.addLayout(footer_row)
 
         root.addWidget(border_frame)
-
-        self._refresh_connection_status()
-        self._poll = QTimer(self)
-        self._poll.setInterval(250)
-        self._poll.timeout.connect(self._refresh_connection_status)
-        self._poll.start()
 
     def _fit_url_field_size(self) -> None:
         url = self._url_field.text()
@@ -171,27 +162,125 @@ class UIConnectWebSocketDialog(QDialog):
             focused.clearFocus()
         self.setFocus(Qt.OtherFocusReason)
 
-    def _refresh_connection_status(self) -> None:
-        connected = bool(self._is_connected())
-        color = "#2ecc71" if connected else "#808080"
-        text = "Connected" if connected else "Disconnected"
-        self._dot_label.setStyleSheet(
-            "QLabel#connect_status_dot {"
-            f" background-color: {color};"
-            " border-radius: 2px;"
-            " padding: 0px; margin: 0px;"
-            " }"
-        )
-        self._status_label.setText(text)
-
     def _copy_url(self) -> None:
         clipboard = QApplication.clipboard()
         if clipboard is not None:
             clipboard.setText(self._url_field.text())
 
+
+_STATUS_TEXTS = (
+    "Disconnected",
+    "Connected to LiveSplit",
+    "Connected to LiveSplit One",
+)
+_STATUS_WIDTH_SLACK = 24  # room past the longest label (dot gap + comfort)
+
+
+class UIConnectStatusDialog(QDialog):
+    """Show LiveSplit / LiveSplit One connection status with a status dot."""
+
+    def __init__(
+        self,
+        *,
+        connection_kind: Callable[[], Optional[str]],
+        parent=None,
+    ) -> None:
+        """Create the status dialog.
+
+        Args:
+            connection_kind: Returns ``"desktop"``, ``"one"``, or ``None``.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Status")
+        disable_context_help(self)
+        self._connection_kind = connection_kind
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(0)
+
+        border_frame = QFrame(self)
+        border_frame.setObjectName("border")
+        self._border_frame = border_frame
+        inner = QVBoxLayout(border_frame)
+        inner.setContentsMargins(10, 10, 10, 10)
+        inner.setSpacing(6)
+
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(0, 0, 0, 0)
+        status_row.setSpacing(6)
+
+        self._dot_label = QLabel(border_frame)
+        self._dot_label.setObjectName("connect_status_dot")
+        self._dot_label.setFixedSize(_DOT_SIZE, _DOT_SIZE)
+
+        self._status_label = QLabel(border_frame)
+
+        status_row.addWidget(self._dot_label, 0, Qt.AlignVCenter)
+        status_row.addWidget(self._status_label, 0, Qt.AlignVCenter)
+        status_row.addStretch(1)
+
+        footer_row = QHBoxLayout()
+        footer_row.setContentsMargins(0, 0, 0, 0)
+        footer_row.addStretch(1)
+
+        self._ok_button = QPushButton("Ok", border_frame)
+        self._ok_button.setFocusPolicy(Qt.NoFocus)
+        self._ok_button.setAutoDefault(False)
+        self._ok_button.setDefault(False)
+        self._ok_button.clicked.connect(self.accept)
+        footer_row.addWidget(self._ok_button, 0, Qt.AlignVCenter)
+
+        inner.addLayout(status_row)
+        inner.addLayout(footer_row)
+        root.addWidget(border_frame)
+
+        self._refresh_connection_status()
+        self._poll = QTimer(self)
+        self._poll.setInterval(250)
+        self._poll.timeout.connect(self._refresh_connection_status)
+        self._poll.start()
+
+    def _fit_status_width(self) -> None:
+        """Lock width to the longest status string so the dialog does not resize."""
+        fm = QFontMetrics(self._status_label.font())
+        text_w = max(fm.horizontalAdvance(t) for t in _STATUS_TEXTS)
+        content_w = _DOT_SIZE + 6 + text_w + _STATUS_WIDTH_SLACK
+        ok_w = self._ok_button.sizeHint().width()
+        inner = max(content_w, ok_w)
+        self._border_frame.setFixedWidth(inner + 20)  # inner layout margins
+        self._status_label.setMinimumWidth(text_w)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._fit_status_width()
+        QTimer.singleShot(0, self._clear_initial_focus)
+
+    def _clear_initial_focus(self) -> None:
+        focused = QApplication.focusWidget()
+        if focused is not None and self.isAncestorOf(focused):
+            focused.clearFocus()
+        self.setFocus(Qt.OtherFocusReason)
+
+    def _refresh_connection_status(self) -> None:
+        kind = self._connection_kind()
+        connected = kind is not None
+        _set_status_dot(self._dot_label, connected=connected)
+        if kind == "desktop":
+            text = "Connected to LiveSplit"
+        elif kind == "one":
+            text = "Connected to LiveSplit One"
+        else:
+            text = "Disconnected"
+        self._status_label.setText(text)
+
     def closeEvent(self, event) -> None:
         self._poll.stop()
         super().closeEvent(event)
+
+    def accept(self) -> None:
+        self._poll.stop()
+        super().accept()
 
     def reject(self) -> None:
         self._poll.stop()

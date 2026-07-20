@@ -212,7 +212,7 @@ def navigate_undo_split_group(splitter) -> bool:
     splitter.safe_exit_record_thread()
 
     def move() -> None:
-        splits.jump_to_split_image(target)
+        splits.jump_to_split_image(target, end_of_loops=True)
 
     _change_split_image(splitter, move)
     splitter.restart_record_thread()

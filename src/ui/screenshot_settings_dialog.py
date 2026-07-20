@@ -38,12 +38,13 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
+
+from ui.window_chrome import disable_context_help, message_warning
 
 import settings
 
@@ -57,6 +58,7 @@ class ScreenshotSettingsDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setFocusPolicy(Qt.NoFocus)
+        disable_context_help(self)
 
     def _blur_focused_descendant(self) -> None:
         app = QApplication.instance()
@@ -295,7 +297,7 @@ def exec_screenshot_settings_dialog(capture: "ScreenshotCapture") -> bool:
     def on_ok() -> None:
         exp = folder_state[0]
         if not exp.is_dir():
-            QMessageBox.warning(
+            message_warning(
                 dlg,
                 "Folder",
                 "Choose a valid folder (use Select folder).",

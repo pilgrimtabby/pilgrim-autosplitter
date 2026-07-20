@@ -37,13 +37,14 @@ def _splitter_stub(*, match_percent=None, continue_recording=False, splits=None)
     splitter.splits.current_image_index = 0
     splitter.splits.current_loop = 1
 
-    def jump_to(index: int) -> bool:
+    def jump_to(index: int, *, end_of_loops: bool = False) -> bool:
         if index >= len(splitter.splits.list):
             splitter.splits.current_image_index = len(splitter.splits.list) - 1
             splitter.splits.current_loop = splitter.splits.list[-1].loops
             return False
         splitter.splits.current_image_index = index
-        splitter.splits.current_loop = 1
+        total = splitter.splits.list[index].loops
+        splitter.splits.current_loop = total if end_of_loops else 1
         return True
 
     splitter.splits.jump_to_split_image.side_effect = jump_to
@@ -129,6 +130,18 @@ def test_navigate_undo_split_group_jumps_to_previous_real():
     splitter.splits.current_image_index = 2
     assert navigate_undo_split_group(splitter) is True
     assert splitter.splits.current_image_index == 1
+    assert splitter.splits.current_loop == 1
+
+
+def test_navigate_undo_split_group_lands_on_last_loop():
+    """Undo into a previous @N@ split should resume its final cycle."""
+    splits = [_split(dummy=True), _split(loops=5), _split()]
+    splitter = _splitter_stub(splits=splits)
+    splitter.splits.current_image_index = 2
+    splitter.splits.current_loop = 1
+    assert navigate_undo_split_group(splitter) is True
+    assert splitter.splits.current_image_index == 1
+    assert splitter.splits.current_loop == 5
 
 
 def test_timer_split_should_advance_loop_mid_cycle():

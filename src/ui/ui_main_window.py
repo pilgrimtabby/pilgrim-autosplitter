@@ -60,6 +60,7 @@ from PyQt5.QtWidgets import (
 
 import settings
 from settings import VERSION_NUMBER
+from ui.window_chrome import disable_context_help
 
 
 class CropStepSpinBox(QSpinBox):
@@ -121,6 +122,7 @@ class UIMainWindow(QMainWindow):
         connect_menu (QMenu): Top-bar menu for LiveSplit One WebSocket integration.
         connect_disconnect_action (QAction): Stops timer sync and the WebSocket server.
         connect_start_server_action (QAction): Starts the WebSocket server and shows its URL.
+        connect_status_action (QAction): Opens the connection status dialog.
         profile_menu (QMenu): Top-bar profile menu for save/load profile actions.
         profile_load_action (QAction): Opens a file picker to load a profile.
         profile_save_action (QAction): Saves current runtime/settings as a profile.
@@ -273,7 +275,9 @@ class UIMainWindow(QMainWindow):
         self.connect_disconnect_action = QAction("Disconnect", self)
         self.connect_disconnect_action.setEnabled(False)
         self.connect_start_server_action = QAction("WebSocket Server...", self)
+        self.connect_status_action = QAction("Status...", self)
         self.connect_menu.addAction(self.connect_start_server_action)
+        self.connect_menu.addAction(self.connect_status_action)
         self.connect_menu.addSeparator()
         self.connect_menu.addAction(self.connect_disconnect_action)
 
@@ -628,11 +632,13 @@ class UIMainWindow(QMainWindow):
         # Screenshot success message box
         # (No parent widget -- parent widget keeps it from closing)
         self.screenshot_ok_msg = QMessageBox()
+        disable_context_help(self.screenshot_ok_msg)
         self.screenshot_ok_msg.setText("Screenshot taken")
 
         # Screenshot error message box (no video)
         # (No parent widget -- parent widget keeps it from closing)
         self.screenshot_err_no_video = QMessageBox()
+        disable_context_help(self.screenshot_err_no_video)
         self.screenshot_err_no_video.setText("Could not take screenshot")
         self.screenshot_err_no_video.setInformativeText(
             "No video feed detected. Please make sure video feed is active and try again."
@@ -642,6 +648,7 @@ class UIMainWindow(QMainWindow):
         # Screenshot error message box (file couldn't be saved)
         # (No parent widget -- parent widget keeps it from closing)
         self.screenshot_err_no_file = QMessageBox()
+        disable_context_help(self.screenshot_err_no_file)
         self.screenshot_err_no_file.setText("Could not save screenshot")
         self.screenshot_err_no_file.setInformativeText(
             "Pilgrim Autosplitter can't write files to this folder. Please select a different folder and try again."
@@ -825,6 +832,7 @@ class UIMainWindow(QMainWindow):
         # Update available message box
         # (Parent widget ok here since the signals are hooked up)
         self.update_available_msg = QMessageBox()
+        disable_context_help(self.update_available_msg)
         self.update_available_msg.setText("New update available!")
         self.update_available_msg.setInformativeText(
             "Pilgrim Autosplitter has been updated!\nShow new release?"
@@ -865,6 +873,7 @@ class UIMainWindow(QMainWindow):
 
         # Couldn't find file or directory error message box
         self.err_not_found_msg = QMessageBox()
+        disable_context_help(self.err_not_found_msg)
         self.err_not_found_msg.setText("File or folder not found")
         self.err_not_found_msg.setInformativeText(
             "The file or folder could not be found. Please try again."
@@ -873,6 +882,7 @@ class UIMainWindow(QMainWindow):
 
         # Invalid image directory chosen message box
         self.err_invalid_dir_msg = QMessageBox()
+        disable_context_help(self.err_invalid_dir_msg)
         self.err_invalid_dir_msg.setText("Invalid folder selection")
         self.err_invalid_dir_msg.setInformativeText(
             f"You must select your home folder ({settings.get_home_dir()}) or one of its subfolders."

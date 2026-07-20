@@ -53,7 +53,6 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QPushButton,
     QShortcut,
     QSizePolicy,
@@ -78,7 +77,7 @@ from ui.split_navigation import (
     timer_undo_should_retreat_loop,
 )
 from ui.timer_hotkey import press_hotkey_or_fallback
-from ui.ui_connect_dialog import UIConnectWebSocketDialog
+from ui.ui_connect_dialog import UIConnectStatusDialog, UIConnectWebSocketDialog
 from ui.ui_keyboard_controller import UIKeyboardController
 from ui.ui_main_window import UIMainWindow
 from ui.ui_settings_window import UISettingsWindow
@@ -117,6 +116,7 @@ from ui.video_crop import VideoCropController
 from ui.labels import SNAP_PEAK_HOTKEY_LABEL
 from ui.screenshot_capture import ScreenshotCapture
 from ui.slot_errors import log_slot_error
+from ui.window_chrome import message_warning
 
 # Slightly larger than global theme for bottom stats + main action buttons only.
 _BOTTOM_PANEL_FONT_PX = 17
@@ -347,6 +347,9 @@ class UIController:
         self._main_window.connect_start_server_action.triggered.connect(
             self._open_livesplit_ws_server_dialog
         )
+        self._main_window.connect_status_action.triggered.connect(
+            self._open_livesplit_status_dialog
+        )
         self._update_connect_menu_state()
 
         if self._desktop_auto_controlled:
@@ -489,7 +492,7 @@ class UIController:
         try:
             from livesplit.ws_server import LiveSplitWebSocketServer
         except ImportError:
-            QMessageBox.warning(
+            message_warning(
                 self._main_window,
                 "Missing dependency",
                 "The websockets package is required for LiveSplit One integration.\n\n"
@@ -519,7 +522,7 @@ class UIController:
         if not server.is_running:
             if not server.start():
                 detail = server.start_error or "The port may already be in use."
-                QMessageBox.warning(
+                message_warning(
                     self._main_window,
                     "WebSocket server failed",
                     "Could not start the WebSocket server.\n\n" + detail,
@@ -530,7 +533,22 @@ class UIController:
                 return
         dialog = UIConnectWebSocketDialog(
             server.url,
-            is_connected=lambda: server.is_client_connected,
+            parent=self._main_window,
+        )
+        dialog.setStyleSheet(self._get_style_sheet())
+        dialog.exec_()
+
+    def _livesplit_connection_kind(self) -> Optional[str]:
+        """Return ``desktop``, ``one``, or ``None`` for the Status dialog."""
+        if self._desktop_linked():
+            return "desktop"
+        if self._lso.linked:
+            return "one"
+        return None
+
+    def _open_livesplit_status_dialog(self) -> None:
+        dialog = UIConnectStatusDialog(
+            connection_kind=self._livesplit_connection_kind,
             parent=self._main_window,
         )
         dialog.setStyleSheet(self._get_style_sheet())
@@ -1129,7 +1147,7 @@ class UIController:
         if new_path == old_path:
             return
         if new_path.exists() and new_path != old_path:
-            QMessageBox.warning(
+            message_warning(
                 self._main_window,
                 "Cannot update split filename",
                 f"Target filename already exists:\n{new_path.name}",
@@ -1139,7 +1157,7 @@ class UIController:
         try:
             old_path.replace(new_path)
         except OSError:
-            QMessageBox.warning(
+            message_warning(
                 self._main_window,
                 "Could not rename split",
                 "Failed to apply threshold/delay/loop override.",
@@ -1462,7 +1480,7 @@ class UIController:
         conflict = self._detect_hotkey_conflict()
         if conflict is not None:
             a_name, b_name, key_name = conflict
-            QMessageBox.warning(
+            message_warning(
                 self._settings_window,
                 "Hotkey conflict",
                 (
