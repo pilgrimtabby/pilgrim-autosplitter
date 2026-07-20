@@ -43,7 +43,7 @@ _DOT_SIZE = 5
 _URL_H_PAD = 12  # matches QLineEdit#connect_ws_url horizontal padding (6px each side)
 _URL_V_PAD = 6   # matches QLineEdit#connect_ws_url vertical padding (3px each side)
 _URL_WIDTH_SLACK = 4
-_DIALOG_EXTRA_WIDTH = 28  # whole popup slightly wider than the URL field
+_DIALOG_BREATHING = 36  # horizontal room past the widest line / URL text
 
 
 class _ConnectUrlLineEdit(QLineEdit):
@@ -104,12 +104,12 @@ class UIConnectWebSocketDialog(QDialog):
         inner.setContentsMargins(10, 10, 10, 10)
         inner.setSpacing(6)
 
-        intro = QLabel(
+        self._intro = QLabel(
             "Paste this URL into LiveSplit One:\n"
             "Settings → Server Connection → Connect",
             border_frame,
         )
-        intro.setWordWrap(True)
+        self._intro.setWordWrap(True)
 
         self._url_field = _ConnectUrlLineEdit(url, border_frame)
         self._url_field.setObjectName("connect_ws_url")
@@ -133,7 +133,7 @@ class UIConnectWebSocketDialog(QDialog):
         self._close_button.clicked.connect(self.reject)
         copy_row.addWidget(self._close_button, 0, Qt.AlignVCenter)
 
-        inner.addWidget(intro)
+        inner.addWidget(self._intro)
         inner.addWidget(self._url_field)
         inner.addLayout(copy_row)
 
@@ -144,11 +144,17 @@ class UIConnectWebSocketDialog(QDialog):
         fm = QFontMetrics(self._url_field.font())
         style = self._url_field.style()
         frame = style.pixelMetric(QStyle.PM_DefaultFrameWidth) * 2
-        text_w = fm.horizontalAdvance(url)
-        width = text_w + frame + _URL_H_PAD + _URL_WIDTH_SLACK
+        url_w = fm.horizontalAdvance(url) + frame + _URL_H_PAD + _URL_WIDTH_SLACK
+        intro_fm = QFontMetrics(self._intro.font())
+        intro_w = max(
+            (intro_fm.horizontalAdvance(line) for line in self._intro.text().splitlines()),
+            default=0,
+        )
+        content_w = max(url_w, intro_w) + _DIALOG_BREATHING
         height = max(self._url_field.sizeHint().height(), fm.height() + _URL_V_PAD)
-        self._url_field.setFixedSize(width, height)
-        self._border_frame.setMinimumWidth(width + _DIALOG_EXTRA_WIDTH)
+        self._url_field.setFixedSize(content_w, height)
+        # +20 matches inner layout left/right margins
+        self._border_frame.setMinimumWidth(content_w + 20)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)
