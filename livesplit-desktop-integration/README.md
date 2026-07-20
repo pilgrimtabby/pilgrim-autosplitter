@@ -9,7 +9,7 @@ When the autosplitter prints `split` on stdout, this component treats it as **st
 - timer not running → `Start()` (same as LiveSplit One `splitOrStart`)
 - timer running → `Split()`
 
-Pilgrim has no separate start-image file, so it always emits `split` for a normal match. Stock upstream AutoSplit Integration only called `Split()`, which does nothing if the timer has not started yet.
+Pilgrim has no separate start-image file. Current Pilgrim emits `start` when the timer is not running and `split` afterward, so **stock** AutoSplit Integration works. This patch remains useful for older Pilgrim builds and for AutoSplit without a start image (outbound `split` while NotRunning).
 
 ## Installation
 

@@ -98,13 +98,21 @@ class SplitDir:
         else:
             self.current_loop -= 1
 
-    def jump_to_split_image(self, index: int, *, end_of_loops: bool = False) -> bool:
+    def jump_to_split_image(
+        self,
+        index: int,
+        *,
+        end_of_loops: bool = False,
+        loop: Optional[int] = None,
+    ) -> bool:
         """Jump to a split image index.
 
         Args:
             index: Target split image index.
             end_of_loops: If True, land on the last ``@N@`` cycle of that image
-                (used when undoing into a previous split). Otherwise loop 1.
+                (used when undoing into a previous split). Ignored when ``loop``
+                is set.
+            loop: Explicit ``@N@`` cycle to land on (clamped to 1..loops).
 
         Returns:
             False if past the end (parks on the last image at its final loop).
@@ -120,7 +128,10 @@ class SplitDir:
             return False
         self.current_image_index = index
         total = self.list[self.current_image_index].loops
-        self.current_loop = total if end_of_loops else 1
+        if loop is not None:
+            self.current_loop = max(1, min(int(loop), total))
+        else:
+            self.current_loop = total if end_of_loops else 1
         return True
 
     def reset_split_images(self) -> None:

@@ -70,6 +70,7 @@ from ui.split_navigation import (
     build_dummy_groups,
     group_contains_dummy,
     navigate_skip_split_group,
+    navigate_timer_skip_from_dummy,
     navigate_to_next_split,
     navigate_to_previous_split,
     navigate_undo_split_group,
@@ -441,19 +442,23 @@ class UIController:
         match line:
             case "start":
                 # User started the timer in LiveSplit — ensure comparison is active.
+                self._desktop.set_timer_running(True)
                 self._desktop_ensure_comparing()
             case "split":
                 # One LiveSplit segment: advance a loop cycle, or skip the group
                 # on the last cycle (dummies are invisible to LiveSplit).
+                self._desktop.set_timer_running(True)
                 self._after_manual_timer_nav()
                 self._pilgrim_timer_split()
             case "skip":
+                self._desktop.set_timer_running(True)
                 self._after_manual_timer_nav()
                 self._pilgrim_skip()
             case "undo":
                 self._after_manual_timer_nav()
                 self._pilgrim_undo()
             case "reset":
+                self._desktop.set_timer_running(False)
                 self._after_manual_timer_nav()
                 self._request_reset_splits()
             case "kill":
@@ -672,7 +677,8 @@ class UIController:
 
         Without LiveSplit, Skip matches classic Pilgrim: ``next_split_image``
         (one ``@N@`` cycle or the next image). Dummy-group jumping is only for
-        timer sync — LiveSplit has no segments for dummies.
+        timer sync — LiveSplit has no segments for dummies. Skipping while on a
+        dummy ignores the dummy and skips one cycle of the group's real split.
         """
         if self._dismiss_reset_overlay_if_showing():
             return
@@ -685,10 +691,29 @@ class UIController:
             self._request_next_split()
             return
 
+        if self._current_split_is_dummy():
+            self._request_timer_skip_from_dummy()
+            return
+
         if timer_split_should_advance_loop(splits.current_loop, splits.list[index].loops):
             self._request_next_split()
             return
         self._request_skip_split_group()
+
+    def _request_timer_skip_from_dummy(self) -> None:
+        """From a dummy: skip one LS segment of the following real (not whole @N@)."""
+        splits = self._splitter.splits
+        index = splits.current_image_index
+        if index is None:
+            return
+        groups = build_dummy_groups(splits.list)
+        continue_recording = group_contains_dummy(groups, splits.list, index)
+        if continue_recording:
+            self._splitter.continue_recording = True
+        if navigate_timer_skip_from_dummy(
+            self._splitter, continue_recording=continue_recording
+        ):
+            self._redraw_split_labels = True
 
     def _request_skip_split_group(self) -> None:
         """Skip dummy group (or single real), preserving recording across dummies."""
@@ -746,20 +771,25 @@ class UIController:
                 return
         self._request_reset_splits()
 
+    def _try_linked_timer_split_or_start(self) -> bool:
+        """Start-or-split on a linked timer. False when no timer link handled it."""
+        if self._desktop_linked():
+            # Stock AutoSplit Integration: "start" if not running, else "split".
+            return self._desktop.emit_split_or_start()
+        if self._lso.linked:
+            return self._lso.send("splitOrStart")
+        return False
+
     def _autosplit_normal_split(self) -> None:
+        """Fire start-or-split for Desktop, LiveSplit One, or the Split hotkey."""
         if self._timer_linked() and not self._autosplit_may_send_timer():
             self._request_next_split()
             return
-        if self._desktop_linked():
-            # No separate start image: always emit "split" (LSO uses splitOrStart).
-            # Use livesplit-desktop-integration (patched AutoSplit Integration) so
-            # the first match start-or-splits when the timer is not running.
-            self._desktop.emit("split")
+        if self._try_linked_timer_split_or_start():
             self._request_next_split()
             return
-        if self._lso.send("splitOrStart"):
-            self._request_next_split()
-            return
+        # No LiveSplit link: press Split. LiveSplit's usual shared Start/Split
+        # hotkey starts the timer when it is not running.
         press_hotkey_or_fallback(
             settings.get_str("SPLIT_HOTKEY_CODE"),
             self._keyboard.press_and_release,

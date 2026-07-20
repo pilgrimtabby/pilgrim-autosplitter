@@ -7,7 +7,9 @@ from unittest.mock import MagicMock
 from ui.split_navigation import (
     build_dummy_groups,
     group_contains_dummy,
+    group_real_index,
     navigate_skip_split_group,
+    navigate_timer_skip_from_dummy,
     navigate_to_next_split,
     navigate_to_previous_split,
     navigate_undo_split_group,
@@ -37,14 +39,17 @@ def _splitter_stub(*, match_percent=None, continue_recording=False, splits=None)
     splitter.splits.current_image_index = 0
     splitter.splits.current_loop = 1
 
-    def jump_to(index: int, *, end_of_loops: bool = False) -> bool:
+    def jump_to(index: int, *, end_of_loops: bool = False, loop: int | None = None) -> bool:
         if index >= len(splitter.splits.list):
             splitter.splits.current_image_index = len(splitter.splits.list) - 1
             splitter.splits.current_loop = splitter.splits.list[-1].loops
             return False
         splitter.splits.current_image_index = index
         total = splitter.splits.list[index].loops
-        splitter.splits.current_loop = total if end_of_loops else 1
+        if loop is not None:
+            splitter.splits.current_loop = max(1, min(loop, total))
+        else:
+            splitter.splits.current_loop = total if end_of_loops else 1
         return True
 
     splitter.splits.jump_to_split_image.side_effect = jump_to
@@ -194,3 +199,42 @@ def test_navigate_skip_from_looping_split_exits_group():
     assert navigate_skip_split_group(splitter, continue_recording=False) is True
     assert splitter.splits.current_image_index == 2
     assert splitter.splits.current_loop == 1
+
+
+def test_group_real_index():
+    groups = [[0, 1, 2], [3, 4]]
+    assert group_real_index(groups, 0) == 2
+    assert group_real_index(groups, 2) == 2
+    assert group_real_index(groups, 3) == 4
+    assert group_real_index(groups, 99) is None
+
+
+def test_timer_skip_from_dummy_before_loop_skips_one_cycle():
+    """LS skip on a dummy must not exit the whole @N@ loop."""
+    splits = [_split(dummy=True), _split(loops=5), _split()]
+    splitter = _splitter_stub(splits=splits)
+    splitter.splits.current_image_index = 0
+    splitter.splits.current_loop = 1
+    assert navigate_timer_skip_from_dummy(splitter, continue_recording=True) is True
+    assert splitter.splits.current_image_index == 1
+    assert splitter.splits.current_loop == 2
+
+
+def test_timer_skip_from_dummy_before_non_looping_exits_group():
+    splits = [_split(dummy=True), _split(loops=1), _split()]
+    splitter = _splitter_stub(splits=splits)
+    splitter.splits.current_image_index = 0
+    assert navigate_timer_skip_from_dummy(splitter, continue_recording=True) is True
+    assert splitter.splits.current_image_index == 2
+    assert splitter.splits.current_loop == 1
+
+
+def test_timer_skip_from_dummy_after_undo_still_one_cycle():
+    """Accidentally landing on the pre-loop dummy still skips only one cycle."""
+    splits = [_split(dummy=True), _split(dummy=True), _split(loops=4), _split()]
+    splitter = _splitter_stub(splits=splits)
+    splitter.splits.current_image_index = 1
+    splitter.splits.current_loop = 1
+    assert navigate_timer_skip_from_dummy(splitter, continue_recording=True) is True
+    assert splitter.splits.current_image_index == 2
+    assert splitter.splits.current_loop == 2

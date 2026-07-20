@@ -22,8 +22,10 @@
 
 Dummy grouping matches Toufool AutoSplit: consecutive dummies plus the following
 real split form one group. When LiveSplit is linked, Skip/Undo jump by group
-(except mid-``@N@`` loop, which advances one cycle). Without a timer link,
-Skip/Next both move one image or loop cycle (classic Pilgrim).
+for non-looping reals; mid-``@N@`` advances one cycle. Skipping while on a
+dummy ignores the dummy and skips one cycle of that group's real split (so a
+``@N@`` loop is not exited in one go). Without a timer link, Skip/Next both
+move one image or loop cycle (classic Pilgrim).
 """
 
 from __future__ import annotations
@@ -93,6 +95,14 @@ def group_contains_dummy(groups: Sequence[Sequence[int]], splits: Sequence, curr
         if current_index in group:
             return any(getattr(splits[i], "dummy_flag", False) for i in group)
     return False
+
+
+def group_real_index(groups: Sequence[Sequence[int]], current_index: int) -> Optional[int]:
+    """Index of the real split closing the group that contains current_index."""
+    for group in groups:
+        if current_index in group:
+            return group[-1]
+    return None
 
 
 def timer_split_should_advance_loop(current_loop: int, total_loops: int) -> bool:
@@ -184,6 +194,46 @@ def navigate_skip_split_group(splitter, *, continue_recording: bool) -> bool:
     if past_end:
         splitter.safe_exit_compare_split_thread()
         splitter.safe_exit_compare_reset_thread()
+
+    if continue_recording:
+        splitter.continue_recording = False
+    else:
+        splitter.restart_record_thread()
+
+    return True
+
+
+def navigate_timer_skip_from_dummy(splitter, *, continue_recording: bool) -> bool:
+    """Timer skip while on a dummy: ignore dummies, skip one real LS segment.
+
+    For a looping real (``@N@``), land on that image at loop 2 (first cycle
+    skipped). For a non-looping real, skip past the whole group.
+    """
+    splits = splitter.splits
+    index = splits.current_image_index
+    if index is None or len(splits.list) == 0:
+        return False
+    if not getattr(splits.list[index], "dummy_flag", False):
+        return False
+
+    groups = build_dummy_groups(splits.list)
+    real_index = group_real_index(groups, index)
+    if real_index is None:
+        return False
+
+    real = splits.list[real_index]
+    if getattr(real, "dummy_flag", False) or real.loops <= 1:
+        return navigate_skip_split_group(
+            splitter, continue_recording=continue_recording
+        )
+
+    if not continue_recording:
+        splitter.safe_exit_record_thread()
+
+    def move() -> None:
+        splits.jump_to_split_image(real_index, loop=2)
+
+    _change_split_image(splitter, move)
 
     if continue_recording:
         splitter.continue_recording = False

@@ -24,23 +24,24 @@ Compatible with Toufool's LiveSplit.AutoSplitIntegration component: LiveSplit
 launches Pilgrim with ``--auto-controlled``, redirects stdin/stdout, and
 exchanges plain-text command lines.
 
-Outbound (Pilgrim → LiveSplit): ``split``, ``reset``, ``pause``.
+Outbound (Pilgrim → LiveSplit): ``start``, ``split``, ``reset``, ``pause``.
 Inbound (LiveSplit → Pilgrim): ``start``, ``split``, ``skip``, ``undo``,
 ``reset``, ``settings|<path>``, ``kill``.
 
-Pilgrim has no separate start-image file. Autosplit always emits ``split``
-(same idea as LiveSplit One ``splitOrStart``). Inbound ``start`` only means
-“user started the timer in LiveSplit — begin/ensure comparing,” not “advance
-a start split.”
+Pilgrim has no separate start-image file. Autosplit uses start-or-split:
+emit ``start`` when the timer is not running, otherwise ``split`` (same idea
+as LiveSplit One ``splitOrStart``). That works with stock AutoSplit
+Integration; the patched component under ``livesplit-desktop-integration/``
+is optional and still treats outbound ``split`` as start-or-split.
+
+Inbound ``start`` means “timer started in LiveSplit — begin/ensure comparing,”
+not “advance a start split.”
 
 Inbound ``split`` and ``skip`` both advance one ``@N@`` loop cycle when
 mid-loop; on the last cycle (or a non-looping image) they skip the
 Toufool-style dummy group so Pilgrim stays aligned with LiveSplit's visible
 segments. With no timer link, Pilgrim's Skip button always advances one
 image/loop cycle (classic behavior — no group jump).
-
-Use the patched component under ``livesplit-desktop-integration/`` so LiveSplit
-treats outbound ``split`` as start-or-split when the timer is not running.
 """
 
 from __future__ import annotations
@@ -123,6 +124,7 @@ class DesktopStdioSession:
 
     def __init__(self) -> None:
         self._active = False
+        self._timer_running = False
         self._reader: Optional[_StdinReader] = None
         self._manual_nav_deadline = 0.0
         self._on_line: Optional[Callable[[str], None]] = None
@@ -131,11 +133,20 @@ class DesktopStdioSession:
     def active(self) -> bool:
         return self._active
 
+    @property
+    def timer_running(self) -> bool:
+        """Best-effort: True after start, False after reset (stdio has no phase query)."""
+        return self._timer_running
+
+    def set_timer_running(self, running: bool) -> None:
+        self._timer_running = running
+
     def start(self, on_line: Callable[[str], None]) -> None:
         """Begin listening for LiveSplit stdin commands."""
         if self._active:
             return
         self._on_line = on_line
+        self._timer_running = False
         self._reader = _StdinReader()
         self._reader.line_received.connect(self._dispatch_line)
         self._reader.start()
@@ -150,12 +161,28 @@ class DesktopStdioSession:
                 pass
             self._reader = None
         self._active = False
+        self._timer_running = False
         self._on_line = None
 
     def emit(self, command: str) -> bool:
         if not self._active:
             return False
         emit_command(command)
+        if command == "reset":
+            self._timer_running = False
+        elif command == "start":
+            self._timer_running = True
+        return True
+
+    def emit_split_or_start(self) -> bool:
+        """Start the timer if needed, otherwise split (stock AutoSplit Integration)."""
+        if not self._active:
+            return False
+        if self._timer_running:
+            emit_command("split")
+        else:
+            emit_command("start")
+            self._timer_running = True
         return True
 
     def after_manual_navigation(self) -> None:
