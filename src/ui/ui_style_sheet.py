@@ -149,6 +149,14 @@ style_sheet_dark = Template(
     QMenu::item:selected {
         background-color: $widget_fill_color;
     }
+    QMenu::item:disabled {
+        color: $disabled_button_text_color;
+        background-color: transparent;
+    }
+    QMenu::item:selected:disabled {
+        color: $disabled_button_text_color;
+        background-color: transparent;
+    }
     QMenu::separator {
         height: 1px;
         background-color: $text_and_borders;
@@ -375,6 +383,14 @@ style_sheet_light = Template(
     }
     QMenu::item:selected {
         background-color: $widget_fill_color;
+    }
+    QMenu::item:disabled {
+        color: $disabled_button_text_color;
+        background-color: transparent;
+    }
+    QMenu::item:selected:disabled {
+        color: $disabled_button_text_color;
+        background-color: transparent;
     }
     QMenu::separator {
         height: 1px;

@@ -46,9 +46,6 @@ def apply_aspect_layout(ctrl: "UIController", preset: AspectLayoutPreset) -> Non
     row1 = preset.bottom_row1(layout_dy, top)
     row2 = preset.bottom_row2(layout_dy, top)
 
-    mw.split_directory_box.setGeometry(chrome.split_directory_box.to_rect(left, top))
-    mw.split_dir_button.setGeometry(chrome.split_dir_button.to_rect(left, top))
-
     video_viewport = preset.video_viewport.to_rect(left, top)
     split_viewport = preset.split_viewport.to_rect(left, top)
 
@@ -61,9 +58,21 @@ def apply_aspect_layout(ctrl: "UIController", preset: AspectLayoutPreset) -> Non
     nb = chrome.next_button
     row_y = mv.y + top
     row_h = mv.height
+    chrome_left = video_viewport.x() - outline_outset
+
+    # Same left edge as Minimal view (outline), not the inner viewport content.
+    mw.split_directory_box.setGeometry(chrome.split_directory_box.to_rect(left, top))
+    mw.split_dir_button.setGeometry(
+        QRect(
+            chrome_left,
+            chrome.split_dir_button.y + top,
+            chrome.split_dir_button.width,
+            chrome.split_dir_button.height,
+        )
+    )
 
     mw.min_view_button.setGeometry(
-        QRect(video_viewport.x() - outline_outset, row_y, mv.width, row_h)
+        QRect(chrome_left, row_y, mv.width, row_h)
     )
 
     if chrome.video_title_center_in_viewport:

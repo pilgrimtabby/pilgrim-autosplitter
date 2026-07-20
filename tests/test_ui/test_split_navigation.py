@@ -12,6 +12,8 @@ from ui.split_navigation import (
     navigate_to_previous_split,
     navigate_undo_split_group,
     skip_group_target_index,
+    timer_split_should_advance_loop,
+    timer_undo_should_retreat_loop,
     undo_group_target_index,
 )
 
@@ -127,3 +129,55 @@ def test_navigate_undo_split_group_jumps_to_previous_real():
     splitter.splits.current_image_index = 2
     assert navigate_undo_split_group(splitter) is True
     assert splitter.splits.current_image_index == 1
+
+
+def test_timer_split_should_advance_loop_mid_cycle():
+    assert timer_split_should_advance_loop(1, 5) is True
+    assert timer_split_should_advance_loop(4, 5) is True
+    assert timer_split_should_advance_loop(5, 5) is False
+    assert timer_split_should_advance_loop(1, 1) is False
+
+
+def test_skip_and_split_mid_loop_use_same_advance_rule():
+    """Linked skip/split must not exit a whole @N@ loop mid-cycle."""
+    assert timer_split_should_advance_loop(2, 4) is True  # → next cycle
+    assert timer_split_should_advance_loop(4, 4) is False  # → leave group
+
+
+def test_undo_mid_loop_retreats_one_cycle():
+    assert timer_undo_should_retreat_loop(1) is False
+    assert timer_undo_should_retreat_loop(2) is True
+    assert timer_undo_should_retreat_loop(5) is True
+
+
+def test_navigate_next_advances_loop_not_index():
+    """LiveSplit mid-loop split should call next_split_image (one cycle)."""
+    splits = [_split(loops=3), _split()]
+    splitter = _splitter_stub(match_percent=None, splits=splits)
+    splitter.splits.current_image_index = 0
+    splitter.splits.current_loop = 2
+
+    def next_image() -> None:
+        if splitter.splits.current_loop < splits[0].loops:
+            splitter.splits.current_loop += 1
+        else:
+            splitter.splits.current_image_index += 1
+            splitter.splits.current_loop = 1
+
+    splitter.splits.next_split_image.side_effect = next_image
+    assert navigate_to_next_split(
+        splitter, continue_recording=False, split_hotkey_pressed=False
+    )
+    assert splitter.splits.current_image_index == 0
+    assert splitter.splits.current_loop == 3
+
+
+def test_navigate_skip_from_looping_split_exits_group():
+    """Last-cycle / skip-group path jumps past the looping real split."""
+    splits = [_split(dummy=True), _split(loops=3), _split()]
+    splitter = _splitter_stub(splits=splits)
+    splitter.splits.current_image_index = 1
+    splitter.splits.current_loop = 3
+    assert navigate_skip_split_group(splitter, continue_recording=False) is True
+    assert splitter.splits.current_image_index == 2
+    assert splitter.splits.current_loop == 1

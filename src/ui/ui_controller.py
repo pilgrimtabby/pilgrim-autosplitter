@@ -74,6 +74,8 @@ from ui.split_navigation import (
     navigate_to_next_split,
     navigate_to_previous_split,
     navigate_undo_split_group,
+    timer_split_should_advance_loop,
+    timer_undo_should_retreat_loop,
 )
 from ui.timer_hotkey import press_hotkey_or_fallback
 from ui.ui_connect_dialog import UIConnectWebSocketDialog
@@ -437,7 +439,12 @@ class UIController:
             case "start":
                 # User started the timer in LiveSplit — ensure comparison is active.
                 self._desktop_ensure_comparing()
-            case "split" | "skip":
+            case "split":
+                # One LiveSplit segment: advance a loop cycle, or skip the group
+                # on the last cycle (dummies are invisible to LiveSplit).
+                self._after_manual_timer_nav()
+                self._pilgrim_timer_split()
+            case "skip":
                 self._after_manual_timer_nav()
                 self._pilgrim_skip()
             case "undo":
@@ -608,13 +615,60 @@ class UIController:
         return True
 
     def _pilgrim_undo(self) -> None:
+        """Undo one image/loop cycle, or undo a dummy group when timer-linked.
+
+        ``navigate_undo_split_group`` alone ignores ``@N@`` and returns no-op in
+        the first group — so LiveSplit undo looked dead while skip still moved.
+        """
         if self._dismiss_reset_overlay_if_showing():
             return
+        splits = self._splitter.splits
+        index = splits.current_image_index
+        if index is None or len(splits.list) == 0:
+            return
+
+        if timer_undo_should_retreat_loop(splits.current_loop):
+            navigate_to_previous_split(self._splitter)
+            self._redraw_split_labels = True
+            return
+
+        if not self._timer_linked():
+            navigate_to_previous_split(self._splitter)
+            self._redraw_split_labels = True
+            return
+
         if navigate_undo_split_group(self._splitter):
             self._redraw_split_labels = True
+            return
+        # First dummy group: group-undo is a no-op — still retreat one image.
+        if splits.current_image_index > 0:
+            navigate_to_previous_split(self._splitter)
+            self._redraw_split_labels = True
+
+    def _pilgrim_timer_split(self) -> None:
+        """Handle inbound LiveSplit split (same loop rules as linked skip)."""
+        self._pilgrim_skip()
 
     def _pilgrim_skip(self) -> None:
+        """Skip one image/loop cycle, or skip a dummy group when timer-linked.
+
+        Without LiveSplit, Skip matches classic Pilgrim: ``next_split_image``
+        (one ``@N@`` cycle or the next image). Dummy-group jumping is only for
+        timer sync — LiveSplit has no segments for dummies.
+        """
         if self._dismiss_reset_overlay_if_showing():
+            return
+        splits = self._splitter.splits
+        index = splits.current_image_index
+        if index is None or len(splits.list) == 0:
+            return
+
+        if not self._timer_linked():
+            self._request_next_split()
+            return
+
+        if timer_split_should_advance_loop(splits.current_loop, splits.list[index].loops):
+            self._request_next_split()
             return
         self._request_skip_split_group()
 

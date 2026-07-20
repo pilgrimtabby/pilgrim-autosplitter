@@ -21,7 +21,9 @@
 """Thread-safe split index changes while compare_split may be active.
 
 Dummy grouping matches Toufool AutoSplit: consecutive dummies plus the following
-real split form one group. Skip/Undo jump by group; Next/Previous move one image.
+real split form one group. When LiveSplit is linked, Skip/Undo jump by group
+(except mid-``@N@`` loop, which advances one cycle). Without a timer link,
+Skip/Next both move one image or loop cycle (classic Pilgrim).
 """
 
 from __future__ import annotations
@@ -91,6 +93,21 @@ def group_contains_dummy(groups: Sequence[Sequence[int]], splits: Sequence, curr
         if current_index in group:
             return any(getattr(splits[i], "dummy_flag", False) for i in group)
     return False
+
+
+def timer_split_should_advance_loop(current_loop: int, total_loops: int) -> bool:
+    """True when a LiveSplit timer split should move to the next loop cycle.
+
+    Each ``@N@`` loop is one LiveSplit segment. Mid-loop splits advance the
+    cycle; the last cycle (and non-looping images) skip the dummy group so
+    Pilgrim stays aligned with LiveSplit's visible segments.
+    """
+    return current_loop < total_loops
+
+
+def timer_undo_should_retreat_loop(current_loop: int) -> bool:
+    """True when undo should go back one ``@N@`` cycle instead of a group jump."""
+    return current_loop > 1
 
 
 def navigate_to_previous_split(splitter) -> None:

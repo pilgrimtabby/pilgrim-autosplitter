@@ -33,6 +33,12 @@ Pilgrim has no separate start-image file. Autosplit always emits ``split``
 “user started the timer in LiveSplit — begin/ensure comparing,” not “advance
 a start split.”
 
+Inbound ``split`` and ``skip`` both advance one ``@N@`` loop cycle when
+mid-loop; on the last cycle (or a non-looping image) they skip the
+Toufool-style dummy group so Pilgrim stays aligned with LiveSplit's visible
+segments. With no timer link, Pilgrim's Skip button always advances one
+image/loop cycle (classic behavior — no group jump).
+
 Use the patched component under ``livesplit-desktop-integration/`` so LiveSplit
 treats outbound ``split`` as start-or-split when the timer is not running.
 """
