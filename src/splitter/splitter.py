@@ -364,10 +364,12 @@ class Splitter:
 
         Set CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
 
-        Set CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to our target value.
-        I can't imagine any capture cards actually support this, but this
-        forces the capture source to choose the next-closest value, which in
-        some cases is quite a lot smaller than the default. This saves CPU.
+        Do not request CAP_PROP_FRAME_WIDTH / HEIGHT. On Windows DirectShow,
+        asking for the comparison size (320x240) often switches the device into
+        a real low-res mode (blocky preview, chroma fringing, broken crop
+        insets). macOS AVFoundation usually ignores that request and keeps
+        native resolution, then we downscale in software in _capture — that is
+        the path we want on every platform.
 
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
@@ -382,8 +384,6 @@ class Splitter:
             cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
 
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, COMPARISON_FRAME_WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, COMPARISON_FRAME_HEIGHT)
         return cap
 
     def _capture(self) -> None:
