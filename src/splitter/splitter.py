@@ -364,12 +364,12 @@ class Splitter:
 
         Set CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
 
-        Do not request CAP_PROP_FRAME_WIDTH / HEIGHT. On Windows DirectShow,
-        asking for the comparison size (320x240) often switches the device into
-        a real low-res mode (blocky preview, chroma fringing, broken crop
-        insets). macOS AVFoundation usually ignores that request and keeps
-        native resolution, then we downscale in software in _capture — that is
-        the path we want on every platform.
+        On Windows, prefer the device/source resolution (largest mode that
+        sticks) instead of the DirectShow default media type — OBS Virtual
+        Camera often defaults to a small pin even when the canvas is 1080p.
+        Never request the comparison size (320x240); that forces a real
+        low-res device mode. macOS AVFoundation already tends to keep native
+        size. Software downscale to comparison/UI size happens in _capture.
 
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
@@ -380,11 +380,56 @@ class Splitter:
             cap = cv2.VideoCapture(
                 settings.get_int("LAST_CAPTURE_SOURCE_INDEX"), cv2.CAP_DSHOW
             )
+            self._prefer_source_capture_resolution(cap)
         else:
             cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
 
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         return cap
+
+    @staticmethod
+    def _prefer_source_capture_resolution(cap: cv2.VideoCapture) -> None:
+        """Select the largest resolution mode the capture device will honor.
+
+        Leaving size unset uses the driver's default format list entry, which
+        is not always the OBS canvas / source size for Virtual Camera.
+        """
+        try:
+            best_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+            best_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        except Exception:
+            return
+
+        best_area = max(0, best_w) * max(0, best_h)
+        # High → low, including oversized values that many drivers clamp to max.
+        for width, height in (
+            (4096, 2160),
+            (2560, 1440),
+            (1920, 1080),
+            (1280, 720),
+            (960, 540),
+            (854, 480),
+            (640, 480),
+            (640, 360),
+        ):
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                got_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+                got_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+            except Exception:
+                continue
+            area = got_w * got_h
+            if area > best_area:
+                best_area = area
+                best_w, best_h = got_w, got_h
+
+        if best_w > 0 and best_h > 0:
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, best_w)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, best_h)
+            except Exception:
+                pass
 
     def _capture(self) -> None:
         """Read frames from a capture source, resize them, and expose them to
