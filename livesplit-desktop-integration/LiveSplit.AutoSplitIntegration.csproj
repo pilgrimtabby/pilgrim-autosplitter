@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>LiveSplit</RootNamespace>
+    <AssemblyName>LiveSplit.AutoSplitIntegration</AssemblyName>
+    <Deterministic>true</Deterministic>
+
+    <!-- Ship a full (Windows) PDB alongside the DLL for readable line numbers in crash reports -->
+    <DebugSymbols>true</DebugSymbols>
+    <!-- .NET Framework runtime's stack-trace reader doesn't reliably resolve portable PDBs -->
+    <DebugType>full</DebugType>
+
+    <!-- Assembly metadata -->
+    <Product>LiveSplit.AutoSplitIntegration</Product>
+    <Description>Connects AutoSplit or Pilgrim Autosplitter with LiveSplit (split = start-or-split).</Description>
+    <Company>Toufool</Company>
+    <Copyright>Copyright © 2026</Copyright>
+    <!-- Dev placeholder; releases are versioned from the git tag via CI (-p:Version). -->
+    <Version>0.0.0-dev</Version>
+  </PropertyGroup>
+
+  <!--
+    Local-only dev tools live under tools/ with their own projects. This project sits at the
+    repo root, so its default `**/*.cs` glob would otherwise compile their sources (and their
+    generated obj/ attributes), breaking the product build. Keep the tools tree out.
+  -->
+  <ItemGroup>
+    <Compile Remove="tools/**/*.cs" />
+    <None Remove="tools/**/*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- LiveSplit host assemblies, vendored under lib/ (see lib/README.md). -->
+    <!-- Private=false: provided by the host at runtime, not shipped with the plugin. -->
+    <Reference Include="LiveSplit">
+      <HintPath>lib\LiveSplit.exe</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="LiveSplit.Core">
+      <HintPath>lib\LiveSplit.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UpdateManager">
+      <HintPath>lib\UpdateManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- GAC framework assemblies are not implicit for .NET Framework SDK-style projects. -->
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+</Project>

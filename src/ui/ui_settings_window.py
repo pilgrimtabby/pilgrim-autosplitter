@@ -23,12 +23,12 @@ and should be provided in a controller class.
 """
 
 
-import platform
-from typing import Optional, Union
+from typing import Optional
 
-from PyQt5.QtCore import QEvent, QRect, Qt
+from PyQt5.QtCore import QEvent, QObject, QRect, Qt, QTimer
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -42,6 +42,9 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QWidget,
 )
+
+from ui.labels import SNAP_PEAK_HOTKEY_LABEL
+from ui.window_chrome import disable_context_help
 
 
 class UISettingsWindow(QDialog):
@@ -117,9 +120,12 @@ class UISettingsWindow(QDialog):
 
         super().__init__()
 
+        # Do not take focus onto the dialog shell (avoids auto-focusing first tab
+        # child when the window is shown).
+        self.setFocusPolicy(Qt.NoFocus)
+
         # Hide question mark button in top right on Windows
-        if platform.system() == "Windows":
-            self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        disable_context_help(self)
 
         # Shift all widgets, except the frame, this many pixels right
         self._LEFT = 0
@@ -130,7 +136,7 @@ class UISettingsWindow(QDialog):
         # Left side widgets are, generally, this many pixels high
         self._LEFT_SIDE_WIDGET_HEIGHT = 27
 
-        self.setFixedSize(610, 392)
+        self.setFixedSize(610, 422)
         self.setWindowTitle("Settings")
 
         self.close_window_shortcut = QShortcut("ctrl+w", self)
@@ -149,7 +155,7 @@ class UISettingsWindow(QDialog):
 
         # Border
         self.border = QFrame(self)
-        self.border.setGeometry(QRect(10, 10, 590, 372))
+        self.border.setGeometry(QRect(10, 10, 590, 402))
         self.border.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.border.setObjectName("border")
 
@@ -612,16 +618,41 @@ class UISettingsWindow(QDialog):
             lambda: setattr(self.screenshot_hotkey_box, "key_code", "")
         )
 
+        # Snap Peak hotkey
+        self.save_peak_hotkey_box = KeyLineEdit(self)
+        self.save_peak_hotkey_box.setGeometry(
+            QRect(410 + self._LEFT, 282 + self._TOP, 121, 25)
+        )
+        self.save_peak_hotkey_box.setReadOnly(True)
+
+        self._save_peak_hotkey_label = QLabel(SNAP_PEAK_HOTKEY_LABEL, self)
+        self._save_peak_hotkey_label.setGeometry(
+            QRect(300 + self._LEFT, 280 + self._TOP, 100, 31)
+        )
+        self._save_peak_hotkey_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+
+        self._save_peak_hotkey_clear_button = QPushButton("clear", self)
+        self._save_peak_hotkey_clear_button.setGeometry(
+            QRect(545 + self._LEFT, 285 + self._TOP, 39, 20)
+        )
+        self._save_peak_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
+        self._save_peak_hotkey_clear_button.clicked.connect(
+            lambda: self.save_peak_hotkey_box.setText("")
+        )
+        self._save_peak_hotkey_clear_button.clicked.connect(
+            lambda: setattr(self.save_peak_hotkey_box, "key_code", "")
+        )
+
         # Toggle global hotkeys hotkey
         self.toggle_global_hotkeys_hotkey_box = KeyLineEdit(self)
         self.toggle_global_hotkeys_hotkey_box.setGeometry(
-            QRect(410 + self._LEFT, 282 + self._TOP, 121, 25)
+            QRect(410 + self._LEFT, 312 + self._TOP, 121, 25)
         )
         self.toggle_global_hotkeys_hotkey_box.setReadOnly(True)
 
         self._toggle_global_hotkeys_hotkey_label = QLabel("Toggle global", self)
         self._toggle_global_hotkeys_hotkey_label.setGeometry(
-            QRect(300 + self._LEFT, 280 + self._TOP, 100, 31)
+            QRect(300 + self._LEFT, 310 + self._TOP, 100, 31)
         )
         self._toggle_global_hotkeys_hotkey_label.setTextInteractionFlags(
             Qt.TextSelectableByMouse
@@ -629,7 +660,7 @@ class UISettingsWindow(QDialog):
 
         self._toggle_global_hotkeys_hotkey_clear_button = QPushButton("clear", self)
         self._toggle_global_hotkeys_hotkey_clear_button.setGeometry(
-            QRect(545 + self._LEFT, 285 + self._TOP, 39, 20)
+            QRect(545 + self._LEFT, 315 + self._TOP, 39, 20)
         )
         self._toggle_global_hotkeys_hotkey_clear_button.setFocusPolicy(Qt.NoFocus)
         self._toggle_global_hotkeys_hotkey_clear_button.clicked.connect(
@@ -642,30 +673,75 @@ class UISettingsWindow(QDialog):
         # Cancel button
         self.cancel_button = QPushButton("Cancel", self)
         self.cancel_button.setGeometry(
-            QRect(319 + self._LEFT, 326 + self._TOP, 111, 31)
+            QRect(319 + self._LEFT, 356 + self._TOP, 111, 31)
         )
         self.cancel_button.setFocusPolicy(Qt.NoFocus)
 
         # Save button
         self.save_button = QPushButton("Save", self)
-        self.save_button.setGeometry(QRect(459 + self._LEFT, 326 + self._TOP, 111, 31))
+        self.save_button.setGeometry(QRect(459 + self._LEFT, 356 + self._TOP, 111, 31))
         self.save_button.setFocusPolicy(Qt.NoFocus)
 
-    def event(self, event: QWidget.event) -> Union[bool, QWidget.event]:
-        """Allow the user to take focus off a widget by clicking somewhere
-        else.
+    def _blur_focused_descendant(self) -> None:
+        """Clear keyboard focus and text selection from inputs inside this dialog."""
+        app = QApplication.instance()
+        if app is None:
+            return
+        fw = app.focusWidget()
+        if fw is None or not self.isAncestorOf(fw):
+            return
+        if isinstance(fw, QComboBox):
+            fw.hidePopup()
+        if isinstance(fw, QLineEdit):
+            fw.deselect()
+        fw.clearFocus()
 
-        Overrides QDialog.event. See help(PyQt5.QtWidgets.QDialog) for
-        implementation details.
+    def _should_blur_for_mouse_press(self, watched: QObject) -> bool:
+        """True when the press is outside the focused widget subtree (deselect).
 
-        Returns:
-            Union[bool, QWidget.event]: True if the mouse press was handled;
-                otherwise, return the event for further handling by the system.
+        ``QAbstractSpinBox`` can report focus on the spinbox while the click
+        target is its internal editor; ``watched.isAncestorOf(fw)`` alone misses
+        that, so we also treat ``fw.isAncestorOf(watched)`` as inside the focus
+        subtree.
         """
-        if event.type() == QEvent.MouseButtonPress:
-            self.setFocus(True)
+        if watched is self:
             return True
-        return QWidget.event(self, event)
+        if not isinstance(watched, QWidget) or not self.isAncestorOf(watched):
+            return False
+        app = QApplication.instance()
+        if app is None:
+            return False
+        fw = app.focusWidget()
+        if fw is None or not self.isAncestorOf(fw):
+            return False
+        if watched is fw:
+            return False
+        if watched.isAncestorOf(fw):
+            return False
+        if isinstance(fw, QWidget) and fw.isAncestorOf(watched):
+            return False
+        return True
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+        # After layout/focus init, drop any auto-assigned focus from exec/show.
+        QTimer.singleShot(0, self._blur_focused_descendant)
+
+    def hideEvent(self, event) -> None:
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
+        super().hideEvent(event)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        """Clear input focus when the user clicks outside the focused control."""
+        if event.type() == QEvent.MouseButtonPress and self.isVisible():
+            if self._should_blur_for_mouse_press(watched):
+                self._blur_focused_descendant()
+        return False
 
 
 class KeyLineEdit(QLineEdit):

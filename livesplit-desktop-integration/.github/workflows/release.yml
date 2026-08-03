@@ -1,0 +1,126 @@
+name: Release
+
+# The `validate` job runs on every PR/push/dispatch (so a manifest that would break the updater
+# is caught before merge). The `release` job depends on it and only publishes on a push to main
+# that changes the manifest, or a manual workflow_dispatch. The tag is created as part of
+# publishing, so a failed run leaves nothing to clean up (just re-run via "Run workflow").
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - update.LiveSplit.AutoSplitIntegration.xml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - update.LiveSplit.AutoSplitIntegration.xml
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (X.Y.Z) to (re)publish. Leave blank for release entry in the manifest"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel previous runs for the same PR
+  # Don't cancel successive pushes to main
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    # Only bash + pwsh needed, so the cheaper Linux runner (with real coreutils) is fine.
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Target version = the workflow_dispatch input if given, else the highest non-0.0.0
+      # <update version> in the manifest (0.0.0 is the unreleased staging block).
+      - name: Determine target version
+        id: ver
+        shell: bash
+        run: |
+          xml=update.LiveSplit.AutoSplitIntegration.xml
+          version="${{ github.event.inputs.version }}"
+          version="${version#v}"  # tolerate a stray leading v; the manifest/build use bare X.Y.Z
+          if [ -z "$version" ]; then
+            version=$(grep -oE '<update version="[^"]+"' "$xml" \
+              | sed -E 's/.*"([^"]+)"/\1/' | grep -v '^0\.0\.0$' | sort -V | tail -1)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Target release version: ${version:-<none>}"
+
+      # Fails on any manifest shape that would break the updater's parse, and (with a target
+      # version) that its release entry is complete. Also fails a manifest with no releasable
+      # entry, so an empty version can never reach the release job.
+      - name: Validate manifest
+        shell: pwsh
+        run: ./scripts/validate-manifest.ps1 -ReleaseVersion "${{ steps.ver.outputs.version }}"
+
+  release:
+    needs: validate
+    # PRs validate only; publishing happens on push-to-main and manual dispatch.
+    if: github.event_name != 'pull_request'
+    # Pinned windows runner for the .NET Framework 4.8.1 targeting pack (see ci.yml).
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # On a push, skip if the release already exists (unrelated manifest edits, e.g. adding to
+      # the 0.0.0 block, must not republish). workflow_dispatch skips this check and always
+      # (re)publishes, so a failed release can be retried.
+      - name: Check existing release
+        id: exists
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "Release v$VERSION already exists; nothing to publish."
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v5
+        if: steps.exists.outputs.already != 'true'
+        with:
+          dotnet-version: "10.0.x"
+
+      - run: dotnet build --configuration Release -p:Version=$env:VERSION
+        if: steps.exists.outputs.already != 'true'
+
+      - name: Release notes from manifest
+        if: steps.exists.outputs.already != 'true'
+        shell: pwsh
+        run: |
+          [xml]$doc = Get-Content -Raw -LiteralPath 'update.LiveSplit.AutoSplitIntegration.xml'
+          $u = $doc.SelectSingleNode("/updates/update[@version='$env:VERSION']")
+          $lines = @($u.SelectNodes('changelog/change') | ForEach-Object { '- ' + $_.InnerText.Trim() })
+          Set-Content -Path release-notes.md -Value $lines -Encoding utf8
+          Get-Content release-notes.md
+
+      # Creates the tag v<version> at this commit and the release together, so nothing is left
+      # dangling on failure. make_latest (default) promotes it to the "latest" release.
+      - uses: softprops/action-gh-release@v3
+        if: steps.exists.outputs.already != 'true'
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: v${{ needs.validate.outputs.version }}
+          body_path: release-notes.md
+          files: |
+            bin/Release/*/LiveSplit.AutoSplitIntegration.dll
+            bin/Release/*/LiveSplit.AutoSplitIntegration.pdb
+          fail_on_unmatched_files: true

@@ -21,6 +21,9 @@
 """Add files in /src to PATH so they can be tested."""
 
 import sys
+from pathlib import Path
 
-
-sys.path.append("./src")
+_src = Path(__file__).resolve().parents[1] / "src"
+_s = str(_src)
+if _s not in sys.path:
+    sys.path.insert(0, _s)

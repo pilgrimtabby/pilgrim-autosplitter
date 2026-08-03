@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+  Local-only dev tool: renders the component's settings UserControl in a bare Form so
+  visual changes can be previewed without a running LiveSplit host. Not shipped, not
+  built by CI (`dotnet build` at the repo root only picks up the root project).
+  Launch via scripts/preview-settings.ps1. See CONTRIBUTING.md > Previewing the settings UI.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Reflection reaches internal types; no InternalsVisibleTo needed on the product. -->
+    <AssemblyName>PreviewSettings</AssemblyName>
+    <RootNamespace>LiveSplit.PreviewTool</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\LiveSplit.AutoSplitIntegration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Product refs are Private=false (host-provided), so they don't flow here.
+      This tool has no host, so copy the vendored assemblies into its output for runtime resolution.
+    -->
+    <Reference Include="LiveSplit">
+      <HintPath>..\..\lib\LiveSplit.exe</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="LiveSplit.Core">
+      <HintPath>..\..\lib\LiveSplit.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="UpdateManager">
+      <HintPath>..\..\lib\UpdateManager.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

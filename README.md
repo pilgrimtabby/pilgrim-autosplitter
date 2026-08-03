@@ -2,7 +2,7 @@
 
 Finally, a multi-platform image-based speedrun autosplitter!
 
-![Demonstration GIF](resources/demo.gif)
+<img src="resources/demo-v5.gif" alt="Demonstration GIF" width="100%">
 
 Pilgrim Autosplitter was designed to fill the gap left by other image-based speedrun autosplitters, which generally only run on Windows.
 
@@ -28,6 +28,7 @@ Table of contents:
    * [Linux](#linux)
       + [Method 1: Download application](#method-1-download-application-2)
       + [Method 2: Run from source with Python](#method-2-run-from-source-with-python-2)
+- [Packaging with PyInstaller](#packaging-with-pyinstaller)
 
 # Usage
 
@@ -129,6 +130,42 @@ If this is your first time using Python:
 * Type `pip3 install -r ` (with a space after it) in Terminal, then click and drag the file `requirements.txt` from Pilgrim Autosplitter's source code into Terminal. You should see the path to the file appear. Press enter, and you'll see a lot of text appear on your screen informing you that Python is installing the necessary third-party packages for running the app.
 
 * In the source code, open the folder `src`. In Terminal, type `python3 ` (with a space after it), then click and drag the file `pilgrim_autosplitter.py` into the Terminal, just like before, and press enter. If you did everything right, the program should open. You can minimize the Terminal window.
+
+## Packaging with PyInstaller
+
+From the **repository root** (folder that contains the `.spec` files), install dependencies and PyInstaller.
+
+**Windows — single `.exe` (recommended for sharing):**
+
+```bat
+python -m pip install -r requirements.txt pyinstaller
+python -m PyInstaller --noconfirm "Pilgrim Autosplitter-windows-onefile.spec"
+```
+
+Or run **`scripts\build-windows.bat`** / **`scripts\build-windows.ps1`**.  
+Output: **`dist\Pilgrim Autosplitter.exe`** — you can copy that file alone to another PC (same Windows architecture you built for) and run it. First launch unpacks to a temp folder, so startup is slower than a folder build.
+
+**Windows — folder build** (faster startup; zip the whole folder for users): `scripts\build-windows-onedir.bat` or `python -m PyInstaller --noconfirm "Pilgrim Autosplitter.spec"` on Windows (no `.app` bundle; you get `dist\Pilgrim Autosplitter\...`).
+
+**macOS:**
+
+```bash
+python -m PyInstaller --noconfirm "Pilgrim Autosplitter.spec"
+```
+
+Output: **`dist/Pilgrim Autosplitter.app`** (bundle — ship the entire `.app`). Camera usage text is in the spec for TCC.
+
+**Linux:** same command as macOS uses **`Pilgrim Autosplitter.spec`**; output is **`dist/Pilgrim Autosplitter/`** with an executable inside. Hotkeys/permissions match [running from source](#linux).
+
+### Distributing builds
+
+* **macOS:** Ship the **entire** `Pilgrim Autosplitter.app` (zipping the `.app` is typical). Do not hand out only the binary inside `Contents/MacOS`.
+* **Windows onefile:** Ship **`Pilgrim Autosplitter.exe`** by itself — that is the point of the onefile spec.
+* **Windows onedir:** Zip the **whole** `dist\Pilgrim Autosplitter` folder; the `.exe` alone is not enough.
+
+Optional **Windows** icon: add `resources/icon-windows.ico`; `Pilgrim Autosplitter-windows-onefile.spec` uses it when the file exists.
+
+Onefile tradeoffs: larger download, slower cold start, and some antivirus tools flag packed executables more often than a folder layout.
 
 ## Linux
 

@@ -25,8 +25,8 @@ import pathlib
 import platform
 from queue import Full, Queue
 import threading
+from typing import List, Optional, Tuple
 import time
-from typing import Optional, Tuple
 
 import cv2
 import numpy
@@ -121,9 +121,14 @@ class Splitter:
         self.splits = SplitDir()
         self.match_percent = None
         self.highest_percent = None
+        self._highest_percent_frame = None
+        self._highest_percent_value = 0.0
+        self._highest_peak_lock = threading.Lock()
         self.split_delay_remaining = None
         self.reset_delay_remaining = None
         self.suspend_remaining = None
+        self.suspend_display_highest = None
+        self.suspend_display_threshold = None
         self.pause_split_action = False
         self.dummy_split_action = False
         self.normal_split_action = False
@@ -285,6 +290,41 @@ class Splitter:
 
         return found_valid_source
 
+    def get_highest_similarity_snapshot(
+        self,
+    ) -> Tuple[Optional[numpy.ndarray], float, float, str]:
+        """Copy of the peak comparison frame for the current split attempt.
+
+        Returns:
+            Tuple of (BGR frame or None, peak match 0–1, threshold 0–1, split
+            stripped name). Falls back to ``comparison_frame`` when no peak
+            frame has been stored yet this attempt.
+        """
+        with self._highest_peak_lock:
+            frame = (
+                self._highest_percent_frame.copy()
+                if self._highest_percent_frame is not None
+                else None
+            )
+            # Use the value stored with the frame. ``highest_percent`` is cleared
+            # to None when a match ends the compare loop, which used to make
+            # Snap Peak report High: 0% even though the peak frame was kept.
+            peak = float(self._highest_percent_value)
+
+        if frame is None and self.comparison_frame is not None:
+            frame = self.comparison_frame.copy()
+            if self.match_percent is not None:
+                peak = float(self.match_percent)
+            elif self.suspend_display_highest is not None:
+                peak = float(self.suspend_display_highest)
+
+        index = self.splits.current_image_index
+        if index is None or index >= len(self.splits.list):
+            return frame, peak, 0.0, "split"
+
+        split = self.splits.list[index]
+        return frame, peak, float(split.threshold), split.stripped_name
+
     def toggle_suspended(self) -> None:
         """Stop the compare threads, then start them if the splitter was
         suspended and there are splits.
@@ -324,10 +364,12 @@ class Splitter:
 
         Set CAP_PROP_BUFFERSIZE to 1 to reduce stuttering.
 
-        Set CAP_PROP_FRAME_WIDTH and CAP_PROP_FRAME_HEIGHT to our target value.
-        I can't imagine any capture cards actually support this, but this
-        forces the capture source to choose the next-closest value, which in
-        some cases is quite a lot smaller than the default. This saves CPU.
+        On Windows, prefer the device/source resolution (largest mode that
+        sticks) instead of the DirectShow default media type — OBS Virtual
+        Camera often defaults to a small pin even when the canvas is 1080p.
+        Never request the comparison size (320x240); that forces a real
+        low-res device mode. macOS AVFoundation already tends to keep native
+        size. Software downscale to comparison/UI size happens in _capture.
 
         Returns:
             cv2.VideoCapture: The initialized and configured VideoCapture.
@@ -338,13 +380,56 @@ class Splitter:
             cap = cv2.VideoCapture(
                 settings.get_int("LAST_CAPTURE_SOURCE_INDEX"), cv2.CAP_DSHOW
             )
+            self._prefer_source_capture_resolution(cap)
         else:
             cap = cv2.VideoCapture(settings.get_int("LAST_CAPTURE_SOURCE_INDEX"))
 
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, COMPARISON_FRAME_WIDTH)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, COMPARISON_FRAME_HEIGHT)
         return cap
+
+    @staticmethod
+    def _prefer_source_capture_resolution(cap: cv2.VideoCapture) -> None:
+        """Select the largest resolution mode the capture device will honor.
+
+        Leaving size unset uses the driver's default format list entry, which
+        is not always the OBS canvas / source size for Virtual Camera.
+        """
+        try:
+            best_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+            best_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        except Exception:
+            return
+
+        best_area = max(0, best_w) * max(0, best_h)
+        # High → low, including oversized values that many drivers clamp to max.
+        for width, height in (
+            (4096, 2160),
+            (2560, 1440),
+            (1920, 1080),
+            (1280, 720),
+            (960, 540),
+            (854, 480),
+            (640, 480),
+            (640, 360),
+        ):
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                got_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+                got_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+            except Exception:
+                continue
+            area = got_w * got_h
+            if area > best_area:
+                best_area = area
+                best_w, best_h = got_w, got_h
+
+        if best_w > 0 and best_h > 0:
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, best_w)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, best_h)
+            except Exception:
+                pass
 
     def _capture(self) -> None:
         """Read frames from a capture source, resize them, and expose them to
@@ -388,6 +473,8 @@ class Splitter:
             if frame is None:  # Video feed is down, kill the thread
                 self._capture_thread_finished = True
                 break
+
+            frame = self._apply_source_crop(frame)
 
             if settings.get_str("ASPECT_RATIO") == "4:3 (320x240)":
                 self.comparison_frame = cv2.resize(
@@ -445,6 +532,57 @@ class Splitter:
         self.safe_exit_record_thread()
         self.safe_exit_compare_split_thread()
         self.safe_exit_compare_reset_thread()
+
+    def _apply_source_crop(self, frame: numpy.ndarray) -> numpy.ndarray:
+        """Trim pixels from each capture edge before resize/compare.
+
+        Stored settings are insets from left, right, top, and bottom. When all
+        are zero, the frame is unchanged. Invalid combinations fall back to
+        the full frame so capture never crashes.
+
+        Args:
+            frame: BGR image from VideoCapture.
+
+        Returns:
+            Cropped frame, or the original frame when crop is off or unsafe.
+        """
+        try:
+            if frame is None or getattr(frame, "size", 0) == 0:
+                return frame
+            if frame.ndim < 2:
+                return frame
+
+            fh, fw = int(frame.shape[0]), int(frame.shape[1])
+            if fh < 2 or fw < 2:
+                return frame
+
+            left = settings.get_int_nonneg("VIDEO_CROP_INSET_LEFT")
+            right = settings.get_int_nonneg("VIDEO_CROP_INSET_RIGHT")
+            top = settings.get_int_nonneg("VIDEO_CROP_INSET_TOP")
+            bottom = settings.get_int_nonneg("VIDEO_CROP_INSET_BOTTOM")
+
+            if left + right + top + bottom == 0:
+                return frame
+
+            left = min(left, fw - 1)
+            right = min(right, fw - 1)
+            top = min(top, fh - 1)
+            bottom = min(bottom, fh - 1)
+
+            if left + right >= fw or top + bottom >= fh:
+                return frame
+
+            w = fw - left - right
+            h = fh - top - bottom
+            if w < 1 or h < 1:
+                return frame
+
+            out = frame[top : top + h, left : left + w]
+            if getattr(out, "size", 0) == 0:
+                return frame
+            return out
+        except Exception:
+            return frame
 
     def _frame_to_pixmap(self, frame: Optional[numpy.ndarray]) -> QPixmap:
         """Generate a QPixmap instance from a 3-channel image stored as a numpy
@@ -678,6 +816,9 @@ class Splitter:
         match_found = False
         self.match_percent = 0
         self.highest_percent = 0
+        with self._highest_peak_lock:
+            self._highest_percent_frame = None
+            self._highest_percent_value = 0.0
         self._compare_split_queue = Queue(10)  # Get rid of old images
 
         while not self._compare_split_thread_finished:
@@ -701,6 +842,15 @@ class Splitter:
             )
             if match_found:
                 break
+
+        if match_found:
+            idx = self.splits.current_image_index
+            if idx is not None and self.splits.list[idx].pause_duration > 0:
+                self.suspend_display_highest = self.highest_percent
+                self.suspend_display_threshold = self.splits.list[idx].threshold
+            else:
+                self.suspend_display_highest = None
+                self.suspend_display_threshold = None
 
         # Tell the ui_controller not to display match percents
         self.match_percent = None
@@ -735,6 +885,9 @@ class Splitter:
         )
         if self.match_percent > self.highest_percent:
             self.highest_percent = self.match_percent
+            with self._highest_peak_lock:
+                self._highest_percent_frame = frame.copy()
+                self._highest_percent_value = float(self.match_percent)
 
         # Image match is above threshold
         if (
@@ -894,6 +1047,8 @@ class Splitter:
                 )
                 time.sleep(0.01)
             self.suspend_remaining = None
+            self.suspend_display_highest = None
+            self.suspend_display_threshold = None
 
         return True
 

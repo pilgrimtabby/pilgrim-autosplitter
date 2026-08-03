@@ -98,6 +98,30 @@ class SplitDir:
         else:
             self.current_loop -= 1
 
+    def jump_to_split_image(
+        self,
+        index: int,
+        *,
+        end_of_loops: bool = False,
+        loop: Optional[int] = None,
+    ) -> bool:
+        """Jump to a split image index. False if past the end."""
+        if len(self.list) == 0 or self.current_image_index is None:
+            return False
+        if index < 0:
+            return False
+        if index >= len(self.list):
+            self.current_image_index = len(self.list) - 1
+            self.current_loop = self.list[self.current_image_index].loops
+            return False
+        self.current_image_index = index
+        total = self.list[self.current_image_index].loops
+        if loop is not None:
+            self.current_loop = max(1, min(int(loop), total))
+        else:
+            self.current_loop = total if end_of_loops else 1
+        return True
+
     def reset_split_images(self) -> None:
         """Rebuild split image list, refresh reset image, and reset flags."""
         new_list, new_reset_image = self._get_split_images()
@@ -459,7 +483,7 @@ class SplitDir:
                     math.sqrt(COMPARISON_FRAME_WIDTH * COMPARISON_FRAME_HEIGHT * 3)
                     * 255
                 )
-
+            
             return math.sqrt(cv2.countNonZero(self.mask) * 3) * 255
 
         def _is_single_channel(self, image: numpy.ndarray) -> bool:

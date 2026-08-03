@@ -23,7 +23,6 @@
 
 
 import platform
-import time
 from typing import Callable, Optional, Tuple, Union
 
 if platform.system() == "Windows" or platform.system() == "Darwin":
@@ -32,6 +31,86 @@ if platform.system() == "Windows" or platform.system() == "Darwin":
 else:
     # Pynput doesn't work well on Linux, so use keyboard instead
     import keyboard
+
+# macOS: keypad digit virtual keys are *not* contiguous (vk 90 is unused;
+# keypad 8/9 are 91/92). Using vk - 0x52 wrongly maps keypad 8 to "Num 9".
+# Aligned with pynput `lib/pynput/_util/darwin_vks.SYMBOLS` keypad entries.
+_DARWIN_NUMPAD_DIGIT_VK = {
+    82: 0,
+    83: 1,
+    84: 2,
+    85: 3,
+    86: 4,
+    87: 5,
+    88: 6,
+    89: 7,
+    91: 8,
+    92: 9,
+}
+
+
+def _pynput_numpad_display_name(vk: int) -> Optional[str]:
+    """Human-readable label for numeric keypad keys (Windows / macOS virtual keys)."""
+    sys = platform.system()
+    if sys == "Windows":
+        if 96 <= vk <= 105:
+            return f"Num {vk - 96}"
+        operators = {
+            106: "Num *",
+            107: "Num +",
+            109: "Num -",
+            110: "Num .",
+            111: "Num /",
+        }
+        return operators.get(vk)
+    if sys == "Darwin":
+        digit = _DARWIN_NUMPAD_DIGIT_VK.get(vk)
+        if digit is not None:
+            return f"Num {digit}"
+        operators = {
+            0x41: "Num .",
+            0x43: "Num *",
+            0x45: "Num +",
+            0x47: "Num Clear",
+            0x4B: "Num /",
+            0x4C: "Num Enter",
+            0x4E: "Num -",
+            0x51: "Num =",
+        }
+        return operators.get(vk)
+    return None
+
+
+_darwin_pynput_events_patched = False
+
+
+def _patch_darwin_pynput_listener_events() -> None:
+    """Drop NSSystemDefined from pynput's macOS event mask.
+
+    pynput converts NSSystemDefined CGEvents via NSEvent.eventWithCGEvent_ on
+    the listener thread. On modern macOS that path can hit Caps Lock /
+    Text Input Source APIs that require the main queue and abort with
+    SIGTRAP (_dispatch_assert_queue_fail). We do not need media keys as
+    hotkeys, so exclude that event type. See pynput#596.
+    """
+    global _darwin_pynput_events_patched
+    if _darwin_pynput_events_patched or platform.system() != "Darwin":
+        return
+    from Quartz import (
+        CGEventMaskBit,
+        kCGEventFlagsChanged,
+        kCGEventKeyDown,
+        kCGEventKeyUp,
+    )
+
+    # Intentionally omit CGEventMaskBit(NSSystemDefined): that is what triggers
+    # NSEvent.eventWithCGEvent_ for media keys / some Caps Lock system events.
+    pynput_keyboard.Listener._EVENTS = (
+        CGEventMaskBit(kCGEventKeyDown)
+        | CGEventMaskBit(kCGEventKeyUp)
+        | CGEventMaskBit(kCGEventFlagsChanged)
+    )
+    _darwin_pynput_events_patched = True
 
 
 class UIKeyboardController:
@@ -52,8 +131,8 @@ class UIKeyboardController:
 
     def start_listener(
         self,
-        on_press: Optional[Callable[..., None]] = None,
-        on_release: Optional[Callable[..., None]] = None,
+        on_press: Optional[Callable[..., None]],
+        on_release: Optional[Callable[..., None]],
     ) -> None:
         """Start a keyboard listener.
 
@@ -63,9 +142,9 @@ class UIKeyboardController:
 
         Args:
             on_press (callable | None): Function to be executed on key down. If
-                None, call _do_nothing (pass). Default is None.
+                None, call _do_nothing (pass).
             on_release (callable | None): Function to be executed on key up. If
-                None, call _do_nothing (pass). Default is None.
+                None, call _do_nothing (pass).
         """
         if on_press is None:
             on_press = self._do_nothing
@@ -73,6 +152,7 @@ class UIKeyboardController:
             on_release = self._do_nothing
 
         if platform.system() == "Windows" or platform.system() == "Darwin":
+            _patch_darwin_pynput_listener_events()
             keyboard_listener = pynput_keyboard.Listener(
                 on_press=on_press, on_release=on_release
             )
@@ -131,43 +211,24 @@ class UIKeyboardController:
         """
         if platform.system() == "Windows" or platform.system() == "Darwin":
             try:
-                return key.char, key.vk
+                vk = key.vk
+                numpad = _pynput_numpad_display_name(vk)
+                if numpad is not None:
+                    return numpad, vk
+                ch = key.char
+                if ch is not None:
+                    return ch, vk
+                return str(key).replace("Key.", ""), vk
             # Thrown when the key isn't an alphanumeric key
             except AttributeError:
-                return str(key).replace("Key.", ""), key.value.vk
+                vk = key.value.vk
+                numpad = _pynput_numpad_display_name(vk)
+                if numpad is not None:
+                    return numpad, vk
+                return str(key).replace("Key.", ""), vk
         else:
             return key.name, key.name
-
-    def _print_key_info(
-        self, key: Union["pynput_keyboard.key", "keyboard.KeyboardEvent"]
-    ) -> None:
-        """Print a key's string name and its internal integer value. For debug.
-
-        Args:
-            key: A wrapper whose structure and contents depend on the backend.
-                With pynput (Windows / MacOS), it's a pynput.keyboard.Key; with
-                keyboard (Linux) it's a keyboard.KeyboardEvent).
-        """
-        if platform.system() == "Windows" or platform.system() == "Darwin":
-            try:
-                print(f"Key name: {key.char} | Key code: {key.vk}")
-            # Thrown when the key isn't an alphanumeric key
-            except AttributeError:
-                print(
-                    f"Key name: {str(key).replace('Key.', '')} | Key code: {key.value.vk}"
-                )
-        else:
-            print(f"Key name: {key.name} | Key code: {key.name}")
 
     def _do_nothing(self, *args, **kwargs) -> None:
         """Dummy method for when you don't want anything to happen."""
         pass
-
-
-if __name__ == "__main__":
-
-    # Test key names and codes -- press any key to see its values
-    controller = UIKeyboardController()
-    controller.start_listener(on_press=controller._print_key_info)
-    while True:
-        time.sleep(1)

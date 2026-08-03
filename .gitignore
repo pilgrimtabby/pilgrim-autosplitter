@@ -9,3 +9,10 @@
 **/.jekyll-cache
 pilgrim_autosplitter.spec
 **/.pytest_cache
+saves/
+.vendor/
+.tools-gh
+livesplit-desktop-integration/bin/
+livesplit-desktop-integration/obj/
+livesplit-desktop-integration/tools/**/bin/
+livesplit-desktop-integration/tools/**/obj/

@@ -24,6 +24,21 @@ import os
 import platform
 import sys
 import time
+import traceback
+
+import paths
+
+
+def _install_excepthook() -> None:
+    """Log uncaught exceptions to stderr before the default handler runs."""
+    _default = sys.excepthook
+
+    def _hook(exc_type, exc_value, exc_tb) -> None:
+        print("[Pilgrim Autosplitter] Uncaught exception:", file=sys.stderr)
+        traceback.print_exception(exc_type, exc_value, exc_tb, file=sys.stderr)
+        _default(exc_type, exc_value, exc_tb)
+
+    sys.excepthook = _hook
 
 
 class PilgrimAutosplitter:
@@ -45,21 +60,29 @@ class PilgrimAutosplitter:
 
     def __init__(self) -> None:
         """Initialize splitter and controller to run Pilgrim Autosplitter."""
+        from PyQt5.QtCore import Qt
         from PyQt5.QtGui import QIcon, QPixmap
         from PyQt5.QtWidgets import QApplication
+
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
         import settings
         from splitter.splitter import Splitter
         from ui.ui_controller import UIController
 
-        program_directory = os.path.dirname(os.path.abspath(__file__))
+        _res = paths.resources_dir()
+
+        from livesplit.desktop_stdio import strip_auto_controlled_flag
 
         if platform.system() == "Windows":
             # Force title bar to follow system theme
             extra_args = ["-platform", "windows:darkmode=1"]
         else:
             extra_args = []
-        self.app = QApplication(sys.argv + extra_args)
+        # Drop --auto-controlled so Qt does not treat it as a file path.
+        qt_argv = strip_auto_controlled_flag(sys.argv) + extra_args
+        self.app = QApplication(qt_argv)
         self.app.setStyle("fusion")
         self.app.setApplicationName("Pilgrim Autosplitter")
 
@@ -68,9 +91,7 @@ class PilgrimAutosplitter:
         if platform.system() == "Windows":
             import ctypes
 
-            self.app.setWindowIcon(
-                QIcon(QPixmap(f"{program_directory}/../resources/icon-windows.png"))
-            )
+            self.app.setWindowIcon(QIcon(QPixmap(str(_res / "icon-windows.png"))))
             # Tell Windows this app is its own process so icon shows up
             app_id = "pilgrim_tabby.pilgrim_autosplitter.latest"
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
@@ -78,9 +99,7 @@ class PilgrimAutosplitter:
         # the program from the same directory /resources is in. This makes
         # it show up regardless (at least when ran from source, not build)
         else:
-            self.app.setWindowIcon(
-                QIcon(QPixmap(f"{program_directory}/../resources/icon-macos.png"))
-            )
+            self.app.setWindowIcon(QIcon(QPixmap(str(_res / "icon-macos.png"))))
 
         settings.set_program_vals()
 
@@ -91,13 +110,22 @@ class PilgrimAutosplitter:
         self.ui_controller = UIController(self.app, self.splitter)
 
 
-def main():
+def main() -> None:
     """Initialize PilgrimAutosplitter."""
-    os.system("cls || clear")  # Cross-platform clear screen
+    _install_excepthook()
 
-    print("Welcome to Pilgrim Autosplitter!")
-    print("You may minimize this window, but DO NOT close it.\n")
-    print("Loading Pilgrim Autosplitter (this may take a few minutes)...")
+    from livesplit.desktop_stdio import is_auto_controlled, print_handshake
+    import settings
+
+    auto_controlled = is_auto_controlled()
+    if auto_controlled:
+        print_handshake(settings.VERSION_NUMBER)
+        print("Loading...", file=sys.stderr)
+    else:
+        os.system("cls || clear")  # Cross-platform clear screen
+        print("Welcome to Pilgrim Autosplitter!")
+        print("You may minimize this window, but DO NOT close it.\n")
+        print("Loading Pilgrim Autosplitter (this may take a few minutes)...")
 
     pilgrim_autosplitter = PilgrimAutosplitter()
 
@@ -108,13 +136,22 @@ def main():
     pilgrim_autosplitter.app.aboutToQuit.connect(
         pilgrim_autosplitter.splitter.safe_exit_all_threads
     )
+    pilgrim_autosplitter.app.aboutToQuit.connect(
+        pilgrim_autosplitter.ui_controller.stop_livesplit_ws_server
+    )
+    pilgrim_autosplitter.app.aboutToQuit.connect(
+        pilgrim_autosplitter.ui_controller.stop_desktop_stdio
+    )
     # Wait for any singleshot QTimers started by widgets to finish.
     # Right now, this includes only the double click timer in some
     # ui_main_window widgets. If we quit while a timer is running, it
     # can cause a segfault, so we want to prevent that.
     pilgrim_autosplitter.app.aboutToQuit.connect(lambda sec=0.2: time.sleep(sec))
 
-    print("Starting...")
+    if auto_controlled:
+        print("Starting...", file=sys.stderr)
+    else:
+        print("Starting...")
     pilgrim_autosplitter.app.exec()
 
 
